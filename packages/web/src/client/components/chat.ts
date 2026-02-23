@@ -115,9 +115,23 @@ export class Chat extends LitElement {
 	private convertMessages(serverMessages: unknown[]): Message[] {
 		return serverMessages.map((msg: unknown) => {
 			const m = msg as Record<string, unknown>;
+
+			// Extract text from content parts array
+			// Server format: content: [{type: "text", text: "..."}]
+			let textContent = "";
+			const contentParts = Array.isArray(m.content) ? m.content : [];
+			for (const part of contentParts) {
+				if (typeof part === "object" && part !== null) {
+					const p = part as Record<string, unknown>;
+					if (p.type === "text" && typeof p.text === "string") {
+						textContent += p.text;
+					}
+				}
+			}
+
 			return {
 				role: m.role as "user" | "assistant",
-				content: (m.content as string) || "",
+				content: textContent,
 				timestamp: m.timestamp as number | undefined,
 				thinking: m.thinking as string | undefined,
 				toolCalls: m.tool_calls as ToolCall[] | undefined,
@@ -173,30 +187,36 @@ export class Chat extends LitElement {
 	render() {
 		return html`
 			<div class="flex flex-col h-full">
-				<!-- Messages -->
+				<!-- Messages (centered with max-width) -->
 				<div ${ref(this.messageListContainerRef)} class="flex-1 overflow-y-auto p-4">
-					<lil-message-list .messages=${this.messages}></lil-message-list>
+					<div class="max-w-3xl mx-auto">
+						<lil-message-list .messages=${this.messages}></lil-message-list>
 
-					<!-- Streaming message -->
-					${
-						this.isStreaming
-							? html`
-								<lil-streaming-message
-									.content=${this.streamingContent}
-									.thinking=${this.streamingThinking}
-									.toolCalls=${this.streamingToolCalls}
-								></lil-streaming-message>
-							`
-							: ""
-					}
+						<!-- Streaming message -->
+						${
+							this.isStreaming
+								? html`
+									<lil-streaming-message
+										.content=${this.streamingContent}
+										.thinking=${this.streamingThinking}
+										.toolCalls=${this.streamingToolCalls}
+									></lil-streaming-message>
+								`
+								: ""
+						}
+					</div>
 				</div>
 
-				<!-- Input -->
-				<lil-message-input
-					.isStreaming=${this.isStreaming}
-					@send=${this.handleSend}
-					@abort=${this.handleAbort}
-				></lil-message-input>
+				<!-- Input (centered with max-width) -->
+				<div class="w-full">
+					<div class="max-w-3xl mx-auto">
+						<lil-message-input
+							.isStreaming=${this.isStreaming}
+							@send=${this.handleSend}
+							@abort=${this.handleAbort}
+						></lil-message-input>
+					</div>
+				</div>
 			</div>
 		`;
 	}

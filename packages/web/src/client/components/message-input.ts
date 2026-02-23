@@ -5,8 +5,8 @@
 
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { html, LitElement } from "lit";
-import { customElement, property, state as litState } from "lit/decorators.js";
-import { createRef, ref, type Ref } from "lit/directives/ref.js";
+import { customElement, state as litState, property } from "lit/decorators.js";
+import { createRef, type Ref, ref } from "lit/directives/ref.js";
 import { Paperclip, Send, Square } from "lucide";
 import type { Attachment } from "../types.ts";
 
@@ -107,10 +107,11 @@ export class MessageInput extends LitElement {
 
 	render() {
 		return html`
-			<div class="border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+			<div class="p-4">
 				<!-- Attachments preview -->
-				${this.attachments.length > 0
-					? html`
+				${
+					this.attachments.length > 0
+						? html`
 							<div class="mb-2 flex flex-wrap gap-2">
 								${this.attachments.map(
 									(att) => html`
@@ -130,7 +131,8 @@ export class MessageInput extends LitElement {
 								)}
 							</div>
 						`
-					: ""}
+						: ""
+				}
 
 				<!-- Input area -->
 				<div class="flex items-end gap-2">
@@ -163,20 +165,22 @@ export class MessageInput extends LitElement {
 					></textarea>
 
 					<!-- Send/Abort button -->
-					${this.isStreaming
-						? Button({
-								variant: "destructive",
-								size: "icon",
-								onClick: this.handleAbort.bind(this),
-								children: Square({ size: 20 }),
-							})
-						: Button({
-								variant: "primary",
-								size: "icon",
-								disabled: this.disabled || (!this.value.trim() && this.attachments.length === 0),
-								onClick: this.handleSend.bind(this),
-								children: Send({ size: 20 }),
-							})}
+					${
+						this.isStreaming
+							? Button({
+									variant: "destructive",
+									size: "icon",
+									onClick: this.handleAbort.bind(this),
+									children: Square({ size: 20 }),
+								})
+							: Button({
+									variant: "primary",
+									size: "icon",
+									disabled: this.disabled || (!this.value.trim() && this.attachments.length === 0),
+									onClick: this.handleSend.bind(this),
+									children: Send({ size: 20 }),
+								})
+					}
 				</div>
 			</div>
 		`;
