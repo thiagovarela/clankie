@@ -5,10 +5,12 @@
  * - Slack app with Socket Mode enabled
  * - App token (xapp-...) for Socket Mode connection
  * - Bot token (xoxb-...) for API calls
- * - Bot scopes: app_mentions:read, chat:write, files:read, im:history, channels:history
+ * - Bot scopes: app_mentions:read, chat:write, files:read, im:history, channels:history, channels:read
+ * - Event subscriptions: app_mention, message.channels, message.im
  *
  * Responds to:
- * - @mentions in channels
+ * - @mentions in channels (starts a conversation thread)
+ * - Messages in threads where bot was @mentioned (continues conversation)
  * - Direct messages
  *
  * Supports file attachments (downloads from Slack, converts to base64).
@@ -36,6 +38,8 @@ export class SlackChannel implements Channel {
 	private allowedUsers: Set<string>;
 	private handler: MessageHandler | undefined;
 	private botUserId: string | null = null;
+	/** Threads where bot has been @mentioned - these become active conversations */
+	private activeThreads: Set<string> = new Set();
 
 	constructor(private options: SlackChannelOptions) {
 		this.socketClient = new SocketModeClient({ appToken: options.appToken });
@@ -108,6 +112,11 @@ export class SlackChannel implements Channel {
 				return;
 			}
 
+			// Track this thread as active for future conversation
+			const threadId = e.thread_ts || e.ts;
+			this.activeThreads.add(threadId);
+			console.log(`[slack] Thread ${threadId} is now active (${this.activeThreads.size} total)`);
+
 			// Strip bot mention from text
 			const text = e.text.replace(/<@[A-Z0-9]+>/gi, "").trim();
 
@@ -129,7 +138,7 @@ export class SlackChannel implements Channel {
 			await this.handler?.(message);
 		});
 
-		// Handle direct messages
+		// Handle direct messages and thread replies
 		this.socketClient.on("message", async ({ event, ack }) => {
 			await ack();
 
@@ -157,15 +166,16 @@ export class SlackChannel implements Channel {
 
 			const isDM = e.channel_type === "im";
 			const isBotMention = e.text?.includes(`<@${this.botUserId}>`);
+			const isInActiveThread = e.thread_ts && this.activeThreads.has(e.thread_ts);
 
 			// Skip channel @mentions (handled by app_mention event)
 			if (!isDM && isBotMention) return;
 
-			// Only process DMs
-			if (!isDM) return;
+			// Only process: DMs OR messages in active threads
+			if (!isDM && !isInActiveThread) return;
 
 			if (!this.allowedUsers.has(e.user)) {
-				console.log(`[slack] Ignoring DM from unauthorized user: ${e.user}`);
+				console.log(`[slack] Ignoring message from unauthorized user: ${e.user}`);
 				return;
 			}
 
