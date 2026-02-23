@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+/* Tailwind v4 CSS-first configuration */
+@theme {
+	--font-sans: system-ui, -apple-system, "Segoe UI", "Roboto", "Helvetica", "Arial", sans-serif;
+}
+
+/* Base styles */
+body {
+	margin: 0;
+	font-family: var(--font-sans);
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+}

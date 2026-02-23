@@ -13,46 +13,46 @@
  */
 
 import {
-  AuthStorage,
-  createAgentSession,
-  DefaultResourceLoader,
-  ModelRegistry,
-  SessionManager,
-  type CreateAgentSessionResult,
+	AuthStorage,
+	type CreateAgentSessionResult,
+	createAgentSession,
+	DefaultResourceLoader,
+	ModelRegistry,
+	SessionManager,
 } from "@mariozechner/pi-coding-agent";
-import { loadConfig, getAgentDir, getWorkspace, getAuthPath, resolvePersonaModel, getPersonaDir } from "./config.ts";
-import securityExtension from "./extensions/security.ts";
-import { createPersonaExtension } from "./extensions/persona/index.ts";
+import { getAgentDir, getAuthPath, getPersonaDir, getWorkspace, loadConfig, resolvePersonaModel } from "./config.ts";
 import cronExtension from "./extensions/cron/index.ts";
+import { createPersonaExtension } from "./extensions/persona/index.ts";
+import securityExtension from "./extensions/security.ts";
 
 export interface LilSessionOptions {
-  /**
-   * Persona name to use for this session.
-   * Defaults to config.agent.persona, then "default".
-   */
-  persona?: string;
+	/**
+	 * Persona name to use for this session.
+	 * Defaults to config.agent.persona, then "default".
+	 */
+	persona?: string;
 
-  /**
-   * Working directory for the agent.
-   * Defaults to config.workspace, then process.cwd().
-   */
-  cwd?: string;
+	/**
+	 * Working directory for the agent.
+	 * Defaults to config.workspace, then process.cwd().
+	 */
+	cwd?: string;
 
-  /**
-   * If true, session is NOT persisted to disk (ephemeral in-memory session).
-   * Default: false — creates a new persistent session under ~/.pi/agent/sessions/.
-   */
-  ephemeral?: boolean;
+	/**
+	 * If true, session is NOT persisted to disk (ephemeral in-memory session).
+	 * Default: false — creates a new persistent session under ~/.pi/agent/sessions/.
+	 */
+	ephemeral?: boolean;
 
-  /**
-   * If true, continue the most recent session instead of starting a new one.
-   */
-  continueRecent?: boolean;
+	/**
+	 * If true, continue the most recent session instead of starting a new one.
+	 */
+	continueRecent?: boolean;
 
-  /**
-   * Path to a specific session file to open.
-   */
-  sessionFile?: string;
+	/**
+	 * Path to a specific session file to open.
+	 */
+	sessionFile?: string;
 }
 
 /**
@@ -62,78 +62,76 @@ export interface LilSessionOptions {
  * (~/.pi/agent/extensions/, ~/.agents/skills/, AGENTS.md, etc.) is
  * automatically available. lil's security extension is always loaded.
  */
-export async function createLilSession(
-  options: LilSessionOptions = {}
-): Promise<CreateAgentSessionResult> {
-  const config = loadConfig();
-  const agentDir = getAgentDir(config);
-  const cwd = options.cwd ?? getWorkspace(config);
+export async function createLilSession(options: LilSessionOptions = {}): Promise<CreateAgentSessionResult> {
+	const config = loadConfig();
+	const agentDir = getAgentDir(config);
+	const cwd = options.cwd ?? getWorkspace(config);
 
-  // Resolve persona name: options → config → "default"
-  const personaName = options.persona ?? config.agent?.persona ?? "default";
+	// Resolve persona name: options → config → "default"
+	const personaName = options.persona ?? config.agent?.persona ?? "default";
 
-  // Validate persona name early
-  try {
-    // This will throw if the persona name is invalid
-    getPersonaDir(personaName);
-  } catch (err) {
-    throw new Error(
-      `Invalid persona name "${personaName}": ${err instanceof Error ? err.message : String(err)}`
-    );
-  }
+	// Validate persona name early
+	try {
+		// This will throw if the persona name is invalid
+		getPersonaDir(personaName);
+	} catch (err) {
+		throw new Error(`Invalid persona name "${personaName}": ${err instanceof Error ? err.message : String(err)}`);
+	}
 
-  // Auth stored in ~/.lil/auth.json (separate from pi's ~/.pi/agent/auth.json)
-  const authStorage = AuthStorage.create(getAuthPath());
-  const modelRegistry = new ModelRegistry(authStorage);
+	// Auth stored in ~/.lil/auth.json (separate from pi's ~/.pi/agent/auth.json)
+	const authStorage = AuthStorage.create(getAuthPath());
+	const modelRegistry = new ModelRegistry(authStorage);
 
-  // DefaultResourceLoader with standard pi discovery + lil's security extension.
-  // Using extensionFactories (not additionalExtensionPaths) so the security
-  // extension is bundled and works correctly in both dev and compiled binary modes.
-  const loader = new DefaultResourceLoader({
-    cwd,
-    agentDir,
-    extensionFactories: [securityExtension, createPersonaExtension(personaName), cronExtension],
-  });
-  await loader.reload();
+	// DefaultResourceLoader with standard pi discovery + lil's security extension.
+	// Using extensionFactories (not additionalExtensionPaths) so the security
+	// extension is bundled and works correctly in both dev and compiled binary modes.
+	const loader = new DefaultResourceLoader({
+		cwd,
+		agentDir,
+		extensionFactories: [securityExtension, createPersonaExtension(personaName), cronExtension],
+	});
+	await loader.reload();
 
-  // Session management
-  let sessionManager: SessionManager;
-  if (options.ephemeral) {
-    sessionManager = SessionManager.inMemory();
-  } else if (options.sessionFile) {
-    sessionManager = SessionManager.open(options.sessionFile);
-  } else if (options.continueRecent) {
-    sessionManager = SessionManager.continueRecent(cwd);
-  } else {
-    sessionManager = SessionManager.create(cwd);
-  }
+	// Session management
+	let sessionManager: SessionManager;
+	if (options.ephemeral) {
+		sessionManager = SessionManager.inMemory();
+	} else if (options.sessionFile) {
+		sessionManager = SessionManager.open(options.sessionFile);
+	} else if (options.continueRecent) {
+		sessionManager = SessionManager.continueRecent(cwd);
+	} else {
+		sessionManager = SessionManager.create(cwd);
+	}
 
-  // Resolve model: persona config → global config → pi auto-detection
-  const personaModel = resolvePersonaModel(personaName);
-  const modelSpec = personaModel ?? config.agent?.model?.primary;
-  let model;
-  if (modelSpec) {
-    const slash = modelSpec.indexOf("/");
-    if (slash !== -1) {
-      const provider = modelSpec.substring(0, slash);
-      const modelId = modelSpec.substring(slash + 1);
-      model = modelRegistry.find(provider, modelId);
-      if (!model) {
-        const source = personaModel ? `persona "${personaName}"` : "config";
-        console.warn(`Warning: model "${modelSpec}" from ${source} not found in registry, falling back to auto-detection`);
-      }
-    } else {
-      console.warn(`Warning: model should be "provider/model" format (got "${modelSpec}")`);
-    }
-  }
+	// Resolve model: persona config → global config → pi auto-detection
+	const personaModel = resolvePersonaModel(personaName);
+	const modelSpec = personaModel ?? config.agent?.model?.primary;
+	let model: ReturnType<typeof modelRegistry.find> | undefined;
+	if (modelSpec) {
+		const slash = modelSpec.indexOf("/");
+		if (slash !== -1) {
+			const provider = modelSpec.substring(0, slash);
+			const modelId = modelSpec.substring(slash + 1);
+			model = modelRegistry.find(provider, modelId);
+			if (!model) {
+				const source = personaModel ? `persona "${personaName}"` : "config";
+				console.warn(
+					`Warning: model "${modelSpec}" from ${source} not found in registry, falling back to auto-detection`,
+				);
+			}
+		} else {
+			console.warn(`Warning: model should be "provider/model" format (got "${modelSpec}")`);
+		}
+	}
 
-  return createAgentSession({
-    cwd,
-    agentDir,
-    authStorage,
-    modelRegistry,
-    resourceLoader: loader,
-    sessionManager,
-    model,
-  });
+	return createAgentSession({
+		cwd,
+		agentDir,
+		authStorage,
+		modelRegistry,
+		resourceLoader: loader,
+		sessionManager,
+		model,
+	});
 }

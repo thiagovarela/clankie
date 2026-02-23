@@ -1,14 +1,14 @@
 {
-  "compilerOptions": {
-    "target": "ESNext",
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "lib": ["ESNext"],
-    "strict": true,
-    "skipLibCheck": true,
-    "allowImportingTsExtensions": true,
-    "noEmit": true,
-    "types": ["bun-types"]
-  },
-  "include": ["src/**/*"]
+	"compilerOptions": {
+		"target": "ESNext",
+		"module": "ESNext",
+		"moduleResolution": "bundler",
+		"lib": ["ESNext"],
+		"strict": true,
+		"skipLibCheck": true,
+		"allowImportingTsExtensions": true,
+		"noEmit": true,
+		"types": ["bun-types"]
+	},
+	"include": ["src/**/*"]
 }
