@@ -1,0 +1,22 @@
+{
+  "name": "lil",
+  "version": "0.1.0",
+  "description": "A minimal personal AI assistant built on pi's SDK",
+  "type": "module",
+  "bin": {
+    "lil": "./src/cli.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/cli.ts"
+  },
+  "dependencies": {
+    "@mariozechner/pi-ai": "^0.54.0",
+    "@mariozechner/pi-coding-agent": "^0.54.0",
+    "@sinclair/typebox": "^0.34.48",
+    "grammy": "^1.36.1", 
+    "json5": "^2.2.3"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

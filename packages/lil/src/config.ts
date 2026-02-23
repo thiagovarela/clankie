@@ -9,6 +9,7 @@
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import JSON5 from "json5";
@@ -41,7 +42,6 @@ export interface LilConfig {
       allowFrom?: number[];
     };
     // Future channels:
-    // discord?: { ... };
     // whatsapp?: { ... };
     // signal?: { ... };
   };
@@ -49,6 +49,18 @@ export interface LilConfig {
   /** Cron / scheduled jobs */
   cron?: {
     enabled?: boolean;
+  };
+
+  /** Web UI server */
+  web?: {
+    /** Enable web server (default: true) */
+    enabled?: boolean;
+    /** Bind host (default: 127.0.0.1) */
+    host?: string;
+    /** Bind port (default: 3333) */
+    port?: number;
+    /** Bearer/cookie token for API + WebSocket auth */
+    token?: string;
   };
 
   /** Heartbeat — periodic task execution */
@@ -98,6 +110,18 @@ export function getAuthPath(): string {
 /** Path to the config file */
 export function getConfigPath(): string {
   return CONFIG_PATH;
+}
+
+/** Returns a valid web auth token, generating and persisting one if needed. */
+export function ensureWebToken(config?: LilConfig): string {
+  const current = config ?? loadConfig();
+  const token = current.web?.token;
+  if (token && token.length >= 16) return token;
+
+  const nextToken = randomUUID();
+  const updated = setByPath(current, "web.token", nextToken);
+  saveConfig(updated);
+  return nextToken;
 }
 
 // ─── Loading & saving ─────────────────────────────────────────────────────────

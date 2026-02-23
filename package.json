@@ -1,20 +1,13 @@
 {
-  "name": "lil",
-  "version": "0.1.0",
-  "description": "A minimal personal AI assistant built on pi's SDK",
-  "type": "module",
-  "bin": {
-    "lil": "./src/cli.ts"
-  },
+  "name": "lil-workspace",
+  "private": true,
+  "workspaces": [
+    "packages/lil",
+    "packages/web"
+  ],
   "scripts": {
-    "dev": "bun run src/cli.ts"
-  },
-  "dependencies": {
-    "@mariozechner/pi-coding-agent": "^0.54.0",
-    "grammy": "^1.36.1",
-    "json5": "^2.2.3"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
+    "dev": "bun run --filter lil dev",
+    "web:dev": "bun run --filter lil-web dev",
+    "web:build": "bun run --filter lil-web build"
   }
 }

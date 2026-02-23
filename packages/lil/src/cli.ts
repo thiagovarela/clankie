@@ -73,11 +73,16 @@ Config paths (dot-separated):
   channels.telegram.botToken        Telegram bot token from @BotFather
   channels.telegram.allowFrom       Allowed Telegram user IDs (JSON array)
   channels.telegram.enabled         Enable/disable Telegram (default: true)
+  web.enabled                       Enable/disable web UI server (default: true)
+  web.host                          Web bind host (default: 127.0.0.1)
+  web.port                          Web bind port (default: 3333)
+  web.token                         Web auth token (auto-generated)
 
 Examples:
   lil login
   lil config set channels.telegram.botToken "123456:ABC-DEF..."
   lil config set channels.telegram.allowFrom [123456789]
+  lil config set web.enabled true
   lil start                         # run in foreground
   lil daemon install                # install as system service (auto-start on boot)
   lil daemon logs                   # tail daemon logs

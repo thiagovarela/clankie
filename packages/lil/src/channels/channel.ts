@@ -25,6 +25,8 @@ export interface InboundMessage {
   senderName?: string;
   /** Chat/conversation identifier (for per-chat sessions) */
   chatId: string;
+  /** Thread/topic ID (e.g., Telegram forum topic) */
+  threadId?: string;
   /** Message text */
   text: string;
   /** File attachments (images, documents, audio, etc.) */
@@ -35,6 +37,11 @@ export interface InboundMessage {
 
 export type MessageHandler = (message: InboundMessage) => Promise<void>;
 
+export interface SendOptions {
+  /** Thread/topic ID for sending to a specific thread */
+  threadId?: string;
+}
+
 export interface Channel {
   /** Channel type identifier */
   readonly name: string;
@@ -43,7 +50,7 @@ export interface Channel {
   start(handler: MessageHandler): Promise<void>;
 
   /** Send a text message to a chat */
-  send(chatId: string, text: string): Promise<void>;
+  send(chatId: string, text: string, options?: SendOptions): Promise<void>;
 
   /** Gracefully stop the channel */
   stop(): Promise<void>;

@@ -48,6 +48,23 @@ export class TelegramChannel implements Channel {
   async start(handler: MessageHandler): Promise<void> {
     this.handler = handler;
 
+    // ── Register bot commands ─────────────────────────────────────────
+    try {
+      // Clear any old commands first
+      await this.bot.api.deleteMyCommands();
+      
+      // Register only the commands we want
+      await this.bot.api.setMyCommands([
+        { command: "switch", description: "Switch to a different conversation (e.g., /switch coding)" },
+        { command: "sessions", description: "List all your conversation sessions" },
+        { command: "new", description: "Start fresh and clear current session context" },
+      ]);
+      
+      console.log("[telegram] Registered bot commands");
+    } catch (err) {
+      console.warn("[telegram] Failed to register commands:", err);
+    }
+
     // ── Text-only messages ────────────────────────────────────────────
     this.bot.on("message:text", async (ctx) => {
       const msg = this.buildBaseMessage(ctx);
@@ -167,18 +184,24 @@ export class TelegramChannel implements Channel {
     });
   }
 
-  async send(chatId: string, text: string): Promise<void> {
+  async send(chatId: string, text: string, options?: { threadId?: string }): Promise<void> {
     // Telegram has a 4096-char limit per message; chunk if needed
     const MAX_LEN = 4096;
+    
+    // Prepare send options (thread ID for forum topics)
+    const sendOpts = options?.threadId 
+      ? { message_thread_id: Number(options.threadId) }
+      : undefined;
+
     if (text.length <= MAX_LEN) {
-      await this.bot.api.sendMessage(chatId, text);
+      await this.bot.api.sendMessage(chatId, text, sendOpts);
       return;
     }
 
     // Split on newlines, respecting the limit
     const chunks = splitMessage(text, MAX_LEN);
     for (const chunk of chunks) {
-      await this.bot.api.sendMessage(chatId, chunk);
+      await this.bot.api.sendMessage(chatId, chunk, sendOpts);
     }
   }
 
@@ -197,6 +220,9 @@ export class TelegramChannel implements Channel {
     const userId = ctx.from?.id;
     if (!userId || !this.allowedUsers.has(userId)) return null;
 
+    // Capture thread ID for forum topics
+    const threadId = ctx.msg?.message_thread_id;
+
     return {
       id: String(ctx.msg!.message_id),
       channel: this.name,
@@ -204,6 +230,7 @@ export class TelegramChannel implements Channel {
       senderName:
         ctx.from!.first_name + (ctx.from!.last_name ? ` ${ctx.from!.last_name}` : ""),
       chatId: String(ctx.chat!.id),
+      threadId: threadId ? String(threadId) : undefined,
       text: "",
       timestamp: ctx.msg!.date * 1000,
     };

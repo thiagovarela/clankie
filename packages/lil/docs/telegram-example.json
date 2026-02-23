@@ -1,0 +1,20 @@
+{
+  // Example lil configuration for Telegram
+  // Save this as ~/.lil/lil.json
+
+  "agent": {
+    "model": {
+      "primary": "anthropic/claude-sonnet-4"
+    }
+  },
+
+  "channels": {
+    "telegram": {
+      "enabled": true,
+      "botToken": "YOUR_BOT_TOKEN_FROM_BOTFATHER",
+      "allowFrom": [
+        123456789  // Your Telegram user ID (get from @userinfobot)
+      ]
+    }
+  }
+}
