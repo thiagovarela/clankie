@@ -263,7 +263,7 @@ export function createWebSocketHandler(deps: WebServerDeps) {
 	};
 }
 
-export function upgradeWebSocket(c: Context, _deps: WebServerDeps): Response | undefined {
+export function upgradeWebSocket(c: Context, _deps: WebServerDeps): Response {
 	const url = new URL(c.req.url);
 	const sessionName = sanitizeSessionName(url.searchParams.get("session") ?? "default");
 	const owner = WEB_CHAT_IDENTIFIER;
@@ -276,5 +276,10 @@ export function upgradeWebSocket(c: Context, _deps: WebServerDeps): Response | u
 	};
 
 	const success = (c.env?.server as any)?.upgrade(c.req.raw, { data });
-	return success ? undefined : c.text("Failed to upgrade", 500);
+	if (success) {
+		// WebSocket upgrade successful - Bun handles the response
+		// Return empty response to satisfy Hono's requirement
+		return new Response(null);
+	}
+	return c.text("Failed to upgrade", 500);
 }
