@@ -67,7 +67,9 @@ export class Chat extends LitElement {
 	private handleWsMessage(message: WsIncomingMessage) {
 		if (message.type === "state") {
 			// Full state update - convert server messages to our format
+			console.log("[chat] Received state message with", message.state.messages.length, "messages");
 			const messages = this.convertMessages(message.state.messages);
+			console.log("[chat] Converted to", messages.length, "messages:", messages);
 			state.setMessages(messages);
 
 			// Handle streaming state

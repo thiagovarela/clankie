@@ -97,6 +97,7 @@ export class MessageList extends LitElement {
 	}
 
 	render() {
+		console.log("[message-list] Rendering with", this.messages.length, "messages");
 		if (this.messages.length === 0) {
 			return html`
 				<div class="flex items-center justify-center h-full text-gray-400 dark:text-gray-600">
