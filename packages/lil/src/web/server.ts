@@ -29,7 +29,7 @@ interface WsClientData {
 }
 
 interface WebServerDeps {
-  getSession: (sessionKey: string, config: LilConfig) => Promise<AgentSession>;
+  getSession: (sessionKey: string, config: LilConfig, personaName?: string) => Promise<AgentSession>;
   resetSession: (sessionKey: string) => Promise<void> | void;
   listSessionNames: (chatIdentifier: string) => string[];
 }
@@ -163,7 +163,8 @@ async function attachSession(
 ): Promise<void> {
   data.unsubscribe?.();
 
-  const session = await deps.getSession(data.sessionKey, config);
+  const personaName = config.web?.persona ?? config.agent?.persona ?? "default";
+  const session = await deps.getSession(data.sessionKey, config, personaName);
   data.unsubscribe = session.subscribe((event: AgentSessionEvent) => {
     wsSend(ws, {
       type: "event",
@@ -450,7 +451,8 @@ export async function startWebServer(config: LilConfig, deps: WebServerDeps): Pr
               return;
             }
 
-            const session = await deps.getSession(data.sessionKey, config);
+            const personaName = config.web?.persona ?? config.agent?.persona ?? "default";
+            const session = await deps.getSession(data.sessionKey, config, personaName);
 
             switch (type) {
               case "prompt": {

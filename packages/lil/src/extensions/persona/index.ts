@@ -1,19 +1,20 @@
 /**
  * lil persona extension
  *
- * Loads personality and instructions from ~/.lil/persona/ flat files,
+ * Loads personality and instructions from ~/.lil/personas/<name>/ flat files,
  * and manages persistent memory via SQLite + FTS5.
  *
  * Flat files (user-editable persona config):
  *
- *   ~/.lil/persona/
- *   ├── identity.md      — Who lil is: name, voice, personality traits
+ *   ~/.lil/personas/<name>/
+ *   ├── identity.md      — Who the persona is: name, voice, personality traits
  *   ├── instructions.md  — Standing orders: how to behave, what to avoid
- *   └── knowledge.md     — Facts about the user: preferences, context, environment
+ *   ├── knowledge.md     — Facts about the user: preferences, context, environment
+ *   └── persona.json     — Optional: { "model": "provider/model" }
  *
  * SQLite memory (auto-managed by tools):
  *
- *   ~/.lil/memory.db     — FTS5-indexed persistent memory
+ *   ~/.lil/memory.db     — FTS5-indexed persistent memory (shared across all personas)
  *     categories: core (permanent facts), daily (session notes), conversation (chat context)
  *
  * Memory model (inspired by nullclaw):
@@ -63,11 +64,16 @@ const PERSONA_FILES: PersonaFile[] = [
   },
 ];
 
-// ─── Extension ─────────────────────────────────────────────────────────────────
+// ─── Extension factory ────────────────────────────────────────────────────────
 
-export default function personaExtension(pi: ExtensionAPI) {
-  const personaDir = join(homedir(), ".lil", "persona");
-  const memoryDbPath = join(homedir(), ".lil", "memory.db");
+/**
+ * Create a persona extension configured for a specific persona.
+ * @param personaName Name of the persona to load (default: "default")
+ */
+export function createPersonaExtension(personaName: string = "default") {
+  return function personaExtension(pi: ExtensionAPI) {
+    const personaDir = join(homedir(), ".lil", "personas", personaName);
+    const memoryDbPath = join(homedir(), ".lil", "memory.db");
 
   /** Loaded persona file sections (refreshed on session_start) */
   let sections: { title: string; content: string }[] = [];
@@ -125,7 +131,7 @@ export default function personaExtension(pi: ExtensionAPI) {
       // Non-fatal
     }
     if (parts.length > 0) {
-      console.log(`[persona] Loaded: ${parts.join(", ")}`);
+      console.log(`[persona:${personaName}] Loaded: ${parts.join(", ")}`);
     }
   });
 
@@ -366,10 +372,14 @@ export default function personaExtension(pi: ExtensionAPI) {
     async execute() {
       const parts: string[] = [];
       const details: Record<string, unknown> = {
+        personaName,
         personaDir,
         memoryDbPath,
         sections: sections.map((s) => s.title),
       };
+
+      // Active persona
+      parts.push(`**Active Persona**: ${personaName}`);
 
       // Persona files
       if (sections.length > 0) {
@@ -532,4 +542,10 @@ export default function personaExtension(pi: ExtensionAPI) {
       }
     },
   });
-}
+  }; // end personaExtension
+} // end createPersonaExtension
+
+// ─── Backward compatibility ───────────────────────────────────────────────────
+
+/** Default export for backward compatibility (uses "default" persona) */
+export default createPersonaExtension("default");

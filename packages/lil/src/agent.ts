@@ -20,12 +20,18 @@ import {
   SessionManager,
   type CreateAgentSessionResult,
 } from "@mariozechner/pi-coding-agent";
-import { loadConfig, getAgentDir, getWorkspace, getAuthPath } from "./config.ts";
+import { loadConfig, getAgentDir, getWorkspace, getAuthPath, resolvePersonaModel } from "./config.ts";
 import securityExtension from "./extensions/security.ts";
-import personaExtension from "./extensions/persona/index.ts";
+import { createPersonaExtension } from "./extensions/persona/index.ts";
 import cronExtension from "./extensions/cron/index.ts";
 
 export interface LilSessionOptions {
+  /**
+   * Persona name to use for this session.
+   * Defaults to config.agent.persona, then "default".
+   */
+  persona?: string;
+
   /**
    * Working directory for the agent.
    * Defaults to config.workspace, then process.cwd().
@@ -63,6 +69,9 @@ export async function createLilSession(
   const agentDir = getAgentDir(config);
   const cwd = options.cwd ?? getWorkspace(config);
 
+  // Resolve persona name: options → config → "default"
+  const personaName = options.persona ?? config.agent?.persona ?? "default";
+
   // Auth stored in ~/.lil/auth.json (separate from pi's ~/.pi/agent/auth.json)
   const authStorage = AuthStorage.create(getAuthPath());
   const modelRegistry = new ModelRegistry(authStorage);
@@ -73,7 +82,7 @@ export async function createLilSession(
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir,
-    extensionFactories: [securityExtension, personaExtension, cronExtension],
+    extensionFactories: [securityExtension, createPersonaExtension(personaName), cronExtension],
   });
   await loader.reload();
 
@@ -89,8 +98,9 @@ export async function createLilSession(
     sessionManager = SessionManager.create(cwd);
   }
 
-  // Resolve model from lil config (agent.model.primary = "provider/model")
-  const modelSpec = config.agent?.model?.primary;
+  // Resolve model: persona config → global config → pi auto-detection
+  const personaModel = resolvePersonaModel(personaName);
+  const modelSpec = personaModel ?? config.agent?.model?.primary;
   let model;
   if (modelSpec) {
     const slash = modelSpec.indexOf("/");
@@ -99,10 +109,11 @@ export async function createLilSession(
       const modelId = modelSpec.substring(slash + 1);
       model = modelRegistry.find(provider, modelId);
       if (!model) {
-        console.warn(`Warning: model "${modelSpec}" not found in registry, falling back to auto-detection`);
+        const source = personaModel ? `persona "${personaName}"` : "config";
+        console.warn(`Warning: model "${modelSpec}" from ${source} not found in registry, falling back to auto-detection`);
       }
     } else {
-      console.warn(`Warning: agent.model.primary should be "provider/model" format (got "${modelSpec}")`);
+      console.warn(`Warning: model should be "provider/model" format (got "${modelSpec}")`);
     }
   }
 

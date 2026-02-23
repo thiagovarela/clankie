@@ -19,9 +19,9 @@ import {
 import type { ImageContent } from "@mariozechner/pi-ai";
 import type { Attachment, Channel, InboundMessage } from "./channels/channel.ts";
 import { TelegramChannel } from "./channels/telegram.ts";
-import { loadConfig, getAgentDir, getWorkspace, getAuthPath, getLilDir, ensureWebToken, type LilConfig } from "./config.ts";
+import { loadConfig, getAgentDir, getWorkspace, getAuthPath, getLilDir, ensureWebToken, resolvePersonaModel, type LilConfig } from "./config.ts";
 import securityExtension from "./extensions/security.ts";
-import personaExtension from "./extensions/persona/index.ts";
+import { createPersonaExtension } from "./extensions/persona/index.ts";
 import cronExtension from "./extensions/cron/index.ts";
 import { existsSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -82,7 +82,8 @@ export function resetSession(chatKey: string): void {
 
 async function getOrCreateSession(
   chatKey: string,
-  config: LilConfig
+  config: LilConfig,
+  personaName: string = "default"
 ): Promise<AgentSession> {
   const cached = sessionCache.get(chatKey);
   if (cached) return cached;
@@ -96,7 +97,7 @@ async function getOrCreateSession(
   const loader = new DefaultResourceLoader({
     cwd,
     agentDir,
-    extensionFactories: [securityExtension, personaExtension, cronExtension],
+    extensionFactories: [securityExtension, createPersonaExtension(personaName), cronExtension],
   });
   await loader.reload();
 
@@ -105,8 +106,9 @@ async function getOrCreateSession(
 
   const sessionManager = SessionManager.continueRecent(cwd, sessionDir);
 
-  // Resolve model from lil config (agent.model.primary = "provider/model")
-  const modelSpec = config.agent?.model?.primary;
+  // Resolve model: persona config → global config → pi auto-detection
+  const personaModel = resolvePersonaModel(personaName);
+  const modelSpec = personaModel ?? config.agent?.model?.primary;
   let model;
   if (modelSpec) {
     const slash = modelSpec.indexOf("/");
@@ -115,7 +117,8 @@ async function getOrCreateSession(
       const modelId = modelSpec.substring(slash + 1);
       model = modelRegistry.find(provider, modelId);
       if (!model) {
-        console.warn(`[daemon] Warning: model "${modelSpec}" not found, falling back to auto-detection`);
+        const source = personaModel ? `persona "${personaName}"` : "config";
+        console.warn(`[daemon] Warning: model "${modelSpec}" from ${source} not found, falling back to auto-detection`);
       }
     }
   }
@@ -176,8 +179,8 @@ async function getOrCreateSession(
   return session;
 }
 
-export async function getSessionByKey(chatKey: string, config: LilConfig): Promise<AgentSession> {
-  return getOrCreateSession(chatKey, config);
+export async function getSessionByKey(chatKey: string, config: LilConfig, personaName?: string): Promise<AgentSession> {
+  return getOrCreateSession(chatKey, config, personaName ?? "default");
 }
 
 // ─── Attachment helpers ────────────────────────────────────────────────────────
@@ -259,6 +262,13 @@ async function processMessage(
 ): Promise<void> {
   const config = loadConfig();
 
+  // Resolve persona: channel config → global config → "default"
+  let personaName = config.agent?.persona ?? "default";
+  if (message.channel === "telegram" && config.channels?.telegram?.persona) {
+    personaName = config.channels.telegram.persona;
+  }
+  // Future: add web, whatsapp, etc.
+
   const attachCount = message.attachments?.length ?? 0;
   const preview = message.text.slice(0, 100) || (attachCount > 0 ? `[${attachCount} attachment(s)]` : "[empty]");
   const sessionInfo = sessionName !== "default" ? ` [session:${sessionName}]` : "";
@@ -320,7 +330,7 @@ async function processMessage(
     
     // Handle /new command — reset current session
     if (trimmed === "/new") {
-      const session = await getOrCreateSession(chatKey, config);
+      const session = await getOrCreateSession(chatKey, config, personaName);
       await session.newSession();
       console.log(`[daemon] Session reset for ${chatKey}`);
       await channel.send(
@@ -331,7 +341,7 @@ async function processMessage(
       return;
     }
 
-    const session = await getOrCreateSession(chatKey, config);
+    const session = await getOrCreateSession(chatKey, config, personaName);
 
     // Build image attachments for the agent (vision-capable models)
     const images = toImageContents(message.attachments);
@@ -457,7 +467,8 @@ export async function startDaemon(): Promise<void> {
     }
 
     const chatKey = `heartbeat_${lastChatId}${lastThreadId ? `_${lastThreadId}` : "_default"}`;
-    const session = await getOrCreateSession(chatKey, config);
+    const personaName = config.agent?.persona ?? "default";
+    const session = await getOrCreateSession(chatKey, config, personaName);
 
     try {
       await session.prompt(prompt, { source: "rpc" });

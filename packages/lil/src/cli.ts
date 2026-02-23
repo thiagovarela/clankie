@@ -38,19 +38,22 @@ function printHelp(): void {
   console.log(`lil — minimal personal AI assistant
 
 Usage:
-  lil send "<message>"              Send a message, print response, exit
-  lil chat                          Start interactive chat session
-  lil login                         Authenticate with your AI provider
-  lil start [--foreground]          Start the daemon (foreground by default)
-  lil stop                          Stop the daemon
-  lil status                        Check if daemon is running
-  lil daemon install                Install as a system service (systemd/launchd)
-  lil daemon uninstall              Remove the system service
-  lil daemon logs                   Show daemon logs
-  lil daemon status                 Show service status
-  lil persona                        Show loaded persona files
-  lil persona init                  Create starter persona files
-  lil persona edit <file>           Open a persona file in $EDITOR
+  lil send [--persona <name>] "<message>"  Send a message, print response, exit
+  lil chat [--persona <name>]              Start interactive chat session
+  lil login                                Authenticate with your AI provider
+  lil start [--foreground]                 Start the daemon (foreground by default)
+  lil stop                                 Stop the daemon
+  lil status                               Check if daemon is running
+  lil daemon install                       Install as a system service (systemd/launchd)
+  lil daemon uninstall                     Remove the system service
+  lil daemon logs                          Show daemon logs
+  lil daemon status                        Show service status
+  lil persona                              List all personas
+  lil persona show [name]                  Show persona files (default: active)
+  lil persona create <name>                Create a new persona
+  lil persona edit [name] [file]           Edit persona files in $EDITOR
+  lil persona remove <name>                Delete a persona (cannot delete "default")
+  lil persona path [name]                  Show persona directory path
   lil memory                        Show memory statistics
   lil memory search <query>         Search memories (FTS5)
   lil memory list [category]        List memories
@@ -66,13 +69,16 @@ Usage:
 Config file: ~/.lil/lil.json (JSON5 — comments and trailing commas allowed)
 
 Config paths (dot-separated):
+  agent.persona                     Default persona name (default: "default")
   agent.workspace                   Agent working directory
   agent.agentDir                    Override pi's agent dir
   agent.model.primary               Primary model (provider/model format)
   agent.model.fallbacks             Fallback models (JSON array)
+  channels.telegram.persona         Persona for Telegram (overrides agent.persona)
   channels.telegram.botToken        Telegram bot token from @BotFather
   channels.telegram.allowFrom       Allowed Telegram user IDs (JSON array)
   channels.telegram.enabled         Enable/disable Telegram (default: true)
+  web.persona                       Persona for web UI (overrides agent.persona)
   web.enabled                       Enable/disable web UI server (default: true)
   web.host                          Web bind host (default: 127.0.0.1)
   web.port                          Web bind port (default: 3333)
@@ -95,16 +101,38 @@ function printVersion(): void {
   console.log("lil 0.1.0");
 }
 
-// ─── Command handlers ─────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function cmdSend(args: string[]): Promise<void> {
-  const message = args.join(" ").trim();
-  if (!message) {
-    console.error("Error: no message provided.\n\nUsage: lil send \"<message>\"");
+/**
+ * Extract --persona flag from args, returning { persona, remainingArgs }
+ */
+function extractPersonaFlag(args: string[]): { persona?: string; remainingArgs: string[] } {
+  const personaIndex = args.findIndex((arg) => arg === "--persona");
+  if (personaIndex === -1) {
+    return { remainingArgs: args };
+  }
+
+  const persona = args[personaIndex + 1];
+  if (!persona || persona.startsWith("-")) {
+    console.error("Error: --persona requires a name argument");
     process.exit(1);
   }
 
-  const { session, modelFallbackMessage } = await createLilSession({ ephemeral: false });
+  const remainingArgs = [...args.slice(0, personaIndex), ...args.slice(personaIndex + 2)];
+  return { persona, remainingArgs };
+}
+
+// ─── Command handlers ─────────────────────────────────────────────────────────
+
+async function cmdSend(args: string[]): Promise<void> {
+  const { persona, remainingArgs } = extractPersonaFlag(args);
+  const message = remainingArgs.join(" ").trim();
+  if (!message) {
+    console.error("Error: no message provided.\n\nUsage: lil send [--persona <name>] \"<message>\"");
+    process.exit(1);
+  }
+
+  const { session, modelFallbackMessage } = await createLilSession({ ephemeral: false, persona });
 
   if (modelFallbackMessage) {
     console.warn(`Warning: ${modelFallbackMessage}`);
@@ -117,10 +145,12 @@ async function cmdSend(args: string[]): Promise<void> {
 }
 
 async function cmdChat(args: string[]): Promise<void> {
-  const initialMessage = args.join(" ").trim() || undefined;
+  const { persona, remainingArgs } = extractPersonaFlag(args);
+  const initialMessage = remainingArgs.join(" ").trim() || undefined;
 
   const { session, modelFallbackMessage } = await createLilSession({
     continueRecent: true,
+    persona,
   });
 
   const mode = new InteractiveMode(session, {
@@ -364,16 +394,16 @@ async function cmdConfig(args: string[]): Promise<void> {
 
 // ─── Persona management ───────────────────────────────────────────────────────
 
-import { existsSync, readdirSync, readFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
+import { getPersonasDir, getPersonaDir, resolvePersonaModel } from "./config.ts";
 
-const PERSONA_DIR = join(getLilDir(), "persona");
+function getPersonaStarters(personaName: string): Record<string, string> {
+  return {
+    "identity.md": `# Identity
 
-const PERSONA_STARTERS: Record<string, string> = {
-  "identity.md": `# Identity
-
-You are **lil**, a personal AI assistant.
+You are **lil (${personaName})**, a personal AI assistant.
 
 - You are direct, concise, and helpful
 - You have a warm but no-nonsense personality
@@ -381,7 +411,7 @@ You are **lil**, a personal AI assistant.
 - You use casual language but stay precise on technical matters
 - When you don't know something, you say so plainly
 `,
-  "instructions.md": `# Instructions
+    "instructions.md": `# Instructions
 
 - Keep responses short unless asked for detail
 - When coding, prefer working solutions over perfect ones — iterate
@@ -389,102 +419,222 @@ You are **lil**, a personal AI assistant.
 - If a task is ambiguous, pick the most likely interpretation and go — ask only if truly stuck
 - Use the \`remember\` tool when the user shares preferences, facts, or context worth keeping
 `,
-  "knowledge.md": `# User Knowledge
+    "knowledge.md": `# User Knowledge
 
 <!-- Add facts about yourself here so lil knows your context -->
 - Name: (your name)
 - Stack: (your tech stack)
 - Current project: (what you're working on)
 `,
-};
+    "persona.json": `{
+  // Optional: override the global model for this persona
+  // "model": "anthropic/claude-sonnet-4-5"
+}
+`,
+  };
+}
 
 async function cmdPersona(args: string[]): Promise<void> {
   const [sub, ...rest] = args;
+  const personasDir = getPersonasDir();
 
-  // lil persona (or lil persona show) — show loaded files
-  if (!sub || sub === "show") {
-    if (!existsSync(PERSONA_DIR)) {
-      console.log(`No persona directory found at ${PERSONA_DIR}\n`);
-      console.log("Run 'lil persona init' to create starter persona files.");
+  // lil persona (no subcommand) — list all personas
+  if (!sub || sub === "list") {
+    const personas = existsSync(personasDir)
+      ? readdirSync(personasDir).filter((name) => {
+          const stat = require("node:fs").statSync(join(personasDir, name));
+          return stat.isDirectory();
+        })
+      : [];
+
+    if (personas.length === 0) {
+      console.log("No personas found.");
+      console.log(`\nCreate one with: lil persona create default`);
       return;
     }
 
-    const files = readdirSync(PERSONA_DIR).filter((f) => f.endsWith(".md"));
-    if (files.length === 0) {
-      console.log(`Persona directory exists but contains no .md files.\n`);
-      console.log("Run 'lil persona init' to create starter files.");
-      return;
-    }
+    console.log(`Personas (${personas.length}):\n`);
+    const config = loadConfig();
+    const defaultPersona = config.agent?.persona ?? "default";
 
-    console.log(`Persona files (${PERSONA_DIR}):\n`);
-    for (const file of files) {
-      const filePath = join(PERSONA_DIR, file);
-      const content = readFileSync(filePath, "utf-8").trim();
-      const lines = content.split("\n");
-      const preview = lines.slice(0, 3).join(" ").slice(0, 80);
-      console.log(`  📄 ${file}`);
-      console.log(`     ${preview}${content.length > 80 ? "..." : ""}\n`);
-    }
-    return;
-  }
+    for (const name of personas.sort()) {
+      const personaDir = getPersonaDir(name);
+      const files = existsSync(personaDir)
+        ? readdirSync(personaDir).filter((f) => f.endsWith(".md"))
+        : [];
 
-  // lil persona init — create starter files
-  if (sub === "init") {
-    if (!existsSync(PERSONA_DIR)) {
-      mkdirSync(PERSONA_DIR, { recursive: true, mode: 0o700 });
-    }
+      const isDefault = name === defaultPersona;
+      const marker = isDefault ? " ✓ (default)" : "";
+      console.log(`  📁 ${name}${marker}`);
 
-    let created = 0;
-    let skipped = 0;
-    for (const [filename, content] of Object.entries(PERSONA_STARTERS)) {
-      const filePath = join(PERSONA_DIR, filename);
-      if (existsSync(filePath)) {
-        console.log(`  ⏭  ${filename} (already exists, skipping)`);
-        skipped++;
-      } else {
-        writeFileSync(filePath, content, "utf-8");
-        console.log(`  ✓  ${filename}`);
-        created++;
+      // Show file count and model if set
+      const details: string[] = [`${files.length} files`];
+      const model = resolvePersonaModel(name);
+      if (model) {
+        details.push(`model: ${model}`);
       }
+      console.log(`     ${details.join(", ")}\n`);
     }
-
-    console.log(`\n${created} file(s) created, ${skipped} skipped.`);
-    console.log(`\nEdit your persona files in: ${PERSONA_DIR}/`);
-    console.log("Changes take effect on the next session start.\n");
     return;
   }
 
-  // lil persona edit [file] — open in $EDITOR
+  // lil persona show [name] — show persona files
+  if (sub === "show") {
+    const personaName = rest[0] ?? loadConfig().agent?.persona ?? "default";
+    const personaDir = getPersonaDir(personaName);
+
+    if (!existsSync(personaDir)) {
+      console.error(`Persona "${personaName}" not found at ${personaDir}`);
+      console.log(`\nCreate it with: lil persona create ${personaName}`);
+      process.exit(1);
+    }
+
+    const files = readdirSync(personaDir).filter(
+      (f) => f.endsWith(".md") || f === "persona.json"
+    );
+
+    if (files.length === 0) {
+      console.log(`Persona "${personaName}" exists but has no files.`);
+      return;
+    }
+
+    console.log(`Persona: ${personaName}\n`);
+    for (const file of files.sort()) {
+      const filePath = join(personaDir, file);
+      const content = readFileSync(filePath, "utf-8").trim();
+      const preview =
+        content.length > 100
+          ? content.slice(0, 100).replace(/\n/g, " ") + "..."
+          : content.replace(/\n/g, " ");
+      console.log(`  📄 ${file}`);
+      console.log(`     ${preview}\n`);
+    }
+    return;
+  }
+
+  // lil persona create <name> — create a new persona
+  if (sub === "create") {
+    const personaName = rest[0];
+    if (!personaName) {
+      console.error("Usage: lil persona create <name>");
+      process.exit(1);
+    }
+
+    const personaDir = getPersonaDir(personaName);
+    if (existsSync(personaDir)) {
+      console.error(`Persona "${personaName}" already exists at ${personaDir}`);
+      process.exit(1);
+    }
+
+    mkdirSync(personaDir, { recursive: true, mode: 0o700 });
+
+    const starters = getPersonaStarters(personaName);
+    for (const [filename, content] of Object.entries(starters)) {
+      writeFileSync(join(personaDir, filename), content, "utf-8");
+    }
+
+    console.log(`✓ Created persona "${personaName}"`);
+    console.log(`  Files: ${Object.keys(starters).join(", ")}`);
+    console.log(`  Path: ${personaDir}`);
+    console.log(`\nEdit with: lil persona edit ${personaName}`);
+    return;
+  }
+
+  // lil persona edit [name] [file] — edit persona files
   if (sub === "edit") {
     const editor = process.env.EDITOR || process.env.VISUAL || "nano";
-    const file = rest[0];
+    let personaName = rest[0];
+    let file = rest[1];
+
+    // If only one arg and it ends with .md or .json, treat it as a file for the default persona
+    if (rest.length === 1 && (rest[0].endsWith(".md") || rest[0].endsWith(".json"))) {
+      personaName = loadConfig().agent?.persona ?? "default";
+      file = rest[0];
+    }
+
+    if (!personaName) {
+      personaName = loadConfig().agent?.persona ?? "default";
+    }
+
+    const personaDir = getPersonaDir(personaName);
+    if (!existsSync(personaDir)) {
+      console.error(`Persona "${personaName}" not found.`);
+      console.log(`\nCreate it with: lil persona create ${personaName}`);
+      process.exit(1);
+    }
 
     if (file) {
-      const filePath = join(PERSONA_DIR, file.endsWith(".md") ? file : `${file}.md`);
+      const filePath = join(personaDir, file);
       if (!existsSync(filePath)) {
         console.error(`File not found: ${filePath}`);
-        console.log(`\nAvailable files: ${readdirSync(PERSONA_DIR).filter((f) => f.endsWith(".md")).join(", ") || "(none)"}`);
+        const available = readdirSync(personaDir)
+          .filter((f) => f.endsWith(".md") || f === "persona.json")
+          .join(", ");
+        console.log(`\nAvailable files: ${available || "(none)"}`);
         process.exit(1);
       }
       execSync(`${editor} "${filePath}"`, { stdio: "inherit" });
     } else {
-      // Open the directory or all files
-      if (!existsSync(PERSONA_DIR)) {
-        console.error(`Persona directory doesn't exist. Run 'lil persona init' first.`);
-        process.exit(1);
-      }
-      execSync(`${editor} "${PERSONA_DIR}"`, { stdio: "inherit" });
+      // Open the whole directory
+      execSync(`${editor} "${personaDir}"`, { stdio: "inherit" });
     }
     return;
   }
 
-  // lil persona path — show the path
-  if (sub === "path") {
-    console.log(PERSONA_DIR);
+  // lil persona remove <name> — delete a persona
+  if (sub === "remove") {
+    const personaName = rest[0];
+    if (!personaName) {
+      console.error("Usage: lil persona remove <name>");
+      process.exit(1);
+    }
+
+    if (personaName === "default") {
+      console.error('Cannot remove the "default" persona.');
+      process.exit(1);
+    }
+
+    const personaDir = getPersonaDir(personaName);
+    if (!existsSync(personaDir)) {
+      console.error(`Persona "${personaName}" not found.`);
+      process.exit(1);
+    }
+
+    // Confirm
+    const readline = require("node:readline/promises");
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
+    const answer = await rl.question(`Delete persona "${personaName}"? [y/N] `);
+    rl.close();
+
+    if (answer.toLowerCase() !== "y") {
+      console.log("Cancelled.");
+      return;
+    }
+
+    rmSync(personaDir, { recursive: true, force: true });
+    console.log(`✓ Removed persona "${personaName}"`);
     return;
   }
 
-  console.error(`Unknown persona subcommand "${sub}".\n\nUsage: lil persona [show | init | edit [file] | path]`);
+  // lil persona path [name] — show persona directory
+  if (sub === "path") {
+    const personaName = rest[0] ?? loadConfig().agent?.persona ?? "default";
+    console.log(getPersonaDir(personaName));
+    return;
+  }
+
+  console.error(`Unknown persona subcommand "${sub}".
+
+Usage:
+  lil persona                       List all personas
+  lil persona show [name]           Show persona files
+  lil persona create <name>         Create a new persona
+  lil persona edit [name] [file]    Edit persona files
+  lil persona remove <name>         Delete a persona
+  lil persona path [name]           Show persona directory`);
   process.exit(1);
 }
 
