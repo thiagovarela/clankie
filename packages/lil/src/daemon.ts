@@ -275,7 +275,8 @@ async function processMessage(
 	console.log(`[daemon] ${message.channel}/${message.chatId}${sessionInfo} (${message.senderName}): ${preview}`);
 
 	// Prepare send options for thread-aware responses
-	const sendOptions = message.threadId ? { threadId: message.threadId } : undefined;
+	// Always reply in a thread: use existing thread or create new one with message.id as parent
+	const sendOptions = { threadId: message.threadId || message.id };
 
 	try {
 		const trimmed = message.text.trim();
