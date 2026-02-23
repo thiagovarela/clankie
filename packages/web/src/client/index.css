@@ -1,3 +1,13 @@
+/* Import mini-lit theme (includes dark mode variables) */
+@import "@mariozechner/mini-lit/styles/themes/default.css";
+
+/* Import pi-web-ui styles */
+@import "@mariozechner/pi-web-ui/app.css";
+
+/* Tell Tailwind to scan mini-lit and pi-web-ui components */
+@source "../node_modules/@mariozechner/mini-lit/dist";
+@source "../node_modules/@mariozechner/pi-web-ui/dist";
+
 @import "tailwindcss";
 
 /* Tailwind v4 CSS-first configuration */

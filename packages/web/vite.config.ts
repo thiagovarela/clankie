@@ -1,10 +1,9 @@
 import path from "node:path";
 import tailwindcss from "@tailwindcss/vite";
-import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-	plugins: [react(), tailwindcss()],
+	plugins: [tailwindcss()],
 	resolve: {
 		alias: {
 			"@": path.resolve(__dirname, "./src"),
@@ -13,6 +12,21 @@ export default defineConfig({
 	build: {
 		outDir: "dist/client",
 		emptyOutDir: true,
+		commonjsOptions: {
+			transformMixedEsModules: true,
+		},
+		rollupOptions: {
+			// Mark Node.js-only packages as external - they won't be bundled
+			// pi-web-ui imports these transitively but doesn't use them in browser context
+			external: [
+				/@smithy\//,
+				/undici/,
+				/basic-ftp/,
+				/@aws-sdk\//,
+				/ollama/,
+				/@lmstudio\/sdk/,
+			],
+		},
 	},
 	server: {
 		port: 5173,

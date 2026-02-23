@@ -8,18 +8,19 @@
 		"preview": "vite preview"
 	},
 	"dependencies": {
+		"@mariozechner/mini-lit": "^0.2.0",
+		"@mariozechner/pi-agent-core": "^0.54.0",
+		"@mariozechner/pi-web-ui": "^0.54.0",
 		"hono": "^4.12.2",
-		"react": "^19.2.4",
-		"react-dom": "^19.2.4"
+		"lit": "^3.3.1",
+		"lucide": "^0.544.0"
 	},
 	"devDependencies": {
 		"@tailwindcss/vite": "^4.2.0",
-		"@types/react": "^19.0.0",
-		"@types/react-dom": "^19.0.0",
-		"@vitejs/plugin-react": "^5.1.4",
 		"tailwindcss": "^4.2.0",
 		"typescript": "^5.9.2",
-		"vite": "^7.3.1"
+		"vite": "^7.3.1",
+		"vite-plugin-node-polyfills": "^0.25.0"
 	},
 	"exports": {
 		"./server": "./src/server/index.ts"
