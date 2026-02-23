@@ -142,7 +142,9 @@ export class WsClient {
 		this.ws.onmessage = (event) => {
 			try {
 				const message = JSON.parse(event.data) as WsIncomingMessage;
-				this.handlers.forEach((handler) => handler(message));
+				for (const handler of this.handlers) {
+					handler(message);
+				}
 			} catch (err) {
 				console.error("[ws] Failed to parse message:", err);
 			}

@@ -1,24 +1,142 @@
-/* Import mini-lit theme (includes dark mode variables) */
-@import "@mariozechner/mini-lit/styles/themes/default.css";
-
-/* Import pi-web-ui styles */
-@import "@mariozechner/pi-web-ui/app.css";
-
-/* Tell Tailwind to scan mini-lit and pi-web-ui components */
-@source "../node_modules/@mariozechner/mini-lit/dist";
-@source "../node_modules/@mariozechner/pi-web-ui/dist";
+/**
+ * Global styles
+ */
 
 @import "tailwindcss";
+@import "@mariozechner/mini-lit/dist/theme.css";
 
-/* Tailwind v4 CSS-first configuration */
-@theme {
-	--font-sans: system-ui, -apple-system, "Segoe UI", "Roboto", "Helvetica", "Arial", sans-serif;
-}
+/* Highlight.js theme for code syntax highlighting */
+@import "highlight.js/styles/github-dark.css";
+
+/* Tailwind source paths */
+@source "../**/*.{ts,tsx,html}";
+@source "../../node_modules/@mariozechner/mini-lit/dist/**/*.{js,css}";
 
 /* Base styles */
+* {
+	box-sizing: border-box;
+}
+
+html,
 body {
 	margin: 0;
-	font-family: var(--font-sans);
-	-webkit-font-smoothing: antialiased;
-	-moz-osx-font-smoothing: grayscale;
+	padding: 0;
+	height: 100%;
+	overflow: hidden;
+}
+
+body {
+	font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* Prose styles for markdown content */
+.prose {
+	color: inherit;
+}
+
+.prose p {
+	margin-top: 0.75em;
+	margin-bottom: 0.75em;
+}
+
+.prose p:first-child {
+	margin-top: 0;
+}
+
+.prose p:last-child {
+	margin-bottom: 0;
+}
+
+.prose code {
+	background-color: rgba(0, 0, 0, 0.1);
+	padding: 0.125rem 0.25rem;
+	border-radius: 0.25rem;
+	font-size: 0.875em;
+}
+
+.dark .prose code {
+	background-color: rgba(255, 255, 255, 0.1);
+}
+
+.prose pre {
+	background-color: #1f2937;
+	padding: 1rem;
+	border-radius: 0.5rem;
+	overflow-x: auto;
+	margin-top: 0.75em;
+	margin-bottom: 0.75em;
+}
+
+.prose pre code {
+	background-color: transparent;
+	padding: 0;
+	border-radius: 0;
+	font-size: 0.875rem;
+}
+
+.prose ul,
+.prose ol {
+	margin-top: 0.75em;
+	margin-bottom: 0.75em;
+	padding-left: 1.5em;
+}
+
+.prose li {
+	margin-top: 0.25em;
+	margin-bottom: 0.25em;
+}
+
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+	margin-top: 1em;
+	margin-bottom: 0.5em;
+	font-weight: 600;
+}
+
+.prose h1:first-child,
+.prose h2:first-child,
+.prose h3:first-child {
+	margin-top: 0;
+}
+
+.prose blockquote {
+	border-left: 3px solid rgba(0, 0, 0, 0.2);
+	padding-left: 1rem;
+	margin-left: 0;
+	font-style: italic;
+}
+
+.dark .prose blockquote {
+	border-left-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: rgba(0, 0, 0, 0.2);
+	border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.2);
+}
+
+::-webkit-scrollbar-thumb:hover {
+	background: rgba(0, 0, 0, 0.3);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+	background: rgba(255, 255, 255, 0.3);
 }

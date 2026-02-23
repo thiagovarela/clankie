@@ -1,66 +1,30 @@
 /**
- * Reactive state management
- *
- * Maps WebSocket state to pi-agent-core compatible types for pi-web-ui components.
+ * Application state management
+ * Reactive store that syncs with WebSocket messages
  */
 
-import type { AgentMessage, AgentTool } from "@mariozechner/pi-agent-core";
-import type { WsClient, WsEventMessage, WsIncomingMessage, WsStateMessage } from "./ws-client.ts";
+import type { AppState, Message, Session, ToolCall } from "./types.ts";
 
-export interface AppState {
-	messages: AgentMessage[];
-	tools: AgentTool[];
-	isStreaming: boolean;
-	streamMessage: AgentMessage | null;
-	pendingToolCalls: Set<string>;
-	sessionName: string;
-	sessions: string[];
-	model: {
-		provider: string;
-		id: string;
-		name: string;
-	} | null;
-	thinkingLevel: string;
-	error?: unknown;
-	persona: {
-		name: string;
-	};
-	connected: boolean;
-}
+type Listener = () => void;
 
-// Simple observable state
-class StateStore {
-	private _state: AppState = {
-		messages: [],
-		tools: [],
-		isStreaming: false,
-		streamMessage: null,
-		pendingToolCalls: new Set(),
-		sessionName: "default",
-		sessions: [],
-		model: null,
-		thinkingLevel: "off",
-		persona: { name: "default" },
+/**
+ * Reactive state store
+ */
+class State {
+	private state: AppState = {
 		connected: false,
+		sessions: [],
+		currentSessionId: null,
+		messages: [],
+		isStreaming: false,
+		streamingContent: "",
+		streamingThinking: undefined,
+		streamingToolCalls: undefined,
 	};
 
-	private listeners: Set<() => void> = new Set();
+	private listeners = new Set<Listener>();
 
-	get value(): AppState {
-		return this._state;
-	}
-
-	set value(newState: AppState) {
-		this._state = newState;
-		this.notify();
-	}
-
-	update(partial: Partial<AppState>) {
-		this._state = { ...this._state, ...partial };
-		this.notify();
-	}
-
-	subscribe(listener: () => void): () => void {
+	subscribe(listener: Listener): () => void {
 		this.listeners.add(listener);
 		return () => this.listeners.delete(listener);
 	}
@@ -70,59 +34,100 @@ class StateStore {
 			listener();
 		}
 	}
-}
 
-export const state = new StateStore();
+	// Getters
+	get connected() {
+		return this.state.connected;
+	}
+	get sessions() {
+		return this.state.sessions;
+	}
+	get currentSessionId() {
+		return this.state.currentSessionId;
+	}
+	get messages() {
+		return this.state.messages;
+	}
+	get isStreaming() {
+		return this.state.isStreaming;
+	}
+	get streamingContent() {
+		return this.state.streamingContent;
+	}
+	get streamingThinking() {
+		return this.state.streamingThinking;
+	}
+	get streamingToolCalls() {
+		return this.state.streamingToolCalls;
+	}
 
-function processState(wsState: WsStateMessage["state"]): Partial<AppState> {
-	return {
-		messages: wsState.messages as AgentMessage[],
-		tools: wsState.tools as AgentTool[],
-		isStreaming: wsState.isStreaming,
-		streamMessage: wsState.streamMessage as AgentMessage | null,
-		pendingToolCalls: new Set(wsState.pendingToolCalls),
-		model: wsState.model,
-		thinkingLevel: wsState.thinkingLevel,
-		error: wsState.error,
-	};
-}
+	// Mutations
+	setConnected(connected: boolean) {
+		this.state.connected = connected;
+		this.notify();
+	}
 
-export function initializeState(wsClient: WsClient): void {
-	wsClient.subscribe((message: WsIncomingMessage) => {
-		if (message.type === "state") {
-			// Full state update
-			state.update({
-				...processState(message.state),
-				sessionName: message.sessionName,
+	setSessions(sessions: Session[]) {
+		this.state.sessions = sessions;
+		this.notify();
+	}
+
+	setCurrentSession(sessionId: string | null) {
+		this.state.currentSessionId = sessionId;
+		this.notify();
+	}
+
+	setMessages(messages: Message[]) {
+		this.state.messages = messages;
+		this.notify();
+	}
+
+	addMessage(message: Message) {
+		this.state.messages = [...this.state.messages, message];
+		this.notify();
+	}
+
+	startStreaming() {
+		this.state.isStreaming = true;
+		this.state.streamingContent = "";
+		this.state.streamingThinking = undefined;
+		this.state.streamingToolCalls = undefined;
+		this.notify();
+	}
+
+	updateStreaming(content: string, thinking?: string, toolCalls?: ToolCall[]) {
+		this.state.streamingContent = content;
+		this.state.streamingThinking = thinking;
+		this.state.streamingToolCalls = toolCalls;
+		this.notify();
+	}
+
+	finishStreaming() {
+		// Add the streamed message to the message list
+		if (this.state.streamingContent || this.state.streamingToolCalls?.length) {
+			this.addMessage({
+				role: "assistant",
+				content: this.state.streamingContent,
+				thinking: this.state.streamingThinking,
+				toolCalls: this.state.streamingToolCalls,
+				timestamp: Date.now(),
 			});
-		} else if (message.type === "event") {
-			// Event with partial state update
-			const eventMsg = message as WsEventMessage;
-			state.update(processState(eventMsg.state));
-		} else if (message.type === "ready") {
-			// Initial connection ready
-			state.update({
-				sessionName: message.sessionName,
-				sessions: message.sessions,
-				persona: message.persona || { name: "default" },
-				connected: true,
-			});
-		} else if (message.type === "response") {
-			// Response to commands - may include sessions list
-			if ("sessions" in message && Array.isArray(message.sessions)) {
-				state.update({
-					sessions: message.sessions,
-				});
-			}
 		}
-	});
 
-	// Track connection status
-	const checkConnection = () => {
-		state.update({
-			connected: wsClient.connected,
-		});
-	};
+		this.state.isStreaming = false;
+		this.state.streamingContent = "";
+		this.state.streamingThinking = undefined;
+		this.state.streamingToolCalls = undefined;
+		this.notify();
+	}
 
-	setInterval(checkConnection, 1000);
+	clearStreaming() {
+		this.state.isStreaming = false;
+		this.state.streamingContent = "";
+		this.state.streamingThinking = undefined;
+		this.state.streamingToolCalls = undefined;
+		this.notify();
+	}
 }
+
+export const state = new State();

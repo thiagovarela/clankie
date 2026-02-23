@@ -12,14 +12,6 @@ export default defineConfig({
 	build: {
 		outDir: "dist/client",
 		emptyOutDir: true,
-		commonjsOptions: {
-			transformMixedEsModules: true,
-		},
-		rollupOptions: {
-			// Mark Node.js-only packages as external - they won't be bundled
-			// pi-web-ui imports these transitively but doesn't use them in browser context
-			external: [/@smithy\//, /undici/, /basic-ftp/, /@aws-sdk\//, /ollama/, /@lmstudio\/sdk/],
-		},
 	},
 	server: {
 		port: 5173,
