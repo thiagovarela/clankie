@@ -20,7 +20,7 @@ import {
   SessionManager,
   type CreateAgentSessionResult,
 } from "@mariozechner/pi-coding-agent";
-import { loadConfig, getAgentDir, getWorkspace, getAuthPath, resolvePersonaModel } from "./config.ts";
+import { loadConfig, getAgentDir, getWorkspace, getAuthPath, resolvePersonaModel, getPersonaDir } from "./config.ts";
 import securityExtension from "./extensions/security.ts";
 import { createPersonaExtension } from "./extensions/persona/index.ts";
 import cronExtension from "./extensions/cron/index.ts";
@@ -71,6 +71,16 @@ export async function createLilSession(
 
   // Resolve persona name: options → config → "default"
   const personaName = options.persona ?? config.agent?.persona ?? "default";
+
+  // Validate persona name early
+  try {
+    // This will throw if the persona name is invalid
+    getPersonaDir(personaName);
+  } catch (err) {
+    throw new Error(
+      `Invalid persona name "${personaName}": ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
 
   // Auth stored in ~/.lil/auth.json (separate from pi's ~/.pi/agent/auth.json)
   const authStorage = AuthStorage.create(getAuthPath());

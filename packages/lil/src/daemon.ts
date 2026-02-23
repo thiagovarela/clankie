@@ -19,7 +19,7 @@ import {
 import type { ImageContent } from "@mariozechner/pi-ai";
 import type { Attachment, Channel, InboundMessage } from "./channels/channel.ts";
 import { TelegramChannel } from "./channels/telegram.ts";
-import { loadConfig, getAgentDir, getWorkspace, getAuthPath, getLilDir, ensureWebToken, resolvePersonaModel, type LilConfig } from "./config.ts";
+import { loadConfig, getAgentDir, getWorkspace, getAuthPath, getLilDir, ensureWebToken, resolvePersonaModel, getPersonaDir, type LilConfig } from "./config.ts";
 import securityExtension from "./extensions/security.ts";
 import { createPersonaExtension } from "./extensions/persona/index.ts";
 import cronExtension from "./extensions/cron/index.ts";
@@ -87,6 +87,16 @@ async function getOrCreateSession(
 ): Promise<AgentSession> {
   const cached = sessionCache.get(chatKey);
   if (cached) return cached;
+
+  // Validate persona name early
+  try {
+    getPersonaDir(personaName);
+  } catch (err) {
+    console.error(
+      `[daemon] Invalid persona name "${personaName}": ${err instanceof Error ? err.message : String(err)}`
+    );
+    throw err;
+  }
 
   const agentDir = getAgentDir(config);
   const cwd = getWorkspace(config);

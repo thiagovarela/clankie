@@ -295,9 +295,63 @@ export function getPersonasDir(): string {
   return dir;
 }
 
-/** Returns the path to a specific persona directory. */
+/**
+ * Validate and sanitize a persona name.
+ * Only allows alphanumeric, underscore, hyphen, and dot.
+ * Throws if invalid to prevent path traversal.
+ */
+function validatePersonaName(name: string): void {
+  if (!name || typeof name !== "string") {
+    throw new Error("Persona name must be a non-empty string");
+  }
+
+  const trimmed = name.trim();
+  if (!trimmed) {
+    throw new Error("Persona name cannot be empty or whitespace-only");
+  }
+
+  // Only allow safe characters: alphanumeric, underscore, hyphen, dot
+  if (!/^[a-zA-Z0-9._-]+$/.test(trimmed)) {
+    throw new Error(
+      `Invalid persona name "${name}". Only alphanumeric characters, dots, underscores, and hyphens are allowed.`
+    );
+  }
+
+  // Prevent names that look like path traversal
+  if (trimmed.includes("..") || trimmed.startsWith(".") || trimmed.startsWith("-")) {
+    throw new Error(`Invalid persona name "${name}". Cannot start with dot or hyphen, or contain ".."`);
+  }
+}
+
+/**
+ * Returns the path to a specific persona directory.
+ * Validates the persona name and ensures the resolved path stays within the personas directory.
+ */
 export function getPersonaDir(personaName: string): string {
-  return join(getPersonasDir(), personaName);
+  validatePersonaName(personaName);
+
+  const personasDir = getPersonasDir();
+  const personaDir = join(personasDir, personaName);
+
+  // Ensure the resolved path is actually under the personas directory (prevent traversal)
+  const { realpathSync } = require("node:fs");
+  try {
+    const canonicalPersonasDir = realpathSync(personasDir);
+    const canonicalPersonaDir = existsSync(personaDir)
+      ? realpathSync(personaDir)
+      : join(canonicalPersonasDir, personaName); // Use join for non-existent paths
+
+    if (!canonicalPersonaDir.startsWith(canonicalPersonasDir + require("node:path").sep)) {
+      throw new Error(`Persona path "${personaDir}" escapes personas directory`);
+    }
+  } catch (err) {
+    // If personas dir doesn't exist yet, just validate the constructed path
+    if (!personaDir.startsWith(personasDir + require("node:path").sep)) {
+      throw new Error(`Invalid persona path: would escape personas directory`);
+    }
+  }
+
+  return personaDir;
 }
 
 /**
@@ -310,8 +364,15 @@ export function resolvePersonaModel(personaName: string): string | undefined {
 
   try {
     const raw = readFileSync(configPath, "utf-8");
-    const config = JSON5.parse(raw) as { model?: string };
-    return config.model;
+    const config = JSON5.parse(raw) as { model?: unknown };
+    
+    // Validate that model is a non-empty string
+    if (typeof config.model !== "string") {
+      return undefined;
+    }
+
+    const trimmed = config.model.trim();
+    return trimmed || undefined;
   } catch {
     return undefined;
   }

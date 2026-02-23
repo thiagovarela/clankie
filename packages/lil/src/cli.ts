@@ -481,7 +481,14 @@ async function cmdPersona(args: string[]): Promise<void> {
   // lil persona show [name] — show persona files
   if (sub === "show") {
     const personaName = rest[0] ?? loadConfig().agent?.persona ?? "default";
-    const personaDir = getPersonaDir(personaName);
+    
+    let personaDir: string;
+    try {
+      personaDir = getPersonaDir(personaName);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
 
     if (!existsSync(personaDir)) {
       console.error(`Persona "${personaName}" not found at ${personaDir}`);
@@ -520,7 +527,14 @@ async function cmdPersona(args: string[]): Promise<void> {
       process.exit(1);
     }
 
-    const personaDir = getPersonaDir(personaName);
+    let personaDir: string;
+    try {
+      personaDir = getPersonaDir(personaName);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+
     if (existsSync(personaDir)) {
       console.error(`Persona "${personaName}" already exists at ${personaDir}`);
       process.exit(1);
@@ -556,7 +570,14 @@ async function cmdPersona(args: string[]): Promise<void> {
       personaName = loadConfig().agent?.persona ?? "default";
     }
 
-    const personaDir = getPersonaDir(personaName);
+    let personaDir: string;
+    try {
+      personaDir = getPersonaDir(personaName);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+
     if (!existsSync(personaDir)) {
       console.error(`Persona "${personaName}" not found.`);
       console.log(`\nCreate it with: lil persona create ${personaName}`);
@@ -594,7 +615,14 @@ async function cmdPersona(args: string[]): Promise<void> {
       process.exit(1);
     }
 
-    const personaDir = getPersonaDir(personaName);
+    let personaDir: string;
+    try {
+      personaDir = getPersonaDir(personaName);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+
     if (!existsSync(personaDir)) {
       console.error(`Persona "${personaName}" not found.`);
       process.exit(1);
@@ -622,7 +650,12 @@ async function cmdPersona(args: string[]): Promise<void> {
   // lil persona path [name] — show persona directory
   if (sub === "path") {
     const personaName = rest[0] ?? loadConfig().agent?.persona ?? "default";
-    console.log(getPersonaDir(personaName));
+    try {
+      console.log(getPersonaDir(personaName));
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
     return;
   }
 
