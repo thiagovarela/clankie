@@ -1,243 +1,579 @@
-# lil
+# lil — Personal AI Assistant
 
-A minimal personal AI assistant built on [pi](https://github.com/badlogic/pi-mono)'s SDK, agent runtime, and extension system.
+A minimal, focused AI assistant that lives in Slack. Built on [pi](https://github.com/badlogic/pi-mono)'s SDK, lil gives you a personal AI teammate that runs on your machine with your credentials.
 
-> **Where OpenClaw is a full-featured multi-channel assistant with 15+ integrations** —
-> **lil starts with one thing done well**: a single, powerful agent session that reuses the entire pi ecosystem.
+## What Can lil Do?
 
-## Philosophy
-
-lil is a thin wrapper around pi, not a replacement. Everything in the pi ecosystem works out of the box:
-
-- Extensions from `~/.pi/agent/extensions/` and `.pi/extensions/`
-- Skills from `~/.agents/skills/`, `~/.pi/agent/skills/`, and project `.pi/skills/`
-- Prompt templates from `~/.pi/agent/prompts/`
-- Context files (`AGENTS.md` walking up from cwd)
-- `pi install` packages — just works
-
-## Usage
-
-```bash
-# Interactive chat session (full pi TUI)
-lil chat
-
-# Send a message and get a response (non-interactive)
-lil send "What files are in the current directory?"
-
-# Shorthand — no subcommand needed
-lil "Refactor this function to be async"
-
-# Authenticate with your AI provider (uses pi's login dialog)
-lil login
-
-# Configuration
-lil config show
-lil config set model gpt-4o
-lil config set provider openai
-```
+- 💬 **Natural conversations in Slack threads** — @mention once, then chat naturally
+- 🧠 **Remember things** — Built-in memory system (facts, preferences, project context)
+- 🎭 **Multiple personas** — Different personalities for different contexts (work, coding, personal)
+- 🛠️ **Use tools** — Read/write files, run bash commands, search memory
+- 🔌 **pi ecosystem** — Works with all pi extensions, skills, and prompt templates
+- 🔒 **Privacy-first** — Runs on your machine, your credentials, your data
 
 ## Installation
 
-Requires [Bun](https://bun.sh).
+### 1. Install Dependencies
+
+Requires [Bun](https://bun.sh):
+
+```bash
+# macOS/Linux
+curl -fsSL https://bun.sh/install | bash
+
+# Verify
+bun --version
+```
+
+### 2. Clone and Install
 
 ```bash
 git clone https://github.com/thiagovarela/lil
 cd lil
 bun install
-bun link --cwd packages/lil   # installs `lil` globally via ~/.bun/bin/lil
 ```
 
-Then just use `lil` from anywhere.
-
-## Authentication
-
-lil uses pi's `AuthStorage` at `~/.pi/agent/auth.json` — the same credentials as the `pi` CLI. You authenticate once and both tools share it.
-
-Options:
-- `lil login` — Opens pi's interactive login dialog (OAuth or API key)
-- Environment variables: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, etc.
-
-## Configuration
-
-Config lives at `~/.lil/config.json` (permissions: `0600`).
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `provider` | (from pi settings) | Provider name: `openai`, `anthropic`, `google` |
-| `model` | (from pi settings) | Model ID: `gpt-4o`, `claude-opus-4-5`, etc. |
-| `agentDir` | `~/.pi/agent` | Override pi's agent directory |
-| `workspace` | `process.cwd()` | Agent's working directory |
-
-## Web UI Setup
-
-lil ships with a web interface powered by pi-web-ui components.
-
-### Build the web app
+### 3. Link Globally (Optional)
 
 ```bash
-# from project root
-bun install
-bun run web:build
+bun link --cwd packages/lil
 ```
 
-### Configure + run
+Now `lil` is available from anywhere. If you skip this, use `bun run packages/lil/src/cli.ts` instead of `lil`.
+
+## Slack Setup
+
+### Step 1: Create Slack App
+
+1. Go to **https://api.slack.com/apps**
+2. Click **Create New App** → **From scratch**
+3. Name: `lil` (or whatever you want)
+4. Pick your workspace
+5. Click **Create App**
+
+### Step 2: Enable Socket Mode
+
+1. In your app settings, go to **Socket Mode**
+2. Toggle **Enable Socket Mode** to ON
+3. When prompted for a token name, enter: `lil-socket`
+4. Click **Generate**
+5. **Copy the token** (starts with `xapp-`) — you'll need this for config
+
+### Step 3: Add Bot Scopes
+
+1. Go to **OAuth & Permissions**
+2. Scroll to **Scopes** → **Bot Token Scopes**
+3. Add these scopes:
+   - `app_mentions:read` — Let bot see @mentions
+   - `chat:write` — Let bot send messages
+   - `channels:history` — Read channel messages
+   - `channels:read` — See channel info
+   - `files:read` — Download files users share
+   - `im:history` — Read DM history
+
+### Step 4: Subscribe to Events
+
+1. Go to **Event Subscriptions**
+2. Toggle **Enable Events** to ON
+3. Scroll to **Subscribe to bot events**
+4. Add these events:
+   - `app_mention` — When bot is @mentioned
+   - `message.channels` — Channel messages (for thread conversations)
+   - `message.im` — Direct messages
+5. Click **Save Changes**
+
+### Step 5: Install App to Workspace
+
+1. Go to **Install App** (in the sidebar)
+2. Click **Install to Workspace**
+3. Review permissions and click **Allow**
+4. **Copy the Bot Token** (starts with `xoxb-`) — you'll need this for config
+
+### Step 6: Get Your Slack User ID
+
+1. In Slack, click your profile picture → **View profile**
+2. Click the three dots (**⋯**) → **Copy member ID**
+3. Save this ID (looks like `U01ABC23DEF`)
+
+### Step 7: Configure lil
 
 ```bash
-lil config set web.enabled true
-lil config set web.host "127.0.0.1"
-lil config set web.port 3333
+lil config set channels.slack.appToken "xapp-1-A0AG6UWU92B-..."
+lil config set channels.slack.botToken "xoxb-10594563095936-..."
+lil config set channels.slack.allowFrom '["U01ABC23DEF"]'
+```
+
+Replace:
+- `xapp-...` with your Socket Mode token from Step 2
+- `xoxb-...` with your Bot Token from Step 5
+- `U01ABC23DEF` with your user ID from Step 6
+
+### Step 8: Authenticate with AI Provider
+
+```bash
+lil login
+```
+
+Choose your provider (Anthropic, OpenAI, etc.) and authenticate. Credentials are stored securely in `~/.lil/auth.json`.
+
+### Step 9: Start lil
+
+```bash
 lil start
 ```
 
-Then open: `http://127.0.0.1:3333`
-
-Notes:
-- Sessions are server-backed (`~/.lil/sessions/`), shared with other channels
-- Uploads go through `POST /api/upload` and are stored under `~/.lil/uploads/`
-- WebSocket/API auth uses a token stored in `~/.lil/lil.json` (`web.token`)
-
-## Telegram Setup
-
-lil includes a Telegram channel for 24/7 access to your agent via Telegram.
-
-### Basic Setup
-
-1. **Create a bot** via [@BotFather](https://t.me/BotFather):
-   ```
-   /newbot
-   ```
-   Follow the prompts. You'll get a bot token like `123456:ABC-DEF...`
-
-2. **Get your Telegram user ID**:
-   - Message [@userinfobot](https://t.me/userinfobot)
-   - It will reply with your numeric user ID (e.g., `123456789`)
-
-3. **Configure lil**:
-   ```bash
-   lil config set channels.telegram.botToken "123456:ABC-DEF..."
-   lil config set channels.telegram.allowFrom [123456789]
-   ```
-
-4. **Start the daemon**:
-   ```bash
-   lil start
-   ```
-
-5. **Message your bot** on Telegram. Only users in the `allowFrom` list can interact with it.
-
-   When you start the daemon, bot commands are automatically registered. Type `/` in Telegram to see available commands.
-
-### Multi-Conversation Support
-
-Manage multiple separate conversations in a single Telegram chat using named sessions:
-
-**Commands:**
-
-- **`/switch <name>`** — Switch to a different conversation
-  ```
-  You: /switch coding
-  Bot: 💬 Switched to session "coding"
-  
-  You: Let's review this function...
-  Bot: [responds with coding context]
-  
-  You: /switch groceries
-  Bot: 💬 Switched to session "groceries"
-  
-  You: Add milk to the list
-  Bot: [completely separate context, no knowledge of code]
-  ```
-
-- **`/sessions`** — List all your sessions
-  ```
-  You: /sessions
-  Bot: 📋 Available sessions:
-       • default
-       • coding ✓ (active)
-       • groceries
-       • ideas
-       
-       Switch with: /switch <name>
-  ```
-
-- **`/new`** — Clear the current session's context
-  ```
-  You: /new
-  Bot: ✨ Started a fresh session in "coding". Previous context cleared.
-  ```
-
-**How it works:**
-
-1. Each session name gets its own isolated agent context
-2. Sessions persist across restarts (saved to disk)
-3. Switch between topics with `/switch <name>`
-4. Session names can be anything: `coding`, `work`, `groceries`, `project-x`, etc.
-
-**Example workflow:**
-
+You should see:
 ```
-You: /switch work
-Bot: 💬 Switched to session "work"
-
-You: Draft an email to the team about the deadline
-Bot: [drafts email with work context]
-
-You: /switch personal
-Bot: 💬 Switched to session "personal"
-
-You: Plan my weekend trip
-Bot: [completely fresh context, no knowledge of work stuff]
-
-You: /switch work
-Bot: 💬 Switched to session "work"
-
-You: Now finish that email
-Bot: [remembers the email draft from earlier]
+[daemon] Starting lil daemon (pid 12345)...
+[daemon] Workspace: /Users/you/.lil/workspace
+[daemon] Channels: slack
+[slack] Connected as @lil (U01XYZ...)
+[daemon] Ready. Waiting for messages...
 ```
 
-### Forum Topics (Advanced: Supergroups Only)
+### Step 10: Test in Slack
 
-If you create a **Telegram supergroup** and enable forum topics, each topic automatically gets its own session. This provides visual separation like Discord channels, but requires more setup:
+1. **Invite the bot to a channel**: Type `/invite @lil` in any channel
+2. **@mention it**: `@lil hello!`
+3. Bot creates a thread and replies
+4. **Continue the conversation** (no more @mentions needed): `what's 2+2?`
+5. Bot responds in the same thread
 
-1. Create a Telegram **supergroup** (not a regular group or DM)
-2. Enable topics: Group Settings → Topics → Enable
-3. Add your bot to the group
-4. Each topic = separate conversation
+🎉 **You're all set!**
 
-For most users, **using `/switch` in a regular DM is simpler**.
+## Using lil
+
+### In Slack
+
+#### Start a Conversation
+
+@mention the bot anywhere:
+```
+Channel: #general
+You: @lil what's the weather in SF?
+  Thread 🧵
+  Bot: It's 68°F and sunny
+  You: and tomorrow?
+  Bot: Tomorrow will be 72°F
+```
+
+After the first @mention, the bot responds to all your messages in that thread automatically.
+
+#### Direct Messages
+
+Just message the bot directly — no @mention needed:
+```
+DM with @lil
+You: analyze this data [uploads file]
+Bot: Sure! Here's what I found...
+You: can you summarize it?
+Bot: Here's a summary...
+```
+
+#### Share Files
+
+Upload files directly in a conversation:
+```
+You: @lil review this code
+[uploads code.py]
+Bot: I'll analyze it...
+[provides feedback]
+```
+
+The bot can read images (with vision models), documents, code files, etc.
+
+### CLI Commands
+
+Even though lil lives in Slack, you also have CLI access:
+
+```bash
+# Interactive chat session (local terminal, uses pi's TUI)
+lil chat
+
+# Send a one-off message (prints response and exits)
+lil send "What files are in the current directory?"
+
+# Shorthand (no subcommand needed)
+lil "Summarize recent git commits"
+
+# Check daemon status
+lil status
+
+# Stop daemon
+lil stop
+
+# View configuration
+lil config show
+
+# Set a config value
+lil config set agent.model.primary "anthropic/claude-sonnet-4-5"
+```
+
+## Configuration
+
+Config file: `~/.lil/lil.json` (JSON5 format — comments and trailing commas allowed)
+
+### Common Settings
+
+```bash
+# Slack credentials
+lil config set channels.slack.appToken "xapp-..."
+lil config set channels.slack.botToken "xoxb-..."
+lil config set channels.slack.allowFrom '["U12345678"]'
+
+# AI model
+lil config set agent.model.primary "anthropic/claude-sonnet-4-5"
+lil config set agent.model.fallbacks '["openai/gpt-4o"]'
+
+# Default persona
+lil config set agent.persona "default"
+
+# Workspace (where agent works)
+lil config set agent.workspace "~/projects"
+```
+
+### Config Paths
+
+| Path | Description | Example |
+|------|-------------|---------|
+| `agent.persona` | Default persona name | `"default"`, `"coding"`, `"work"` |
+| `agent.workspace` | Agent working directory | `"~/projects"` |
+| `agent.model.primary` | Primary AI model | `"anthropic/claude-sonnet-4-5"` |
+| `agent.model.fallbacks` | Fallback models (array) | `["openai/gpt-4o"]` |
+| `channels.slack.appToken` | Socket Mode app token | `"xapp-..."` |
+| `channels.slack.botToken` | Bot token for API calls | `"xoxb-..."` |
+| `channels.slack.allowFrom` | Allowed user IDs (array) | `["U12345678"]` |
+| `channels.slack.persona` | Override persona for Slack | `"work"` |
+
+## Personas
+
+Personas let you customize lil's personality, knowledge, and behavior for different contexts. Each persona is a set of markdown files that shape the system prompt.
+
+### Built-in Persona: "default"
+
+lil ships with a minimal default persona. You can customize it:
+
+```bash
+# View persona files
+lil persona show default
+
+# Edit persona
+lil persona edit default
+```
+
+### Create a New Persona
+
+```bash
+# Create a new persona
+lil persona create coding
+
+# Edit its files
+lil persona edit coding
+```
+
+This creates `~/.lil/personas/coding/` with these files:
+
+#### `identity.md` — Who the assistant is
+```markdown
+# Identity
+
+You are **lil (coding)**, a personal AI coding assistant.
+
+- You're an expert in software engineering
+- You prefer working solutions over perfect ones
+- You're concise but thorough with explanations
+- You use modern best practices
+```
+
+#### `instructions.md` — How to behave
+```markdown
+# Instructions
+
+- Write clean, readable code with comments
+- Explain complex concepts simply
+- Run tests before claiming something works
+- Use git for version control
+- Ask for clarification on ambiguous requirements
+```
+
+#### `knowledge.md` — User context
+```markdown
+# User Knowledge
+
+- Name: Thiago
+- Stack: TypeScript, Bun, React
+- Current project: lil (AI assistant)
+- Prefers: Functional programming, immutability
+```
+
+#### `persona.json` — Model override (optional)
+```json
+{
+  // Override the global model for this persona
+  "model": "anthropic/claude-sonnet-4-5"
+}
+```
+
+### Use a Persona
+
+```bash
+# Set as default
+lil config set agent.persona "coding"
+
+# Use for a specific session
+lil chat --persona coding
+lil send --persona coding "Review this code"
+
+# Use for Slack only
+lil config set channels.slack.persona "work"
+```
+
+### Manage Personas
+
+```bash
+# List all personas
+lil persona
+
+# Show persona files
+lil persona show coding
+
+# Edit persona
+lil persona edit coding
+
+# Edit specific file
+lil persona edit coding identity.md
+
+# Get persona directory path
+lil persona path coding
+
+# Remove persona
+lil persona remove coding
+```
+
+## Memory
+
+lil has a built-in memory system powered by SQLite FTS5 (full-text search). The bot can remember facts, preferences, and context across conversations.
+
+### How It Works
+
+When you tell lil to remember something:
+```
+You: @lil remember my timezone is PST
+Bot: Got it, I'll remember that.
+```
+
+Behind the scenes, lil uses the `remember` tool (provided by the persona extension) to store this in `~/.lil/memory.db`. Later:
+
+```
+You: @lil what time is it for me?
+Bot: Since you're in PST, it's currently 3:45 PM.
+```
+
+### Memory Categories
+
+Memories are automatically categorized:
+- **preference** — User preferences, settings
+- **fact** — Objective facts about the user, project, etc.
+- **context** — Project context, working memory
+- **note** — General notes, ideas
+
+### CLI Commands
+
+```bash
+# Show memory stats
+lil memory
+
+# Search memories
+lil memory search "timezone"
+
+# List all memories (or by category)
+lil memory list
+lil memory list preference
+
+# Export core memories as JSON
+lil memory export > memories.json
+
+# Forget a specific memory
+lil memory forget "timezone"
+```
+
+### How lil Uses Memory
+
+The persona extension automatically:
+1. **Injects relevant memories** into the system prompt based on the current conversation
+2. **Uses FTS5 search** to find contextually relevant memories
+3. **Provides the `remember` tool** so lil can store new information
+
+You don't need to do anything special — just tell lil to remember things naturally.
+
+## Running as a Service
+
+Instead of running `lil start` manually, you can install lil as a system service that starts automatically on boot.
+
+### Install Service
+
+```bash
+lil daemon install
+```
+
+This installs:
+- **macOS**: launchd agent (`~/Library/LaunchAgents/ai.lil.daemon.plist`)
+- **Linux**: systemd user service (`~/.config/systemd/user/lil.service`)
+
+The daemon starts immediately and runs on boot.
+
+### Manage Service
+
+```bash
+# Check service status
+lil daemon status
+
+# View logs
+lil daemon logs
+
+# Uninstall service
+lil daemon uninstall
+```
+
+Logs are stored in `~/.lil/logs/daemon.log`.
 
 ## Security
 
-lil ships with a built-in security extension that:
+lil includes a built-in security extension that protects against common mistakes:
 
-- **Blocks dangerous bash commands**: `rm -rf`, `sudo`, `curl | sh`, `eval`, network exfiltration patterns
-- **Protects sensitive write paths**: `~/.ssh/`, `~/.aws/`, `~/.lil/`, `.env` files, system dirs
-- **Blocks reads of credential files**: SSH keys, `.env`, `~/.lil/config.json`, AWS credentials
-- **Redacts sensitive output**: PEM private keys, AWS access keys, OpenAI/Anthropic/GitHub tokens
+### What It Blocks
 
-See [docs/security.md](docs/security.md) for the full threat model.
+- **Dangerous bash commands**: `rm -rf /`, `sudo`, `curl | sh`, `eval`
+- **Sensitive file writes**: `~/.ssh/`, `~/.aws/`, `.env` files, system directories
+- **Credential reads**: SSH keys, AWS credentials, API keys, `~/.lil/auth.json`
+- **Network exfiltration**: Patterns that suggest data theft
+
+### What It Redacts
+
+When the agent reads files, it automatically redacts:
+- Private keys (PEM, SSH)
+- API keys (OpenAI, Anthropic, AWS, GitHub, etc.)
+- Tokens and secrets
+
+The agent sees `[REDACTED:...]` instead of the actual value.
+
+### Limitations
+
+⚠️ **The security extension is not a sandbox.** It's a safety net for common mistakes, not a security boundary. The agent runs with your user permissions and can still:
+- Write to most files in your home directory
+- Run most bash commands
+- Access the internet
+
+**Don't give lil credentials to production systems or sensitive environments.**
+
+For the full threat model, see `docs/security.md` (if you've added this).
+
+## Advanced Features
+
+### Cron Jobs (Scheduled Tasks)
+
+lil can schedule periodic tasks (not yet documented — coming soon).
+
+### Heartbeat
+
+lil can check `~/.lil/heartbeat.md` periodically and take proactive actions (not yet documented — coming soon).
+
+### pi Extensions
+
+lil works with all pi extensions out of the box. Extensions are loaded from:
+- `~/.pi/agent/extensions/`
+- `.pi/extensions/` (in your project)
+
+See pi's documentation for creating extensions.
+
+### Skills
+
+Skills are reusable CLI tools the agent can create and invoke. They're loaded from:
+- `~/.agents/skills/` (global)
+- `~/.pi/agent/skills/` (pi shared)
+- `.pi/skills/` (project-specific)
+
+See pi's documentation for the skills system.
+
+## Troubleshooting
+
+### Bot doesn't respond in threads
+
+**Problem**: Bot replies to @mentions but ignores subsequent messages in the thread.
+
+**Solution**: Make sure you added the `message.channels` event subscription and `channels:read` scope to your Slack app. Then reinstall the app to your workspace.
+
+### "No channels configured" error
+
+**Problem**: `lil start` fails with "No channels configured".
+
+**Solution**: Configure Slack credentials:
+```bash
+lil config set channels.slack.appToken "xapp-..."
+lil config set channels.slack.botToken "xoxb-..."
+lil config set channels.slack.allowFrom '["U12345678"]'
+```
+
+### Bot responds to everyone
+
+**Problem**: Bot responds to all users, not just you.
+
+**Solution**: Set `allowFrom` to only include your user ID:
+```bash
+lil config get channels.slack.allowFrom
+lil config set channels.slack.allowFrom '["U12345678"]'
+```
+
+### "Failed to run git: fatal: 'main' is already used by worktree"
+
+**Problem**: Git worktree conflicts when trying to merge.
+
+**Solution**: Merge from the main worktree directory, not a branch worktree.
+
+### Daemon won't start after reboot
+
+**Problem**: Daemon doesn't auto-start after reboot (when installed as service).
+
+**Solution**: Check service status:
+```bash
+lil daemon status
+lil daemon logs
+```
+
+If the service isn't running, reinstall:
+```bash
+lil daemon uninstall
+lil daemon install
+```
 
 ## Development
 
 ```bash
-# Run directly with Bun (no compile step)
-bun run src/cli.ts chat
-bun run src/cli.ts send "hello"
+# Run directly with Bun (no build step)
+bun run packages/lil/src/cli.ts chat
+bun run packages/lil/src/cli.ts send "hello"
 
-# Build single-file binary
-bun run build
-
-# Build all targets
-bun run build:all
+# Code quality checks
+bun run check        # Run linter
+bun run check:fix    # Auto-fix issues
+bun run format       # Format code
 ```
 
-## Roadmap
+## Philosophy
 
-- **Milestone 0** ✅ — Core agent loop, CLI (`send`, `chat`, `login`), security extension, `bun link` global install
-- **Milestone 1** ✅ — Telegram channel (long polling, allowlist, daemon mode)
-- **Milestone 1.5** ✅ — Multi-conversation support (`/switch`, `/sessions`, supergroup forum topics)
-- **Milestone 2** — Memory & persistent context
-- **Milestone 3** — Web UI channel (pi-web-ui)
-- **Milestone 4** — More channels (WhatsApp, Signal)
+lil is a **thin wrapper around pi**, not a replacement. It reuses the entire pi ecosystem:
+- Extensions, skills, and prompt templates just work
+- Same agent runtime, same resource loaders
+- Authentication shared with `pi` CLI
 
-See [docs/plan.md](docs/plan.md) for the full plan.
+Where other assistants try to be everything, lil focuses on **one thing done well**: giving you a personal AI teammate in Slack that reuses proven infrastructure.
+
+## Credits
+
+Built on [pi](https://github.com/badlogic/pi-mono) by [@badlogic](https://github.com/badlogic).
+
+Inspired by [OpenClaw](https://github.com/badlogic/openclaw) and [mom](https://github.com/badlogic/pi-mono/tree/main/packages/mom).
+
+## License
+
+MIT
