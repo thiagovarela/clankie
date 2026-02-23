@@ -1,6 +1,6 @@
 /**
  * Streaming message component
- * Shows assistant's message as it's being streamed
+ * Shows assistant's message as it's being streamed (Claude-style)
  */
 
 import { html, LitElement } from "lit";
@@ -26,61 +26,58 @@ export class StreamingMessage extends LitElement {
 		}
 
 		return html`
-			<div class="flex justify-start mb-4">
-				<div class="max-w-[80%]">
-					<!-- Streaming indicator -->
-					<div class="flex items-center gap-2 mb-1">
-						<div class="flex gap-1">
-							<div class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-							<div
-								class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"
-								style="animation-delay: 0.2s"
-							></div>
-							<div
-								class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"
-								style="animation-delay: 0.4s"
-							></div>
-						</div>
-						<span class="text-xs text-gray-500 dark:text-gray-400">Assistant is typing...</span>
+			<div class="mb-8 animate-fade-in">
+				<!-- Role label with streaming indicator -->
+				<div class="flex items-center gap-2 mb-2">
+					<span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">lil</span>
+					<div class="flex items-center gap-1">
+						<div class="w-1.5 h-1.5 bg-accent rounded-full animate-pulse"></div>
+						<div class="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" style="animation-delay: 0.2s"></div>
+						<div class="w-1.5 h-1.5 bg-accent rounded-full animate-pulse" style="animation-delay: 0.4s"></div>
 					</div>
-
-					<!-- Message content -->
-					${
-						this.content
-							? html`
-								<div
-									class="bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-2xl px-4 py-2 shadow-sm"
-								>
-									<div class="prose prose-sm dark:prose-invert max-w-none">
-										${unsafeHTML(renderMarkdown(this.content))}
-									</div>
-								</div>
-							`
-							: ""
-					}
-
-					<!-- Thinking -->
-					${
-						this.thinking
-							? html`
-								<div class="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
-									💭 ${this.thinking}
-								</div>
-							`
-							: ""
-					}
-
-					<!-- Tool calls -->
-					${
-						this.toolCalls?.length
-							? html`
-								<div class="mt-2 space-y-2">
-									${this.toolCalls.map((tool) => html` <lil-tool-renderer .tool=${tool}></lil-tool-renderer> `)}
-								</div>
-							`
-							: ""
-					}
 				</div>
+
+				<!-- Message content -->
+				${
+					this.content
+						? html`
+							<div class="prose prose-sm max-w-none">
+								${unsafeHTML(renderMarkdown(this.content))}
+								<span class="inline-block w-1.5 h-4 bg-accent/50 animate-pulse ml-0.5 align-middle"></span>
+							</div>
+						`
+						: ""
+				}
+
+				<!-- Thinking -->
+				${
+					this.thinking
+						? html`
+							<details class="mt-3 group" open>
+								<summary
+									class="text-xs text-muted-foreground/70 italic cursor-pointer hover:text-muted-foreground list-none flex items-center gap-1.5"
+								>
+									<span class="inline-block transition-transform group-open:rotate-90">▸</span>
+									<span>Thinking</span>
+								</summary>
+								<div class="mt-2 text-sm text-muted-foreground/80 italic pl-4 border-l-2 border-accent/30">
+									${this.thinking}
+								</div>
+							</details>
+						`
+						: ""
+				}
+
+				<!-- Tool calls -->
+				${
+					this.toolCalls?.length
+						? html`
+							<div class="mt-4 space-y-3">
+								${this.toolCalls.map((tool) => html` <lil-tool-renderer .tool=${tool}></lil-tool-renderer> `)}
+							</div>
+						`
+						: ""
+				}
 			</div>
 		`;
 	}

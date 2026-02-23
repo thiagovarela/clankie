@@ -1,6 +1,6 @@
 /**
  * Message list component
- * Displays chat messages with markdown rendering and tool calls
+ * Displays chat messages with Claude-style clean layout
  */
 
 import { html, LitElement } from "lit";
@@ -24,91 +24,102 @@ export class MessageList extends LitElement {
 		return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 	}
 
-	private renderMessage(message: Message) {
+	private renderMessage(message: Message, index: number) {
 		const isUser = message.role === "user";
-		const alignClass = isUser ? "justify-end" : "justify-start";
-		const bgClass = isUser ? "bg-blue-600 text-white" : "bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100";
+		const showRole = index === 0 || this.messages[index - 1]?.role !== message.role;
 
 		return html`
-			<div class="flex ${alignClass} mb-4">
-				<div class="max-w-[80%]">
-					<!-- Message bubble -->
-					<div class="${bgClass} rounded-2xl px-4 py-2 shadow-sm">
-						<!-- Content -->
-						<div class="prose prose-sm dark:prose-invert max-w-none">
-							${unsafeHTML(renderMarkdown(message.content))}
-						</div>
+			<div class="mb-8 animate-fade-in">
+				<!-- Role label -->
+				${
+					showRole
+						? html`
+							<div class="text-xs font-medium text-muted-foreground mb-2 uppercase tracking-wider">
+								${isUser ? "You" : "lil"}
+							</div>
+						`
+						: ""
+				}
 
-						<!-- Attachments -->
-						${
-							message.attachments?.length
-								? html`
-									<div class="mt-2 flex flex-wrap gap-2">
-										${message.attachments.map(
-											(att) => html`
-												<div
-													class="text-xs opacity-80 bg-black/10 dark:bg-white/10 rounded px-2 py-1"
-												>
-													📎 ${att.fileName}
-												</div>
-											`,
-										)}
-									</div>
-								`
-								: ""
-						}
-					</div>
-
-					<!-- Thinking (for assistant messages) -->
-					${
-						!isUser && message.thinking
-							? html`
-								<div class="mt-2 text-xs text-gray-500 dark:text-gray-400 italic">
-									💭 ${message.thinking}
-								</div>
-							`
-							: ""
-					}
-
-					<!-- Tool calls -->
-					${
-						!isUser && message.toolCalls?.length
-							? html`
-								<div class="mt-2 space-y-2">
-									${message.toolCalls.map((tool) => html` <lil-tool-renderer .tool=${tool}></lil-tool-renderer> `)}
-								</div>
-							`
-							: ""
-					}
-
-					<!-- Timestamp -->
-					${
-						message.timestamp
-							? html`
-								<div class="mt-1 text-xs text-gray-400 dark:text-gray-500 text-right">
-									${this.formatTime(message.timestamp)}
-								</div>
-							`
-							: ""
-					}
+				<!-- Message content -->
+				<div class="prose prose-sm max-w-none">
+					${unsafeHTML(renderMarkdown(message.content))}
 				</div>
+
+				<!-- Attachments -->
+				${
+					message.attachments?.length
+						? html`
+							<div class="mt-3 flex flex-wrap gap-2">
+								${message.attachments.map(
+									(att) => html`
+										<div
+											class="text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-1.5 flex items-center gap-2"
+										>
+											<span class="opacity-60">📎</span>
+											<span>${att.fileName}</span>
+										</div>
+									`,
+								)}
+							</div>
+						`
+						: ""
+				}
+
+				<!-- Thinking (for assistant messages) -->
+				${
+					!isUser && message.thinking
+						? html`
+							<details class="mt-3 group">
+								<summary
+									class="text-xs text-muted-foreground/70 italic cursor-pointer hover:text-muted-foreground list-none flex items-center gap-1.5"
+								>
+									<span class="inline-block transition-transform group-open:rotate-90">▸</span>
+									<span>Thinking</span>
+								</summary>
+								<div class="mt-2 text-sm text-muted-foreground/80 italic pl-4 border-l-2 border-muted">
+									${message.thinking}
+								</div>
+							</details>
+						`
+						: ""
+				}
+
+				<!-- Tool calls -->
+				${
+					!isUser && message.toolCalls?.length
+						? html`
+							<div class="mt-4 space-y-3">
+								${message.toolCalls.map((tool) => html` <lil-tool-renderer .tool=${tool}></lil-tool-renderer> `)}
+							</div>
+						`
+						: ""
+				}
+
+				<!-- Timestamp -->
+				${
+					message.timestamp
+						? html`
+							<div class="mt-2 text-xs text-muted-foreground/50">${this.formatTime(message.timestamp)}</div>
+						`
+						: ""
+				}
 			</div>
 		`;
 	}
 
 	render() {
-		console.log("[message-list] Rendering with", this.messages.length, "messages");
 		if (this.messages.length === 0) {
 			return html`
-				<div class="flex items-center justify-center h-full text-gray-400 dark:text-gray-600">
-					<div class="text-center">
-						<div class="text-4xl mb-2">💬</div>
-						<div>Start a conversation...</div>
-					</div>
+				<div class="flex flex-col items-center justify-center h-full text-center py-16">
+					<h2 class="text-5xl font-display mb-4 text-foreground">lil</h2>
+					<p class="text-sm text-muted-foreground">Your personal AI assistant</p>
 				</div>
 			`;
 		}
 
-		return html` <div class="flex flex-col">${this.messages.map((msg) => this.renderMessage(msg))}</div> `;
+		return html`
+			<div class="flex flex-col space-y-4">${this.messages.map((msg, idx) => this.renderMessage(msg, idx))}</div>
+		`;
 	}
 }

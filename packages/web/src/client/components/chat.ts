@@ -5,7 +5,7 @@
 
 import { html, LitElement } from "lit";
 import { customElement, state as litState } from "lit/decorators.js";
-import { createRef, ref, type Ref } from "lit/directives/ref.js";
+import { createRef, type Ref, ref } from "lit/directives/ref.js";
 import { state } from "../state.ts";
 import type { Attachment, Message, ToolCall } from "../types.ts";
 import type { WsClient } from "../ws-client.ts";
@@ -50,8 +50,6 @@ export class Chat extends LitElement {
 		this.streamingContent = state.streamingContent;
 		this.streamingThinking = state.streamingThinking;
 		this.streamingToolCalls = state.streamingToolCalls;
-		
-		console.log("[chat] Connected with initial state:", this.messages.length, "messages");
 	}
 
 	disconnectedCallback(): void {
@@ -89,7 +87,7 @@ export class Chat extends LitElement {
 			uploadIds: [], // Placeholder
 		});
 
-		state.startStreaming();
+		// Don't call state.startStreaming() here - let server event trigger it
 	}
 
 	private handleAbort() {

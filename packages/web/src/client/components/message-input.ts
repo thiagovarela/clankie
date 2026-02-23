@@ -6,8 +6,8 @@
 import { Button } from "@mariozechner/mini-lit/dist/Button.js";
 import { icon } from "@mariozechner/mini-lit/dist/icons.js";
 import { html, LitElement } from "lit";
-import { customElement, property, state as litState } from "lit/decorators.js";
-import { createRef, ref, type Ref } from "lit/directives/ref.js";
+import { customElement, state as litState, property } from "lit/decorators.js";
+import { createRef, type Ref, ref } from "lit/directives/ref.js";
 import { Paperclip, Send, Square } from "lucide";
 import type { Attachment } from "../types.ts";
 
@@ -107,23 +107,25 @@ export class MessageInput extends LitElement {
 	}
 
 	render() {
+		const hasContent = this.value.trim() || this.attachments.length > 0;
+
 		return html`
-			<div class="p-4">
+			<div class="p-6 bg-card/50 backdrop-blur-sm border-t border-border/50">
 				<!-- Attachments preview -->
 				${
 					this.attachments.length > 0
 						? html`
-							<div class="mb-2 flex flex-wrap gap-2">
+							<div class="mb-3 flex flex-wrap gap-2">
 								${this.attachments.map(
 									(att) => html`
 										<div
-											class="flex items-center gap-2 bg-gray-100 dark:bg-gray-800 rounded px-3 py-1 text-sm"
+											class="flex items-center gap-2 bg-muted/50 text-muted-foreground rounded-md px-3 py-1.5 text-sm"
 										>
-											<span>📎</span>
+											<span class="opacity-60">📎</span>
 											<span>${att.fileName}</span>
 											<button
 												@click=${() => this.removeAttachment(att.id)}
-												class="ml-1 text-gray-500 hover:text-red-500"
+												class="ml-1 text-muted-foreground hover:text-destructive transition-colors"
 											>
 												×
 											</button>
@@ -135,9 +137,13 @@ export class MessageInput extends LitElement {
 						: ""
 				}
 
-				<!-- Input area -->
-				<div class="flex items-end gap-2">
-					<!-- File upload -->
+				<!-- Input area with warm elevation -->
+				<div
+					class="flex items-end gap-3 bg-background rounded-lg border border-input shadow-sm transition-shadow duration-200 ${
+						hasContent ? "shadow-md ring-1 ring-accent/20" : ""
+					}"
+				>
+					<!-- File upload button -->
 					<input
 						${ref(this.fileInputRef)}
 						type="file"
@@ -145,19 +151,20 @@ export class MessageInput extends LitElement {
 						class="hidden"
 						@change=${this.handleFileSelect}
 					/>
-					${Button({
-						variant: "ghost",
-						size: "icon",
-						disabled: this.disabled || this.isStreaming,
-						onClick: this.openFilePicker.bind(this),
-						children: icon(Paperclip, "sm"),
-					})}
+					<button
+						@click=${this.openFilePicker.bind(this)}
+						?disabled=${this.disabled || this.isStreaming}
+						class="p-3 text-muted-foreground hover:text-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+						title="Attach files"
+					>
+						${icon(Paperclip, "sm")}
+					</button>
 
 					<!-- Text input -->
 					<textarea
 						${ref(this.textareaRef)}
-						class="flex-1 resize-none rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-						placeholder="Type a message..."
+						class="flex-1 resize-none bg-transparent px-2 py-3 text-sm focus:outline-none placeholder:text-muted-foreground/50 disabled:opacity-50"
+						placeholder="Message lil..."
 						.value=${this.value}
 						@input=${this.handleInput}
 						@keydown=${this.handleKeyDown}
@@ -166,20 +173,33 @@ export class MessageInput extends LitElement {
 					></textarea>
 
 					<!-- Send/Abort button -->
-					${this.isStreaming
-						? Button({
-								variant: "destructive",
-								size: "icon",
-								onClick: this.handleAbort.bind(this),
-								children: icon(Square, "sm"),
-							})
-						: Button({
-								variant: "primary",
-								size: "icon",
-								disabled: this.disabled || (!this.value.trim() && this.attachments.length === 0),
-								onClick: this.handleSend.bind(this),
-								children: icon(Send, "sm"),
-							})}
+					${
+						this.isStreaming
+							? html`
+								<button
+									@click=${this.handleAbort.bind(this)}
+									class="p-3 text-destructive hover:text-destructive/80 transition-colors"
+									title="Stop generating"
+								>
+									${icon(Square, "sm")}
+								</button>
+							`
+							: hasContent
+								? html`
+									<button
+										@click=${this.handleSend.bind(this)}
+										class="p-3 text-accent hover:text-accent/80 transition-colors"
+										title="Send message"
+									>
+										${icon(Send, "sm")}
+									</button>
+								`
+								: html`
+									<div class="p-3 text-muted-foreground/30" title="Type a message to send">
+										${icon(Send, "sm")}
+									</div>
+								`
+					}
 				</div>
 			</div>
 		`;

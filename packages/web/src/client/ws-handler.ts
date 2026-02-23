@@ -43,7 +43,6 @@ function convertMessages(serverMessages: unknown[]): Message[] {
  */
 export function handleWsMessage(message: WsIncomingMessage): void {
 	if (message.type === "ready") {
-		console.log("[ws-handler] Received ready message");
 		state.setConnected(true);
 		// Store available sessions
 		const sessions = message.sessions.map((name) => ({ id: name }));
@@ -51,9 +50,7 @@ export function handleWsMessage(message: WsIncomingMessage): void {
 		state.setCurrentSession(message.sessionName);
 	} else if (message.type === "state") {
 		// Full state update - convert server messages to our format
-		console.log("[ws-handler] Received state message with", message.state.messages.length, "messages");
 		const messages = convertMessages(message.state.messages);
-		console.log("[ws-handler] Converted to", messages.length, "messages:", messages);
 		state.setMessages(messages);
 
 		// Handle streaming state
