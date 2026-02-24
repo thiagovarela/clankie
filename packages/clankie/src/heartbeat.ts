@@ -1,12 +1,12 @@
 /**
- * lil heartbeat service
+ * clankie heartbeat service
  *
- * Periodically reads ~/.lil/heartbeat.md and sends its contents as a prompt
+ * Periodically reads ~/.clankie/heartbeat.md and sends its contents as a prompt
  * to the agent. Results are delivered to the last active channel.
  *
- * Also checks cron jobs from ~/.lil/cron/jobs.json and fires due jobs.
+ * Also checks cron jobs from ~/.clankie/cron/jobs.json and fires due jobs.
  *
- * Runs inside the daemon process. Configurable via lil.json:
+ * Runs inside the daemon process. Configurable via clankie.json:
  *   heartbeat.enabled (default: true)
  *   heartbeat.intervalMinutes (default: 30, min: 5)
  */
@@ -14,13 +14,13 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { LilConfig } from "./config.ts";
+import type { AppConfig } from "./config.ts";
 import { calculateNextRun, loadJobs, saveJobs } from "./extensions/cron/index.ts";
 
 const MIN_INTERVAL_MINUTES = 5;
 const DEFAULT_INTERVAL_MINUTES = 30;
 
-const HEARTBEAT_FILE = join(homedir(), ".lil", "heartbeat.md");
+const HEARTBEAT_FILE = join(homedir(), ".clankie", "heartbeat.md");
 
 export type HeartbeatHandler = (prompt: string) => Promise<void>;
 
@@ -30,7 +30,7 @@ export class HeartbeatService {
 	private timer: ReturnType<typeof setInterval> | null = null;
 	private handler: HeartbeatHandler | null = null;
 
-	constructor(config?: LilConfig) {
+	constructor(config?: AppConfig) {
 		const hb = config?.heartbeat;
 		this.enabled = hb?.enabled !== false; // default: true
 
@@ -115,7 +115,7 @@ export class HeartbeatService {
 	private createDefaultHeartbeatFile(): void {
 		const content = `# Heartbeat Tasks
 
-This file is checked periodically by lil's heartbeat service.
+This file is checked periodically by clankie's heartbeat service.
 Add tasks below — they'll be executed every ${this.intervalMs / 60_000} minutes.
 
 ## Instructions

@@ -1,12 +1,12 @@
 /**
- * lil persona extension
+ * clankie persona extension
  *
- * Loads personality and instructions from ~/.lil/personas/<name>/ flat files,
+ * Loads personality and instructions from ~/.clankie/personas/<name>/ flat files,
  * and manages persistent memory via SQLite + FTS5.
  *
  * Flat files (user-editable persona config):
  *
- *   ~/.lil/personas/<name>/
+ *   ~/.clankie/personas/<name>/
  *   ├── identity.md      — Who the persona is: name, voice, personality traits
  *   ├── instructions.md  — Standing orders: how to behave, what to avoid
  *   ├── knowledge.md     — Facts about the user: preferences, context, environment
@@ -14,7 +14,7 @@
  *
  * SQLite memory (auto-managed by tools):
  *
- *   ~/.lil/memory.db     — FTS5-indexed persistent memory (shared across all personas)
+ *   ~/.clankie/memory.db     — FTS5-indexed persistent memory (shared across all personas)
  *     categories: core (permanent facts), daily (session notes), conversation (chat context)
  *
  * Memory model (inspired by nullclaw):
@@ -72,8 +72,8 @@ const PERSONA_FILES: PersonaFile[] = [
  */
 export function createPersonaExtension(personaName: string = "default") {
 	return function personaExtension(pi: ExtensionAPI) {
-		const personaDir = join(homedir(), ".lil", "personas", personaName);
-		const memoryDbPath = join(homedir(), ".lil", "memory.db");
+		const personaDir = join(homedir(), ".clankie", "personas", personaName);
+		const memoryDbPath = join(homedir(), ".clankie", "memory.db");
 
 		/** Loaded persona file sections (refreshed on session_start) */
 		let sections: { title: string; content: string }[] = [];
@@ -190,7 +190,7 @@ export function createPersonaExtension(personaName: string = "default") {
 				"Examples:\n" +
 				'  key: "user_lang", content: "Prefers TypeScript", category: "core", scope: "persona"\n' +
 				'  key: "user_timezone", content: "GMT-3", category: "core", scope: "global"\n' +
-				'  key: "today_project", content: "Working on lil memory", category: "daily", scope: "persona"',
+				'  key: "today_project", content: "Working on clankie memory", category: "daily", scope: "persona"',
 			parameters: Type.Object({
 				key: Type.String({
 					description:
@@ -444,7 +444,7 @@ export function createPersonaExtension(personaName: string = "default") {
 			description:
 				"Read or replace the contents of a persona file. " +
 				"Use this when the user asks you to change your personality, update instructions, " +
-				"or modify knowledge. Files live in ~/.lil/persona/.\n\n" +
+				"or modify knowledge. Files live in ~/.clankie/persona/.\n\n" +
 				"Available files:\n" +
 				"- identity.md — your name, voice, personality traits\n" +
 				"- instructions.md — standing orders, how to behave\n" +

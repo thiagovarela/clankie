@@ -1,39 +1,39 @@
 #!/usr/bin/env bun
 
 /**
- * lil — CLI entry point
+ * clankie — CLI entry point
  *
  * Commands:
- *   lil send "<message>"            Send a message, print response, exit
- *   lil chat                        Interactive chat session (full pi TUI)
- *   lil login                       Authenticate with your AI provider
- *   lil start                       Start the daemon (channels + agent)
- *   lil stop                        Stop the daemon
- *   lil status                      Check daemon status
- *   lil config show                 Show current configuration
- *   lil config get <path>           Get a config value by dot-path
- *   lil config set <path> <value>   Set a config value by dot-path
- *   lil config unset <path>         Remove a config value
- *   lil persona                     Show loaded persona files
- *   lil persona init                Create starter persona files
- *   lil persona edit <file>         Open a persona file in $EDITOR
- *   lil memory                      Show memory statistics
- *   lil memory search <query>       Search memories
- *   lil memory list [category]      List memories
- *   lil memory export               Export core memories as JSON
- *   lil cron list                   List scheduled jobs
- *   lil cron remove <id>            Remove a scheduled job
+ *   clankie send "<message>"            Send a message, print response, exit
+ *   clankie chat                        Interactive chat session (full pi TUI)
+ *   clankie login                       Authenticate with your AI provider
+ *   clankie start                       Start the daemon (channels + agent)
+ *   clankie stop                        Stop the daemon
+ *   clankie status                      Check daemon status
+ *   clankie config show                 Show current configuration
+ *   clankie config get <path>           Get a config value by dot-path
+ *   clankie config set <path> <value>   Set a config value by dot-path
+ *   clankie config unset <path>         Remove a config value
+ *   clankie persona                     Show loaded persona files
+ *   clankie persona init                Create starter persona files
+ *   clankie persona edit <file>         Open a persona file in $EDITOR
+ *   clankie memory                      Show memory statistics
+ *   clankie memory search <query>       Search memories
+ *   clankie memory list [category]      List memories
+ *   clankie memory export               Export core memories as JSON
+ *   clankie cron list                   List scheduled jobs
+ *   clankie cron remove <id>            Remove a scheduled job
  */
 
 import * as readline from "node:readline/promises";
 import { AuthStorage, InteractiveMode, runPrintMode } from "@mariozechner/pi-coding-agent";
 import JSON5 from "json5";
-import { createLilSession } from "./agent.ts";
+import { createSession } from "./agent.ts";
 import {
+	getAppDir,
 	getAuthPath,
 	getByPath,
 	getConfigPath,
-	getLilDir,
 	loadConfig,
 	saveConfig,
 	setByPath,
@@ -45,38 +45,38 @@ import { installService, showServiceLogs, showServiceStatus, uninstallService } 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function printHelp(): void {
-	console.log(`lil — minimal personal AI assistant
+	console.log(`clankie — minimal personal AI assistant
 
 Usage:
-  lil send [--persona <name>] "<message>"  Send a message, print response, exit
-  lil chat [--persona <name>]              Start interactive chat session
-  lil login                                Authenticate with your AI provider
-  lil start [--foreground]                 Start the daemon (foreground by default)
-  lil stop                                 Stop the daemon
-  lil status                               Check if daemon is running
-  lil daemon install                       Install as a system service (systemd/launchd)
-  lil daemon uninstall                     Remove the system service
-  lil daemon logs                          Show daemon logs
-  lil daemon status                        Show service status
-  lil persona                              List all personas
-  lil persona show [name]                  Show persona files (default: active)
-  lil persona create <name>                Create a new persona
-  lil persona edit [name] [file]           Edit persona files in $EDITOR
-  lil persona remove <name>                Delete a persona (cannot delete "default")
-  lil persona path [name]                  Show persona directory path
-  lil memory                        Show memory statistics
-  lil memory search <query>         Search memories (FTS5)
-  lil memory list [category]        List memories
-  lil memory export                 Export core memories as JSON
-  lil cron list                     List all scheduled jobs
-  lil cron remove <id>              Remove a scheduled job
-  lil config show                   Show current configuration
-  lil config get <path>             Get a config value (dot-path)
-  lil config set <path> <value>     Set a config value (dot-path)
-  lil config unset <path>           Remove a config value
-  lil --help, -h                    Show this help
+  clankie send [--persona <name>] "<message>"  Send a message, print response, exit
+  clankie chat [--persona <name>]              Start interactive chat session
+  clankie login                                Authenticate with your AI provider
+  clankie start [--foreground]                 Start the daemon (foreground by default)
+  clankie stop                                 Stop the daemon
+  clankie status                               Check if daemon is running
+  clankie daemon install                       Install as a system service (systemd/launchd)
+  clankie daemon uninstall                     Remove the system service
+  clankie daemon logs                          Show daemon logs
+  clankie daemon status                        Show service status
+  clankie persona                              List all personas
+  clankie persona show [name]                  Show persona files (default: active)
+  clankie persona create <name>                Create a new persona
+  clankie persona edit [name] [file]           Edit persona files in $EDITOR
+  clankie persona remove <name>                Delete a persona (cannot delete "default")
+  clankie persona path [name]                  Show persona directory path
+  clankie memory                        Show memory statistics
+  clankie memory search <query>         Search memories (FTS5)
+  clankie memory list [category]        List memories
+  clankie memory export                 Export core memories as JSON
+  clankie cron list                     List all scheduled jobs
+  clankie cron remove <id>              Remove a scheduled job
+  clankie config show                   Show current configuration
+  clankie config get <path>             Get a config value (dot-path)
+  clankie config set <path> <value>     Set a config value (dot-path)
+  clankie config unset <path>           Remove a config value
+  clankie --help, -h                    Show this help
 
-Config file: ~/.lil/lil.json (JSON5 — comments and trailing commas allowed)
+Config file: ~/.clankie/clankie.json (JSON5 — comments and trailing commas allowed)
 
 Config paths (dot-separated):
   agent.persona                     Default persona name (default: "default")
@@ -100,20 +100,20 @@ Slack slash commands (when running as daemon):
   /new                              Start a fresh session
 
 Examples:
-  lil login
-  lil config set channels.slack.appToken "xapp-..."
-  lil config set channels.slack.botToken "xoxb-..."
-  lil config set channels.slack.allowFrom ["U12345678"]
-  lil start                         # run in foreground
-  lil daemon install                # install as system service (auto-start on boot)
-  lil daemon logs                   # tail daemon logs
+  clankie login
+  clankie config set channels.slack.appToken "xapp-..."
+  clankie config set channels.slack.botToken "xoxb-..."
+  clankie config set channels.slack.allowFrom ["U12345678"]
+  clankie start                         # run in foreground
+  clankie daemon install                # install as system service (auto-start on boot)
+  clankie daemon logs                   # tail daemon logs
 
-Credentials are stored at ~/.lil/auth.json (separate from pi's auth).
+Credentials are stored at ~/.clankie/auth.json (separate from pi's auth).
 `);
 }
 
 function printVersion(): void {
-	console.log("lil 0.1.0");
+	console.log("clankie 0.1.0");
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -143,11 +143,11 @@ async function cmdSend(args: string[]): Promise<void> {
 	const { persona, remainingArgs } = extractPersonaFlag(args);
 	const message = remainingArgs.join(" ").trim();
 	if (!message) {
-		console.error('Error: no message provided.\n\nUsage: lil send [--persona <name>] "<message>"');
+		console.error('Error: no message provided.\n\nUsage: clankie send [--persona <name>] "<message>"');
 		process.exit(1);
 	}
 
-	const { session, modelFallbackMessage } = await createLilSession({ ephemeral: false, persona });
+	const { session, modelFallbackMessage } = await createSession({ ephemeral: false, persona });
 
 	if (modelFallbackMessage) {
 		console.warn(`Warning: ${modelFallbackMessage}`);
@@ -163,7 +163,7 @@ async function cmdChat(args: string[]): Promise<void> {
 	const { persona, remainingArgs } = extractPersonaFlag(args);
 	const initialMessage = remainingArgs.join(" ").trim() || undefined;
 
-	const { session, modelFallbackMessage } = await createLilSession({
+	const { session, modelFallbackMessage } = await createSession({
 		continueRecent: true,
 		persona,
 	});
@@ -298,7 +298,7 @@ async function cmdDaemon(args: string[]): Promise<void> {
 	const [sub] = args;
 
 	if (!sub) {
-		console.error("Usage: lil daemon install | uninstall | logs | status");
+		console.error("Usage: clankie daemon install | uninstall | logs | status");
 		process.exit(1);
 	}
 
@@ -316,7 +316,7 @@ async function cmdDaemon(args: string[]): Promise<void> {
 			showServiceStatus();
 			break;
 		default:
-			console.error(`Unknown daemon subcommand "${sub}".\n\nUsage: lil daemon install | uninstall | logs | status`);
+			console.error(`Unknown daemon subcommand "${sub}".\n\nUsage: clankie daemon install | uninstall | logs | status`);
 			process.exit(1);
 	}
 }
@@ -324,7 +324,7 @@ async function cmdDaemon(args: string[]): Promise<void> {
 async function cmdConfig(args: string[]): Promise<void> {
 	const [sub, ...rest] = args;
 
-	// lil config show (or just `lil config`)
+	// clankie config show (or just `clankie config`)
 	if (!sub || sub === "show") {
 		const config = loadConfig();
 		if (Object.keys(config).length === 0) {
@@ -337,11 +337,11 @@ async function cmdConfig(args: string[]): Promise<void> {
 		return;
 	}
 
-	// lil config get <path>
+	// clankie config get <path>
 	if (sub === "get") {
 		const [path] = rest;
 		if (!path) {
-			console.error("Usage: lil config get <path>\n\nExample: lil config get channels.slack.botToken");
+			console.error("Usage: clankie config get <path>\n\nExample: clankie config get channels.slack.botToken");
 			process.exit(1);
 		}
 		const config = loadConfig();
@@ -354,12 +354,12 @@ async function cmdConfig(args: string[]): Promise<void> {
 		return;
 	}
 
-	// lil config set <path> <value>
+	// clankie config set <path> <value>
 	if (sub === "set") {
 		const [path, ...valueParts] = rest;
 		if (!path) {
 			console.error(
-				'Usage: lil config set <path> <value>\n\nExample: lil config set channels.slack.botToken "xoxb-..."',
+				'Usage: clankie config set <path> <value>\n\nExample: clankie config set channels.slack.botToken "xoxb-..."',
 			);
 			process.exit(1);
 		}
@@ -385,11 +385,11 @@ async function cmdConfig(args: string[]): Promise<void> {
 		return;
 	}
 
-	// lil config unset <path>
+	// clankie config unset <path>
 	if (sub === "unset") {
 		const [path] = rest;
 		if (!path) {
-			console.error("Usage: lil config unset <path>");
+			console.error("Usage: clankie config unset <path>");
 			process.exit(1);
 		}
 		const config = loadConfig();
@@ -399,14 +399,14 @@ async function cmdConfig(args: string[]): Promise<void> {
 		return;
 	}
 
-	// lil config path
+	// clankie config path
 	if (sub === "path") {
 		console.log(getConfigPath());
 		return;
 	}
 
 	console.error(
-		`Unknown config subcommand "${sub}".\n\nUsage: lil config show | get <path> | set <path> <value> | unset <path>`,
+		`Unknown config subcommand "${sub}".\n\nUsage: clankie config show | get <path> | set <path> <value> | unset <path>`,
 	);
 	process.exit(1);
 }
@@ -422,7 +422,7 @@ function getPersonaStarters(personaName: string): Record<string, string> {
 	return {
 		"identity.md": `# Identity
 
-You are **lil (${personaName})**, a personal AI assistant.
+You are **clankie (${personaName})**, a personal AI assistant.
 
 - You are direct, concise, and helpful
 - You have a warm but no-nonsense personality
@@ -440,7 +440,7 @@ You are **lil (${personaName})**, a personal AI assistant.
 `,
 		"knowledge.md": `# User Knowledge
 
-<!-- Add facts about yourself here so lil knows your context -->
+<!-- Add facts about yourself here so clankie knows your context -->
 - Name: (your name)
 - Stack: (your tech stack)
 - Current project: (what you're working on)
@@ -468,7 +468,7 @@ async function cmdPersona(args: string[]): Promise<void> {
 
 		if (personas.length === 0) {
 			console.log("No personas found.");
-			console.log(`\nCreate one with: lil persona create default`);
+			console.log(`\nCreate one with: clankie persona create default`);
 			return;
 		}
 
@@ -509,7 +509,7 @@ async function cmdPersona(args: string[]): Promise<void> {
 
 		if (!existsSync(personaDir)) {
 			console.error(`Persona "${personaName}" not found at ${personaDir}`);
-			console.log(`\nCreate it with: lil persona create ${personaName}`);
+			console.log(`\nCreate it with: clankie persona create ${personaName}`);
 			process.exit(1);
 		}
 
@@ -563,7 +563,7 @@ async function cmdPersona(args: string[]): Promise<void> {
 		console.log(`✓ Created persona "${personaName}"`);
 		console.log(`  Files: ${Object.keys(starters).join(", ")}`);
 		console.log(`  Path: ${personaDir}`);
-		console.log(`\nEdit with: lil persona edit ${personaName}`);
+		console.log(`\nEdit with: clankie persona edit ${personaName}`);
 		return;
 	}
 
@@ -593,7 +593,7 @@ async function cmdPersona(args: string[]): Promise<void> {
 
 		if (!existsSync(personaDir)) {
 			console.error(`Persona "${personaName}" not found.`);
-			console.log(`\nCreate it with: lil persona create ${personaName}`);
+			console.log(`\nCreate it with: clankie persona create ${personaName}`);
 			process.exit(1);
 		}
 
@@ -675,12 +675,12 @@ async function cmdPersona(args: string[]): Promise<void> {
 	console.error(`Unknown persona subcommand "${sub}".
 
 Usage:
-  lil persona                       List all personas
-  lil persona show [name]           Show persona files
-  lil persona create <name>         Create a new persona
-  lil persona edit [name] [file]    Edit persona files
-  lil persona remove <name>         Delete a persona
-  lil persona path [name]           Show persona directory`);
+  clankie persona                       List all personas
+  clankie persona show [name]           Show persona files
+  clankie persona create <name>         Create a new persona
+  clankie persona edit [name] [file]    Edit persona files
+  clankie persona remove <name>         Delete a persona
+  clankie persona path [name]           Show persona directory`);
 	process.exit(1);
 }
 
@@ -688,7 +688,7 @@ Usage:
 
 import { MemoryDB } from "./extensions/persona/memory-db.ts";
 
-const MEMORY_DB_PATH = join(getLilDir(), "memory.db");
+const MEMORY_DB_PATH = join(getAppDir(), "memory.db");
 
 async function cmdMemory(args: string[]): Promise<void> {
 	// Extract --persona flag
@@ -724,11 +724,11 @@ async function cmdMemory(args: string[]): Promise<void> {
 			return;
 		}
 
-		// lil memory search <query>
+		// clankie memory search <query>
 		if (sub === "search") {
 			const query = rest.join(" ").trim();
 			if (!query) {
-				console.error("Usage: lil memory search [--persona <name>] <query>");
+				console.error("Usage: clankie memory search [--persona <name>] <query>");
 				process.exit(1);
 			}
 			const results = db.recall(query, personaName, 10);
@@ -746,7 +746,7 @@ async function cmdMemory(args: string[]): Promise<void> {
 			return;
 		}
 
-		// lil memory list [category]
+		// clankie memory list [category]
 		if (sub === "list") {
 			const category = rest[0];
 			const entries = db.list(category, personaName, 50);
@@ -766,7 +766,7 @@ async function cmdMemory(args: string[]): Promise<void> {
 			return;
 		}
 
-		// lil memory export
+		// clankie memory export
 		if (sub === "export") {
 			const core = db.exportCore();
 			const json = JSON.stringify(
@@ -778,11 +778,11 @@ async function cmdMemory(args: string[]): Promise<void> {
 			return;
 		}
 
-		// lil memory forget <key>
+		// clankie memory forget <key>
 		if (sub === "forget") {
 			const key = rest[0];
 			if (!key) {
-				console.error("Usage: lil memory forget <key>");
+				console.error("Usage: clankie memory forget <key>");
 				process.exit(1);
 			}
 			const forgotten = db.forget(key);
@@ -795,7 +795,7 @@ async function cmdMemory(args: string[]): Promise<void> {
 		}
 
 		console.error(
-			`Unknown memory subcommand "${sub}".\n\nUsage: lil memory [stats | search <query> | list [category] | export | forget <key>]`,
+			`Unknown memory subcommand "${sub}".\n\nUsage: clankie memory [stats | search <query> | list [category] | export | forget <key>]`,
 		);
 		process.exit(1);
 	} finally {
@@ -810,7 +810,7 @@ import { loadJobs, saveJobs } from "./extensions/cron/index.ts";
 async function cmdCron(args: string[]): Promise<void> {
 	const [sub, ...rest] = args;
 
-	// lil cron list
+	// clankie cron list
 	if (!sub || sub === "list") {
 		const jobs = loadJobs();
 		const active = jobs.filter((j) => !j.completed);
@@ -831,11 +831,11 @@ async function cmdCron(args: string[]): Promise<void> {
 		return;
 	}
 
-	// lil cron remove <id>
+	// clankie cron remove <id>
 	if (sub === "remove") {
 		const id = rest[0];
 		if (!id) {
-			console.error("Usage: lil cron remove <id>");
+			console.error("Usage: clankie cron remove <id>");
 			process.exit(1);
 		}
 		const jobs = loadJobs();
@@ -850,7 +850,7 @@ async function cmdCron(args: string[]): Promise<void> {
 		return;
 	}
 
-	// lil cron clear — remove all completed jobs
+	// clankie cron clear — remove all completed jobs
 	if (sub === "clear") {
 		const jobs = loadJobs();
 		const before = jobs.length;
@@ -860,7 +860,7 @@ async function cmdCron(args: string[]): Promise<void> {
 		return;
 	}
 
-	console.error(`Unknown cron subcommand "${sub}".\n\nUsage: lil cron [list | remove <id> | clear]`);
+	console.error(`Unknown cron subcommand "${sub}".\n\nUsage: clankie cron [list | remove <id> | clear]`);
 	process.exit(1);
 }
 

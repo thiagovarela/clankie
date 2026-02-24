@@ -1,11 +1,11 @@
 display_information:
-  name: lil
+  name: clankie
   description: Your AI assistant in Slack
   background_color: "#1a1a2e"
 
 features:
   bot_user:
-    display_name: lil
+    display_name: clankie
     always_online: true
 
 oauth_config:

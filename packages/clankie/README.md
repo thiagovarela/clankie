@@ -55,7 +55,7 @@ Now `lil` is available from anywhere. If you skip this, use `bun run packages/li
 
 1. Go to **Basic Information** (in the sidebar)
 2. Scroll to **App-Level Tokens** → Click **Generate Token and Scopes**
-3. Name: `lil-socket`
+3. Name: `clankie-socket`
 4. Click **Add Scope** → Select `connections:write`
 5. Click **Generate**
 6. **Copy the token** (starts with `xapp-`) — you'll need this for config
@@ -92,7 +92,7 @@ Replace:
 lil login
 ```
 
-Choose your provider (Anthropic, OpenAI, etc.) and authenticate. Credentials are stored securely in `~/.lil/auth.json`.
+Choose your provider (Anthropic, OpenAI, etc.) and authenticate. Credentials are stored securely in `~/.clankie/auth.json`.
 
 ### Step 7: Start lil
 
@@ -103,7 +103,7 @@ lil start
 You should see:
 ```
 [daemon] Starting lil daemon (pid 12345)...
-[daemon] Workspace: /Users/you/.lil/workspace
+[daemon] Workspace: /Users/you/.clankie/workspace
 [daemon] Channels: slack
 [slack] Connected as @lil (U01XYZ...)
 [daemon] Ready. Waiting for messages...
@@ -189,7 +189,7 @@ lil config set agent.model.primary "anthropic/claude-sonnet-4-5"
 
 ## Configuration
 
-Config file: `~/.lil/lil.json` (JSON5 format — comments and trailing commas allowed)
+Config file: `~/.clankie/clankie.json` (JSON5 format — comments and trailing commas allowed)
 
 ### Common Settings
 
@@ -249,7 +249,7 @@ lil persona create coding
 lil persona edit coding
 ```
 
-This creates `~/.lil/personas/coding/` with these files:
+This creates `~/.clankie/personas/coding/` with these files:
 
 #### `identity.md` — Who the assistant is
 ```markdown
@@ -340,7 +340,7 @@ You: @lil remember my timezone is PST
 Bot: Got it, I'll remember that.
 ```
 
-Behind the scenes, lil uses the `remember` tool (provided by the persona extension) to store this in `~/.lil/memory.db`. Later:
+Behind the scenes, lil uses the `remember` tool (provided by the persona extension) to store this in `~/.clankie/memory.db`. Later:
 
 ```
 You: @lil what time is it for me?
@@ -395,7 +395,7 @@ lil daemon install
 ```
 
 This installs:
-- **macOS**: launchd agent (`~/Library/LaunchAgents/ai.lil.daemon.plist`)
+- **macOS**: launchd agent (`~/Library/LaunchAgents/ai.clankie.daemon.plist`)
 - **Linux**: systemd user service (`~/.config/systemd/user/lil.service`)
 
 The daemon starts immediately and runs on boot.
@@ -413,7 +413,7 @@ lil daemon logs
 lil daemon uninstall
 ```
 
-Logs are stored in `~/.lil/logs/daemon.log`.
+Logs are stored in `~/.clankie/logs/daemon.log`.
 
 ## Security
 
@@ -423,7 +423,7 @@ lil includes a built-in security extension that protects against common mistakes
 
 - **Dangerous bash commands**: `rm -rf /`, `sudo`, `curl | sh`, `eval`
 - **Sensitive file writes**: `~/.ssh/`, `~/.aws/`, `.env` files, system directories
-- **Credential reads**: SSH keys, AWS credentials, API keys, `~/.lil/auth.json`
+- **Credential reads**: SSH keys, AWS credentials, API keys, `~/.clankie/auth.json`
 - **Network exfiltration**: Patterns that suggest data theft
 
 ### What It Redacts
@@ -454,7 +454,7 @@ lil can schedule periodic tasks (not yet documented — coming soon).
 
 ### Heartbeat
 
-lil can check `~/.lil/heartbeat.md` periodically and take proactive actions (not yet documented — coming soon).
+lil can check `~/.clankie/heartbeat.md` periodically and take proactive actions (not yet documented — coming soon).
 
 ### pi Extensions
 

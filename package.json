@@ -1,11 +1,11 @@
 {
-	"name": "lil-workspace",
+	"name": "clankie-workspace",
 	"private": true,
 	"workspaces": [
-		"packages/lil"
+		"packages/clankie"
 	],
 	"scripts": {
-		"dev": "bun run --filter lil dev",
+		"dev": "bun run --filter clankie dev",
 		"check": "biome check .",
 		"check:fix": "biome check --fix .",
 		"format": "biome format --write ."

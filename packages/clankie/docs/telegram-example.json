@@ -1,6 +1,6 @@
 {
   // Example lil configuration for Telegram
-  // Save this as ~/.lil/lil.json
+  // Save this as ~/.clankie/clankie.json
 
   "agent": {
     "model": {

@@ -1,5 +1,5 @@
 /**
- * lil daemon — always-on process that connects channels to the agent.
+ * clankie daemon — always-on process that connects channels to the agent.
  *
  * Receives messages from channels (Telegram, etc.), routes them to
  * a pi agent session, collects the response, and sends it back.
@@ -22,12 +22,12 @@ import {
 import type { Attachment, Channel, InboundMessage } from "./channels/channel.ts";
 import { SlackChannel } from "./channels/slack.ts";
 import {
+	type AppConfig,
 	getAgentDir,
+	getAppDir,
 	getAuthPath,
-	getLilDir,
 	getPersonaDir,
 	getWorkspace,
-	type LilConfig,
 	loadChannelPersonaOverrides,
 	loadConfig,
 	resolvePersonaModel,
@@ -40,7 +40,7 @@ import { HeartbeatService } from "./heartbeat.ts";
 
 // ─── PID file management ──────────────────────────────────────────────────────
 
-const PID_FILE = join(getLilDir(), "daemon.pid");
+const PID_FILE = join(getAppDir(), "daemon.pid");
 
 export function isRunning(): { running: boolean; pid?: number } {
 	if (!existsSync(PID_FILE)) return { running: false };
@@ -76,7 +76,7 @@ const sessionCache = new Map<string, AgentSession>();
 // Track active session name per chat (for /switch command)
 const activeSessionNames = new Map<string, string>();
 
-// Track channel-specific persona overrides (runtime, persisted to ~/.lil/channel-personas.json)
+// Track channel-specific persona overrides (runtime, persisted to ~/.clankie/channel-personas.json)
 const channelPersonaOverrides = new Map<string, string>();
 
 /**
@@ -88,7 +88,7 @@ const channelPersonaOverrides = new Map<string, string>();
  * 4. Config global default (agent.persona)
  * 5. Hardcoded fallback ("default")
  */
-function resolveChannelPersona(channel: string, chatId: string, config: LilConfig): string {
+function resolveChannelPersona(channel: string, chatId: string, config: AppConfig): string {
 	const channelKey = `${channel}_${chatId}`;
 
 	// 1. Runtime override
@@ -114,7 +114,7 @@ function resolveChannelPersona(channel: string, chatId: string, config: LilConfi
 
 async function getOrCreateSession(
 	chatKey: string,
-	config: LilConfig,
+	config: AppConfig,
 	personaName: string = "default",
 ): Promise<AgentSession> {
 	const cached = sessionCache.get(chatKey);
@@ -144,7 +144,7 @@ async function getOrCreateSession(
 	await loader.reload();
 
 	// Use a stable session directory per chat so conversations persist across restarts
-	const sessionDir = join(getLilDir(), "sessions", chatKey);
+	const sessionDir = join(getAppDir(), "sessions", chatKey);
 
 	const sessionManager = SessionManager.continueRecent(cwd, sessionDir);
 
@@ -225,10 +225,10 @@ async function getOrCreateSession(
 
 /**
  * List all session names for a given chat identifier.
- * Scans ~/.lil/sessions/ for directories matching the chatIdentifier prefix.
+ * Scans ~/.clankie/sessions/ for directories matching the chatIdentifier prefix.
  */
 function listSessionNames(chatIdentifier: string): string[] {
-	const sessionsDir = join(getLilDir(), "sessions");
+	const sessionsDir = join(getAppDir(), "sessions");
 	if (!existsSync(sessionsDir)) {
 		return [];
 	}
@@ -287,7 +287,7 @@ async function saveNonImageAttachments(
 	const { mkdirSync, writeFileSync } = await import("node:fs");
 	const { join } = await import("node:path");
 
-	const dir = join(getLilDir(), "attachments", chatKey);
+	const dir = join(getAppDir(), "attachments", chatKey);
 	mkdirSync(dir, { recursive: true });
 
 	const results: { fileName: string; path: string }[] = [];
@@ -449,7 +449,7 @@ async function processMessage(
 				lines.push("  `/persona <name>` — switch to a different persona");
 				lines.push("  `/persona reset` — reset to the configured default");
 				lines.push("");
-				lines.push("Use `lil persona` to list available personas.");
+				lines.push("Use `clankie persona` to list available personas.");
 
 				await channel.send(message.chatId, lines.join("\n"), sendOptions);
 				return;
@@ -494,7 +494,7 @@ async function processMessage(
 			} catch (err) {
 				await channel.send(
 					message.chatId,
-					`⚠️ Invalid persona name: ${err instanceof Error ? err.message : String(err)}\n\nUse \`lil persona\` to list available personas.`,
+					`⚠️ Invalid persona name: ${err instanceof Error ? err.message : String(err)}\n\nUse \`clankie persona\` to list available personas.`,
 					sendOptions,
 				);
 				return;
@@ -608,10 +608,10 @@ export async function startDaemon(): Promise<void> {
 	if (channels.length === 0) {
 		console.error(
 			"No channels configured. Set up Slack:\n\n" +
-				"  lil config set channels.slack.appToken <xapp-...>\n" +
-				"  lil config set channels.slack.botToken <xoxb-...>\n" +
-				'  lil config set channels.slack.allowFrom ["U12345678"]\n' +
-				"\nOr edit ~/.lil/lil.json directly.\n",
+				"  clankie config set channels.slack.appToken <xapp-...>\n" +
+				"  clankie config set channels.slack.botToken <xoxb-...>\n" +
+				'  clankie config set channels.slack.allowFrom ["U12345678"]\n' +
+				"\nOr edit ~/.clankie/clankie.json directly.\n",
 		);
 		process.exit(1);
 	}
@@ -682,7 +682,7 @@ export async function startDaemon(): Promise<void> {
 
 	// ─── Start channels ──────────────────────────────────────────────────
 
-	console.log(`[daemon] Starting lil daemon (pid ${process.pid})...`);
+	console.log(`[daemon] Starting clankie daemon (pid ${process.pid})...`);
 	console.log(`[daemon] Workspace: ${getWorkspace(config)}`);
 	console.log(`[daemon] Channels: ${channels.length > 0 ? channels.map((c) => c.name).join(", ") : "(none)"}`);
 

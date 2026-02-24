@@ -1,8 +1,8 @@
 /**
- * lil cron extension
+ * clankie cron extension
  *
  * Provides tools for the agent to schedule one-time reminders and recurring tasks.
- * Jobs are stored in ~/.lil/cron/jobs.json and executed by the daemon's heartbeat loop.
+ * Jobs are stored in ~/.clankie/cron/jobs.json and executed by the daemon's heartbeat loop.
  *
  * Tools:
  *   - cron_add      — Schedule a new job (one-time or recurring)
@@ -11,7 +11,7 @@
  *   - cron_update   — Update an existing job
  *
  * Job storage:
- *   ~/.lil/cron/jobs.json — Array of CronJob objects, managed atomically.
+ *   ~/.clankie/cron/jobs.json — Array of CronJob objects, managed atomically.
  *
  * The daemon reads this file and triggers jobs when they're due.
  * This extension only manages the job definitions — execution is in the daemon.
@@ -57,7 +57,7 @@ export interface CronJob {
 
 // ─── Storage helpers ───────────────────────────────────────────────────────────
 
-const CRON_DIR = join(homedir(), ".lil", "cron");
+const CRON_DIR = join(homedir(), ".clankie", "cron");
 const JOBS_FILE = join(CRON_DIR, "jobs.json");
 
 function ensureCronDir(): void {

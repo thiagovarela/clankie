@@ -29,7 +29,7 @@ Telegram (untrusted)
 **Mitigation:**
 - **Telegram user ID allowlist** — only pre-approved user IDs get responses
 - Unknown senders are silently ignored (no error, no acknowledgment)
-- Allowlist stored in `~/.lil/config.json` with restrictive file permissions (0600)
+- Allowlist stored in `~/.clankie/config.json` with restrictive file permissions (0600)
 - `lil allow <user-id>` to add users, requires local access
 
 ### 2. Prompt Injection (Direct)
@@ -51,15 +51,15 @@ A built-in lil extension that intercepts `tool_call` events:
   - Any command that pipes to a shell interpreter
   - Network exfiltration patterns (`curl -d`, `wget --post`, `nc`, etc.)
 - **Protected path blocking** — block writes to:
-  - `~/.ssh/`, `~/.gnupg/`, `~/.aws/`, `~/.lil/`
+  - `~/.ssh/`, `~/.gnupg/`, `~/.aws/`, `~/.clankie/`
   - `.env` files, `/etc/`, system directories
   - The lil config and credentials themselves
 - **Read restrictions** — block reads of:
   - Private keys, credentials, tokens
-  - `~/.lil/config.json` (contains bot token, allowlist)
+  - `~/.clankie/config.json` (contains bot token, allowlist)
 
 #### Layer 2: Working directory confinement
-- Agent sessions run with `cwd` set to a dedicated workspace (e.g., `~/.lil/workspace/`)
+- Agent sessions run with `cwd` set to a dedicated workspace (e.g., `~/.clankie/workspace/`)
 - The agent CAN still access paths outside via absolute paths, but the confinement
   makes casual access harder and is a signal to the model
 
@@ -110,7 +110,7 @@ through the Telegram channel.
 
 **Mitigations:**
 - Config file permissions: `0600` (owner-only read/write)
-- Telegram bot token stored in `~/.lil/config.json`, not in env vars by default
+- Telegram bot token stored in `~/.clankie/config.json`, not in env vars by default
 - Pi's `AuthStorage` handles API key/OAuth token storage
 - Never log credentials, never include them in agent context
 - Protected path blocking prevents agent from reading its own config
@@ -147,7 +147,7 @@ export default function (pi: ExtensionAPI) {
     /\.ssh\//i,
     /\.gnupg\//i,
     /\.aws\//i,
-    /\.lil\//i,
+    /\.clankie\//i,
     /\.env$/i,
     /\/etc\//i,
     /id_rsa/i,
@@ -158,7 +158,7 @@ export default function (pi: ExtensionAPI) {
     /\.ssh\/id_/i,
     /\.env$/i,
     /credentials/i,
-    /\.lil\/config/i,
+    /\.clankie\/config/i,
     /secret/i,
     /\.pem$/i,
   ];
@@ -237,7 +237,7 @@ export default function (pi: ExtensionAPI) {
 | Rate limiting | Messages per minute | 10/min | Config |
 | Token budget | Max tokens per session | 100K | Config |
 | Execution timeout | Max seconds per message | 120s | Config |
-| Working directory | Agent cwd | `~/.lil/workspace/` | Config |
+| Working directory | Agent cwd | `~/.clankie/workspace/` | Config |
 
 ---
 

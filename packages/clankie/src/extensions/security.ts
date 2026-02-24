@@ -1,5 +1,5 @@
 /**
- * lil security extension
+ * clankie security extension
  *
  * Hooks into pi's extension system to block dangerous tool calls,
  * protect sensitive paths, and redact sensitive data from tool results.
@@ -40,7 +40,7 @@ export default function securityExtension(pi: ExtensionAPI) {
 		/[/\\]\.ssh[/\\]/i,
 		/[/\\]\.gnupg[/\\]/i,
 		/[/\\]\.aws[/\\]/i,
-		/[/\\]\.lil[/\\]/i,
+		/[/\\]\.clankie[/\\]/i,
 		/[/\\]\.pi[/\\]/i,
 		/\.env$/i,
 		/\.env\./i,
@@ -63,7 +63,7 @@ export default function securityExtension(pi: ExtensionAPI) {
 		/[/\\]\.ssh[/\\].*_ecdsa/i,
 		/\.env$/i,
 		/\.env\./i,
-		/[/\\]\.lil[/\\]config/i,
+		/[/\\]\.clankie[/\\]config/i,
 		/[/\\]\.aws[/\\]credentials/i,
 		/[/\\]\.gnupg[/\\]/i,
 		/\.pem$/i,
@@ -96,7 +96,7 @@ export default function securityExtension(pi: ExtensionAPI) {
 				if (pattern.test(cmd)) {
 					return {
 						block: true,
-						reason: `[lil security] Blocked dangerous command pattern.\nCommand: ${cmd.slice(0, 200)}`,
+						reason: `[clankie security] Blocked dangerous command pattern.\nCommand: ${cmd.slice(0, 200)}`,
 					};
 				}
 			}
@@ -109,7 +109,7 @@ export default function securityExtension(pi: ExtensionAPI) {
 				if (pattern.test(path)) {
 					return {
 						block: true,
-						reason: `[lil security] Blocked write to protected path: ${path}`,
+						reason: `[clankie security] Blocked write to protected path: ${path}`,
 					};
 				}
 			}
@@ -122,7 +122,7 @@ export default function securityExtension(pi: ExtensionAPI) {
 				if (pattern.test(path)) {
 					return {
 						block: true,
-						reason: `[lil security] Blocked read of sensitive path: ${path}`,
+						reason: `[clankie security] Blocked read of sensitive path: ${path}`,
 					};
 				}
 			}
@@ -145,7 +145,7 @@ export default function securityExtension(pi: ExtensionAPI) {
 				pattern.lastIndex = 0;
 				if (pattern.test(text)) {
 					pattern.lastIndex = 0;
-					text = text.replace(pattern, "[REDACTED by lil security]");
+					text = text.replace(pattern, "[REDACTED by clankie security]");
 					redacted = true;
 				}
 			}

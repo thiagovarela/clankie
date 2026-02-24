@@ -1,10 +1,10 @@
 {
-	"name": "lil",
+	"name": "clankie",
 	"version": "0.1.0",
 	"description": "A minimal personal AI assistant built on pi's SDK",
 	"type": "module",
 	"bin": {
-		"lil": "./src/cli.ts"
+		"clankie": "./src/cli.ts"
 	},
 	"scripts": {
 		"dev": "bun run src/cli.ts"

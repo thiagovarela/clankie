@@ -1,27 +1,27 @@
 /**
- * lil service installer — manages systemd (Linux) and launchd (macOS) services.
+ * clankie service installer — manages systemd (Linux) and launchd (macOS) services.
  *
  * Commands:
- *   lil daemon install    — install and start the service
- *   lil daemon uninstall  — stop and remove the service
- *   lil daemon logs       — show service logs
+ *   clankie daemon install    — install and start the service
+ *   clankie daemon uninstall  — stop and remove the service
+ *   clankie daemon logs       — show service logs
  *
- * On Linux:  installs a systemd user service (~/.config/systemd/user/lil.service)
- * On macOS:  installs a launchd user agent (~/Library/LaunchAgents/ai.lil.daemon.plist)
+ * On Linux:  installs a systemd user service (~/.config/systemd/user/clankie.service)
+ * On macOS:  installs a launchd user agent (~/Library/LaunchAgents/ai.clankie.daemon.plist)
  */
 
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { dirname, join } from "node:path";
-import { getLilDir } from "./config.ts";
+import { getAppDir } from "./config.ts";
 
-const SERVICE_NAME = "lil";
-const LAUNCHD_LABEL = "ai.lil.daemon";
+const SERVICE_NAME = "clankie";
+const LAUNCHD_LABEL = "ai.clankie.daemon";
 
-// ─── Resolve the lil binary path ──────────────────────────────────────────────
+// ─── Resolve the app binary path ──────────────────────────────────────────────
 
-function _resolveLilBinary(): string {
+function _resolveAppBinary(): string {
 	// If running from a compiled binary, use its path
 	if (!process.argv[1]?.endsWith(".ts")) {
 		return process.argv[0];
@@ -50,12 +50,12 @@ function systemdUnitPath(): string {
 function buildSystemdUnit(): string {
 	const args = resolveProgramArguments();
 	const execStart = args.map(systemdEscapeArg).join(" ");
-	const workspace = join(getLilDir(), "workspace");
-	const logDir = join(getLilDir(), "logs");
+	const workspace = join(getAppDir(), "workspace");
+	const logDir = join(getAppDir(), "logs");
 
 	return [
 		"[Unit]",
-		`Description=lil — personal AI assistant daemon`,
+		`Description=clankie — personal AI assistant daemon`,
 		"After=network-online.target",
 		"Wants=network-online.target",
 		"",
@@ -102,8 +102,8 @@ async function installSystemd(): Promise<void> {
 	}
 
 	const unitPath = systemdUnitPath();
-	const logDir = join(getLilDir(), "logs");
-	const workspace = join(getLilDir(), "workspace");
+	const logDir = join(getAppDir(), "logs");
+	const workspace = join(getAppDir(), "workspace");
 
 	// Ensure directories exist
 	mkdirSync(dirname(unitPath), { recursive: true });
@@ -162,7 +162,7 @@ async function uninstallSystemd(): Promise<void> {
 }
 
 function logsSystemd(): void {
-	const logFile = join(getLilDir(), "logs", "daemon.log");
+	const logFile = join(getAppDir(), "logs", "daemon.log");
 	console.log(`Log file: ${logFile}\n`);
 
 	// Try journalctl first, fall back to log file
@@ -201,8 +201,8 @@ function plistEscape(value: string): string {
 
 function buildLaunchdPlist(): string {
 	const args = resolveProgramArguments();
-	const logDir = join(getLilDir(), "logs");
-	const workspace = join(getLilDir(), "workspace");
+	const logDir = join(getAppDir(), "logs");
+	const workspace = join(getAppDir(), "workspace");
 
 	const argsXml = args.map((a) => `      <string>${plistEscape(a)}</string>`).join("\n");
 
@@ -246,8 +246,8 @@ ${envXml}
 
 async function installLaunchd(): Promise<void> {
 	const plistPath = launchdPlistPath();
-	const logDir = join(getLilDir(), "logs");
-	const workspace = join(getLilDir(), "workspace");
+	const logDir = join(getAppDir(), "logs");
+	const workspace = join(getAppDir(), "workspace");
 
 	mkdirSync(dirname(plistPath), { recursive: true });
 	mkdirSync(logDir, { recursive: true });
@@ -287,7 +287,7 @@ async function uninstallLaunchd(): Promise<void> {
 }
 
 function logsLaunchd(): void {
-	const logFile = join(getLilDir(), "logs", "daemon.log");
+	const logFile = join(getAppDir(), "logs", "daemon.log");
 	console.log(`Log file: ${logFile}\n`);
 
 	if (existsSync(logFile)) {
@@ -328,7 +328,7 @@ export async function installService(): Promise<void> {
 		await installSystemd();
 	} else {
 		console.error(`Service installation not supported on ${platform()}.`);
-		console.log("Run 'lil start' manually instead.");
+		console.log("Run 'clankie start' manually instead.");
 		process.exit(1);
 	}
 }
@@ -350,7 +350,7 @@ export function showServiceLogs(): void {
 	} else if (isLinux) {
 		logsSystemd();
 	} else {
-		const logFile = join(getLilDir(), "logs", "daemon.log");
+		const logFile = join(getAppDir(), "logs", "daemon.log");
 		if (existsSync(logFile)) {
 			console.log(readFileSync(logFile, "utf-8"));
 		} else {
@@ -366,6 +366,6 @@ export function showServiceStatus(): void {
 		statusSystemd();
 	} else {
 		console.log(`Service management not supported on ${platform()}.`);
-		console.log("Use 'lil status' to check if the daemon is running via PID file.");
+		console.log("Use 'clankie status' to check if the daemon is running via PID file.");
 	}
 }

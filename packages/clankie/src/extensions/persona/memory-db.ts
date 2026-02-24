@@ -1,5 +1,5 @@
 /**
- * lil memory database — SQLite + FTS5 persistent memory
+ * clankie memory database — SQLite + FTS5 persistent memory
  *
  * Inspired by nullclaw's memory architecture. Uses Bun's built-in SQLite
  * for zero-dependency, fast, searchable persistent memory.
@@ -12,7 +12,7 @@
  *   - Forget/delete individual entries
  *   - Hygiene (auto-cleanup of old daily/conversation entries)
  *
- * Storage: ~/.lil/memory.db
+ * Storage: ~/.clankie/memory.db
  */
 
 import { Database, type Statement } from "bun:sqlite";

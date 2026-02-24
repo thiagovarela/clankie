@@ -33,7 +33,7 @@ A running lil process that receives a message, routes it to pi's agent (using Op
    - `lil login` — authenticate with OpenAI Codex subscription
 
 4. **Configuration** (`src/config.ts`)
-   - `~/.lil/config.json` — provider, model, default channel (future)
+   - `~/.clankie/config.json` — provider, model, default channel (future)
    - Delegates auth storage to pi's `AuthStorage`
    - Minimal: just enough to pick the model and store preferences
 
@@ -82,7 +82,7 @@ Receive and respond to Telegram messages via a single, always-on process.
 ### What we build
 1. **Telegram adapter** (`src/channels/telegram.ts`)
    - Uses [grammY](https://grammy.dev/) (same as OpenClaw)
-   - Bot token from BotFather, stored in `~/.lil/config.json`
+   - Bot token from BotFather, stored in `~/.clankie/config.json`
    - Long polling (no webhook / public URL needed)
    - Receives messages → forwards to agent session → sends response back
    - Single user only (allowlist by Telegram user ID)
@@ -102,7 +102,7 @@ Receive and respond to Telegram messages via a single, always-on process.
    - Allowlist by Telegram user ID (you set your own ID in config)
    - Unknown senders are ignored
    - `lil allow <telegram-user-id>` to add a user
-   - Allowlist persisted in `~/.lil/config.json`
+   - Allowlist persisted in `~/.clankie/config.json`
 
 ## Milestone 2 — Memory & Context
 
@@ -111,9 +111,9 @@ lil remembers things across sessions and can be given persistent instructions.
 
 ### What we build
 1. **Persistent sessions** — use pi's `SessionManager` with file persistence
-2. **Context files** — `~/.lil/AGENTS.md` for global instructions
-3. **Skills** — `~/.lil/skills/` for on-demand capabilities
-4. **Extensions** — `~/.lil/extensions/` for custom tools
+2. **Context files** — `~/.clankie/AGENTS.md` for global instructions
+3. **Skills** — `~/.clankie/skills/` for on-demand capabilities
+4. **Extensions** — `~/.clankie/extensions/` for custom tools
 
 ## Milestone 3 — More Channels
 
@@ -147,8 +147,8 @@ Add channels one at a time using the channel abstraction from M1:
 │  Model: OpenAI Codex (OAuth)     │
 │  Tools: read, bash, edit, write  │
 │  Sessions: in-memory / file      │
-│  Extensions: ~/.lil/extensions/  │
-│  Skills: ~/.lil/skills/          │
+│  Extensions: ~/.clankie/extensions/  │
+│  Skills: ~/.clankie/skills/          │
 └──────────────────────────────────┘
 ```
 
@@ -172,8 +172,8 @@ Telegram (grammY, long polling)
 │  Model: OpenAI Codex (OAuth)     │
 │  Tools: read, bash, edit, write  │
 │  Sessions: persistent (JSONL)    │
-│  Extensions: ~/.lil/extensions/  │
-│  Skills: ~/.lil/skills/          │
+│  Extensions: ~/.clankie/extensions/  │
+│  Skills: ~/.clankie/skills/          │
 └──────────────────────────────────┘
 ```
 

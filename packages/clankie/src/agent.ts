@@ -1,14 +1,14 @@
 /**
- * lil agent session wrapper
+ * clankie agent session wrapper
  *
  * Creates an AgentSession using pi's SDK with full DefaultResourceLoader
  * discovery — skills, extensions, prompt templates, context files all
  * load from the standard pi directories (~/.pi/agent/, .pi/, etc.).
  *
- * lil's own security and persona extensions are loaded in addition to
+ * The app's own security and persona extensions are loaded in addition to
  * any user extensions.
  *
- * Model is resolved from ~/.lil/lil.json → agent.model.primary (provider/model format).
+ * Model is resolved from ~/.clankie/clankie.json → agent.model.primary (provider/model format).
  * If not set, falls back to pi's default resolution (settings → first available).
  */
 
@@ -25,7 +25,7 @@ import cronExtension from "./extensions/cron/index.ts";
 import { createPersonaExtension } from "./extensions/persona/index.ts";
 import securityExtension from "./extensions/security.ts";
 
-export interface LilSessionOptions {
+export interface SessionOptions {
 	/**
 	 * Persona name to use for this session.
 	 * Defaults to config.agent.persona, then "default".
@@ -56,13 +56,13 @@ export interface LilSessionOptions {
 }
 
 /**
- * Create a pi agent session with lil's configuration.
+ * Create a pi agent session with the app's configuration.
  *
  * Uses pi's DefaultResourceLoader so the entire pi extension ecosystem
  * (~/.pi/agent/extensions/, ~/.agents/skills/, AGENTS.md, etc.) is
- * automatically available. lil's security extension is always loaded.
+ * automatically available. The app's security extension is always loaded.
  */
-export async function createLilSession(options: LilSessionOptions = {}): Promise<CreateAgentSessionResult> {
+export async function createSession(options: SessionOptions = {}): Promise<CreateAgentSessionResult> {
 	const config = loadConfig();
 	const agentDir = getAgentDir(config);
 	const cwd = options.cwd ?? getWorkspace(config);
@@ -78,7 +78,7 @@ export async function createLilSession(options: LilSessionOptions = {}): Promise
 		throw new Error(`Invalid persona name "${personaName}": ${err instanceof Error ? err.message : String(err)}`);
 	}
 
-	// Auth stored in ~/.lil/auth.json (separate from pi's ~/.pi/agent/auth.json)
+	// Auth stored in ~/.clankie/auth.json (separate from pi's ~/.pi/agent/auth.json)
 	const authStorage = AuthStorage.create(getAuthPath());
 	const modelRegistry = new ModelRegistry(authStorage);
 

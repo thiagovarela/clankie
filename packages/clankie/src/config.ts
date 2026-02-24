@@ -1,11 +1,11 @@
 /**
- * lil configuration management
+ * clankie configuration management
  *
- * Reads an optional JSON5 config from ~/.lil/lil.json (comments + trailing commas allowed).
+ * Reads an optional JSON5 config from ~/.clankie/clankie.json (comments + trailing commas allowed).
  * Structure mirrors OpenClaw's ~/.openclaw/openclaw.json where applicable.
  *
  * Authentication credentials are managed by pi's AuthStorage
- * at ~/.pi/agent/auth.json — shared between `pi` and `lil`.
+ * at ~/.pi/agent/auth.json — shared between `pi` and `clankie`.
  */
 
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -15,14 +15,14 @@ import JSON5 from "json5";
 
 // ─── Config types ────────────────────────────────────────────────────────────
 
-export interface LilConfig {
+export interface AppConfig {
 	/** Agent runtime settings */
 	agent?: {
 		/** Default persona name (default: "default") */
 		persona?: string;
-		/** Working directory for the agent (default: ~/.lil/workspace) */
+		/** Working directory for the agent (default: ~/.clankie/workspace) */
 		workspace?: string;
-		/** Override for pi's agent dir (default: ~/.lil) */
+		/** Override for pi's agent dir (default: ~/.clankie) */
 		agentDir?: string;
 		/** Model configuration */
 		model?: {
@@ -66,22 +66,22 @@ export interface LilConfig {
 
 // ─── Paths ────────────────────────────────────────────────────────────────────
 
-const LIL_DIR = join(homedir(), ".lil");
-const CONFIG_PATH = join(LIL_DIR, "lil.json");
+const APP_DIR = join(homedir(), ".clankie");
+const CONFIG_PATH = join(APP_DIR, "clankie.json");
 /** Legacy path — migrated automatically */
-const LEGACY_CONFIG_PATH = join(LIL_DIR, "config.json");
+const LEGACY_CONFIG_PATH = join(APP_DIR, "config.json");
 
-/** Returns the path to lil's config directory, creating it if needed. */
-export function getLilDir(): string {
-	if (!existsSync(LIL_DIR)) {
-		mkdirSync(LIL_DIR, { recursive: true, mode: 0o700 });
+/** Returns the path to the app's config directory, creating it if needed. */
+export function getAppDir(): string {
+	if (!existsSync(APP_DIR)) {
+		mkdirSync(APP_DIR, { recursive: true, mode: 0o700 });
 	}
-	return LIL_DIR;
+	return APP_DIR;
 }
 
 /** Resolves the workspace directory, creating it if needed. */
-export function getWorkspace(config?: LilConfig): string {
-	const workspace = config?.agent?.workspace ?? join(homedir(), ".lil", "workspace");
+export function getWorkspace(config?: AppConfig): string {
+	const workspace = config?.agent?.workspace ?? join(homedir(), ".clankie", "workspace");
 	const resolved = workspace.replace(/^~/, homedir());
 	if (!existsSync(resolved)) {
 		mkdirSync(resolved, { recursive: true, mode: 0o755 });
@@ -89,14 +89,14 @@ export function getWorkspace(config?: LilConfig): string {
 	return resolved;
 }
 
-/** Resolves pi's agent directory (defaults to ~/.lil to keep lil self-contained). */
-export function getAgentDir(config?: LilConfig): string {
-	return config?.agent?.agentDir ?? join(homedir(), ".lil");
+/** Resolves pi's agent directory (defaults to ~/.clankie to keep the app self-contained). */
+export function getAgentDir(config?: AppConfig): string {
+	return config?.agent?.agentDir ?? join(homedir(), ".clankie");
 }
 
-/** Returns the path to lil's auth file (~/.lil/auth.json). */
+/** Returns the path to the app's auth file (~/.clankie/auth.json). */
 export function getAuthPath(): string {
-	return join(getLilDir(), "auth.json");
+	return join(getAppDir(), "auth.json");
 }
 
 /** Path to the config file */
@@ -106,11 +106,11 @@ export function getConfigPath(): string {
 
 // ─── Loading & saving ─────────────────────────────────────────────────────────
 
-/** Load lil config from ~/.lil/lil.json (JSON5). Returns empty config if missing. */
-export function loadConfig(): LilConfig {
-	getLilDir();
+/** Load config from ~/.clankie/clankie.json (JSON5). Returns empty config if missing. */
+export function loadConfig(): AppConfig {
+	getAppDir();
 
-	// Auto-migrate legacy config.json → lil.json
+	// Auto-migrate legacy config.json → clankie.json
 	if (!existsSync(CONFIG_PATH) && existsSync(LEGACY_CONFIG_PATH)) {
 		migrateFromLegacy();
 	}
@@ -120,16 +120,16 @@ export function loadConfig(): LilConfig {
 	}
 	try {
 		const raw = readFileSync(CONFIG_PATH, "utf-8");
-		return JSON5.parse(raw) as LilConfig;
+		return JSON5.parse(raw) as AppConfig;
 	} catch (err) {
 		console.error(`Warning: failed to parse ${CONFIG_PATH}: ${err instanceof Error ? err.message : String(err)}`);
 		return {};
 	}
 }
 
-/** Save lil config to ~/.lil/lil.json (JSON5-formatted with 2-space indent). */
-export function saveConfig(config: LilConfig): void {
-	getLilDir();
+/** Save config to ~/.clankie/clankie.json (JSON5-formatted with 2-space indent). */
+export function saveConfig(config: AppConfig): void {
+	getAppDir();
 	// JSON5.stringify produces valid JSON5 with trailing commas when possible
 	writeFileSync(CONFIG_PATH, `${JSON5.stringify(config, null, 2)}\n`, "utf-8");
 	try {
@@ -140,20 +140,20 @@ export function saveConfig(config: LilConfig): void {
 }
 
 /** Deep-merge partial updates into the config. */
-export function updateConfig(partial: Partial<LilConfig>): LilConfig {
+export function updateConfig(partial: Partial<AppConfig>): AppConfig {
 	const current = loadConfig();
 	const updated = deepMerge(
 		current as unknown as Record<string, unknown>,
 		partial as unknown as Record<string, unknown>,
 	);
-	saveConfig(updated as unknown as LilConfig);
-	return updated as unknown as LilConfig;
+	saveConfig(updated as unknown as AppConfig);
+	return updated as unknown as AppConfig;
 }
 
-// ─── Dot-path accessors (for `lil config get/set`) ───────────────────────────
+// ─── Dot-path accessors (for `clankie config get/set`) ───────────────────────
 
 /** Get a value from the config by dot-separated path (e.g. "channels.telegram.botToken") */
-export function getByPath(config: LilConfig, path: string): unknown {
+export function getByPath(config: AppConfig, path: string): unknown {
 	const parts = path.split(".");
 	let current: unknown = config;
 	for (const part of parts) {
@@ -164,7 +164,7 @@ export function getByPath(config: LilConfig, path: string): unknown {
 }
 
 /** Set a value in the config by dot-separated path. Returns the updated config. */
-export function setByPath(config: LilConfig, path: string, value: unknown): LilConfig {
+export function setByPath(config: AppConfig, path: string, value: unknown): AppConfig {
 	const parts = path.split(".");
 	const clone = structuredClone(config) as Record<string, unknown>;
 
@@ -180,23 +180,23 @@ export function setByPath(config: LilConfig, path: string, value: unknown): LilC
 	const lastKey = parts[parts.length - 1];
 	current[lastKey] = value;
 
-	return clone as unknown as LilConfig;
+	return clone as unknown as AppConfig;
 }
 
 /** Unset (delete) a value from the config by dot-separated path. Returns the updated config. */
-export function unsetByPath(config: LilConfig, path: string): LilConfig {
+export function unsetByPath(config: AppConfig, path: string): AppConfig {
 	const parts = path.split(".");
 	const clone = structuredClone(config) as Record<string, unknown>;
 
 	let current: Record<string, unknown> = clone;
 	for (let i = 0; i < parts.length - 1; i++) {
 		const part = parts[i];
-		if (current[part] == null || typeof current[part] !== "object") return clone as unknown as LilConfig;
+		if (current[part] == null || typeof current[part] !== "object") return clone as unknown as AppConfig;
 		current = current[part] as Record<string, unknown>;
 	}
 
 	delete current[parts[parts.length - 1]];
-	return clone as unknown as LilConfig;
+	return clone as unknown as AppConfig;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -222,13 +222,13 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
 	return result;
 }
 
-/** Migrate legacy ~/.lil/config.json (flat keys) to new ~/.lil/lil.json (nested). */
+/** Migrate legacy ~/.clankie/config.json (flat keys) to new ~/.clankie/clankie.json (nested). */
 function migrateFromLegacy(): void {
 	try {
 		const raw = readFileSync(LEGACY_CONFIG_PATH, "utf-8");
 		const legacy = JSON.parse(raw) as Record<string, unknown>;
 
-		const config: LilConfig = {};
+		const config: AppConfig = {};
 
 		// Map flat keys → nested structure
 		if (legacy.workspace || legacy.agentDir || legacy.provider || legacy.model) {
@@ -249,9 +249,9 @@ function migrateFromLegacy(): void {
 
 // ─── Persona helpers ──────────────────────────────────────────────────────────
 
-/** Returns the path to the personas directory (~/.lil/personas/), creating it if needed. */
+/** Returns the path to the personas directory (~/.clankie/personas/), creating it if needed. */
 export function getPersonasDir(): string {
-	const dir = join(getLilDir(), "personas");
+	const dir = join(getAppDir(), "personas");
 	if (!existsSync(dir)) {
 		mkdirSync(dir, { recursive: true, mode: 0o700 });
 	}
@@ -343,10 +343,10 @@ export function resolvePersonaModel(personaName: string): string | undefined {
 
 // ─── Channel persona override helpers ──────────────────────────────────────────
 
-const CHANNEL_PERSONA_OVERRIDES_PATH = join(LIL_DIR, "channel-personas.json");
+const CHANNEL_PERSONA_OVERRIDES_PATH = join(APP_DIR, "channel-personas.json");
 
 /**
- * Load channel-specific persona overrides from ~/.lil/channel-personas.json.
+ * Load channel-specific persona overrides from ~/.clankie/channel-personas.json.
  * Returns a map of channel keys (e.g., "slack_C12345678") to persona names.
  */
 export function loadChannelPersonaOverrides(): Record<string, string> {
@@ -367,10 +367,10 @@ export function loadChannelPersonaOverrides(): Record<string, string> {
 }
 
 /**
- * Save channel-specific persona overrides to ~/.lil/channel-personas.json.
+ * Save channel-specific persona overrides to ~/.clankie/channel-personas.json.
  */
 export function saveChannelPersonaOverrides(overrides: Record<string, string>): void {
-	getLilDir(); // Ensure directory exists
+	getAppDir(); // Ensure directory exists
 	writeFileSync(CHANNEL_PERSONA_OVERRIDES_PATH, JSON.stringify(overrides, null, 2), "utf-8");
 	try {
 		chmodSync(CHANNEL_PERSONA_OVERRIDES_PATH, 0o600);
