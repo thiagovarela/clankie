@@ -31,6 +31,8 @@ export interface MemoryEntry {
 	createdAt: string;
 	updatedAt: string;
 	sessionId: string | null;
+	/** Persona name (NULL = global, accessible to all personas) */
+	persona: string | null;
 	/** BM25 relevance score (lower = more relevant for FTS5, we negate it) */
 	score?: number;
 }
@@ -78,22 +80,72 @@ export class MemoryDB {
 	}
 
 	private migrate(): void {
-		this.db.exec(`
-      -- Core memories table
-      CREATE TABLE IF NOT EXISTS memories (
-        id         TEXT PRIMARY KEY,
-        key        TEXT NOT NULL UNIQUE,
-        content    TEXT NOT NULL,
-        category   TEXT NOT NULL DEFAULT 'core',
-        session_id TEXT,
-        created_at TEXT NOT NULL,
-        updated_at TEXT NOT NULL
-      );
-      CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
-      CREATE INDEX IF NOT EXISTS idx_memories_key ON memories(key);
-      CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id);
-      CREATE INDEX IF NOT EXISTS idx_memories_updated ON memories(updated_at);
-    `);
+		// Check if we need to add persona column (migration v2)
+		const tableInfo = this.db.prepare("PRAGMA table_info(memories)").all() as Array<{ name: string }>;
+		const hasPersonaColumn = tableInfo.some((col) => col.name === "persona");
+
+		if (!hasPersonaColumn && tableInfo.length > 0) {
+			// Existing table without persona column — migrate
+			console.log("[memory] Migrating database to add persona column...");
+
+			this.db.exec(`
+				BEGIN TRANSACTION;
+				
+				-- Add persona column (NULL = global, accessible to all personas)
+				ALTER TABLE memories ADD COLUMN persona TEXT DEFAULT NULL;
+				
+				-- Create new table with updated unique constraint
+				CREATE TABLE memories_new (
+					id         TEXT PRIMARY KEY,
+					key        TEXT NOT NULL,
+					content    TEXT NOT NULL,
+					category   TEXT NOT NULL DEFAULT 'core',
+					session_id TEXT,
+					persona    TEXT,
+					created_at TEXT NOT NULL,
+					updated_at TEXT NOT NULL,
+					UNIQUE(key, persona)
+				);
+				
+				-- Copy data
+				INSERT INTO memories_new SELECT id, key, content, category, session_id, persona, created_at, updated_at FROM memories;
+				
+				-- Drop old table and rename
+				DROP TABLE memories;
+				ALTER TABLE memories_new RENAME TO memories;
+				
+				-- Recreate indexes
+				CREATE INDEX idx_memories_category ON memories(category);
+				CREATE INDEX idx_memories_key ON memories(key);
+				CREATE INDEX idx_memories_persona ON memories(persona);
+				CREATE INDEX idx_memories_session ON memories(session_id);
+				CREATE INDEX idx_memories_updated ON memories(updated_at);
+				
+				COMMIT;
+			`);
+
+			console.log("[memory] Migration complete. Existing memories are now global (persona = NULL).");
+		} else if (tableInfo.length === 0) {
+			// Fresh database — create with persona column from the start
+			this.db.exec(`
+				CREATE TABLE IF NOT EXISTS memories (
+					id         TEXT PRIMARY KEY,
+					key        TEXT NOT NULL,
+					content    TEXT NOT NULL,
+					category   TEXT NOT NULL DEFAULT 'core',
+					session_id TEXT,
+					persona    TEXT,
+					created_at TEXT NOT NULL,
+					updated_at TEXT NOT NULL,
+					UNIQUE(key, persona)
+				);
+				CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
+				CREATE INDEX IF NOT EXISTS idx_memories_key ON memories(key);
+				CREATE INDEX IF NOT EXISTS idx_memories_persona ON memories(persona);
+				CREATE INDEX IF NOT EXISTS idx_memories_session ON memories(session_id);
+				CREATE INDEX IF NOT EXISTS idx_memories_updated ON memories(updated_at);
+			`);
+		}
 
 		// FTS5 virtual table for full-text search (BM25 scoring)
 		// Wrapped in try/catch because FTS5 creation fails silently if already exists
@@ -131,9 +183,9 @@ export class MemoryDB {
 	private prepareStatements() {
 		return {
 			store: this.db.prepare(`
-        INSERT INTO memories (id, key, content, category, session_id, created_at, updated_at)
-        VALUES ($id, $key, $content, $category, $sessionId, $now, $now)
-        ON CONFLICT(key) DO UPDATE SET
+        INSERT INTO memories (id, key, content, category, session_id, persona, created_at, updated_at)
+        VALUES ($id, $key, $content, $category, $sessionId, $persona, $now, $now)
+        ON CONFLICT(key, persona) DO UPDATE SET
           content = excluded.content,
           category = excluded.category,
           session_id = excluded.session_id,
@@ -141,44 +193,52 @@ export class MemoryDB {
       `),
 
 			get: this.db.prepare(`
-        SELECT id, key, content, category, session_id, created_at, updated_at
-        FROM memories WHERE key = $key
+        SELECT id, key, content, category, session_id, persona, created_at, updated_at
+        FROM memories WHERE key = $key AND (persona = $persona OR (persona IS NULL AND $persona IS NOT NULL))
       `),
 
-			forget: this.db.prepare(`DELETE FROM memories WHERE key = $key`),
+			forget: this.db.prepare(`DELETE FROM memories WHERE key = $key AND persona = $persona`),
 
 			count: this.db.prepare(`SELECT COUNT(*) as count FROM memories`),
 
 			listAll: this.db.prepare(`
-        SELECT id, key, content, category, session_id, created_at, updated_at
-        FROM memories ORDER BY updated_at DESC LIMIT $limit
+        SELECT id, key, content, category, session_id, persona, created_at, updated_at
+        FROM memories 
+        WHERE persona = $persona OR persona IS NULL
+        ORDER BY updated_at DESC LIMIT $limit
       `),
 
 			listByCategory: this.db.prepare(`
-        SELECT id, key, content, category, session_id, created_at, updated_at
-        FROM memories WHERE category = $category ORDER BY updated_at DESC LIMIT $limit
+        SELECT id, key, content, category, session_id, persona, created_at, updated_at
+        FROM memories 
+        WHERE category = $category AND (persona = $persona OR persona IS NULL)
+        ORDER BY updated_at DESC LIMIT $limit
       `),
 
 			ftsSearch: this.db.prepare(`
-        SELECT m.id, m.key, m.content, m.category, m.session_id, m.created_at, m.updated_at,
+        SELECT m.id, m.key, m.content, m.category, m.session_id, m.persona, m.created_at, m.updated_at,
                bm25(memories_fts) as score
         FROM memories_fts f
         JOIN memories m ON m.rowid = f.rowid
         WHERE memories_fts MATCH $query
+          AND (m.persona = $persona OR m.persona IS NULL)
         ORDER BY score
         LIMIT $limit
       `),
 
 			likeSearch: this.db.prepare(`
-        SELECT id, key, content, category, session_id, created_at, updated_at
+        SELECT id, key, content, category, session_id, persona, created_at, updated_at
         FROM memories
-        WHERE content LIKE $pattern OR key LIKE $pattern
+        WHERE (content LIKE $pattern OR key LIKE $pattern)
+          AND (persona = $persona OR persona IS NULL)
         ORDER BY updated_at DESC
         LIMIT $limit
       `),
 
 			countByCategory: this.db.prepare(`
-        SELECT category, COUNT(*) as count FROM memories GROUP BY category
+        SELECT category, COUNT(*) as count FROM memories 
+        WHERE persona = $persona OR persona IS NULL
+        GROUP BY category
       `),
 
 			pruneOld: this.db.prepare(`
@@ -192,9 +252,16 @@ export class MemoryDB {
 	// ─── Core operations ──────────────────────────────────────────────
 
 	/**
-	 * Store a memory. Uses upsert — same key updates existing content.
+	 * Store a memory. Uses upsert — same key + persona updates existing content.
+	 * @param persona Persona name (null = global, accessible to all personas)
 	 */
-	store(key: string, content: string, category: MemoryCategory = "core", sessionId?: string): void {
+	store(
+		key: string,
+		content: string,
+		category: MemoryCategory = "core",
+		persona: string | null = null,
+		sessionId?: string,
+	): void {
 		const id = generateId();
 		const now = new Date().toISOString();
 		this.stmts.store.run({
@@ -203,38 +270,44 @@ export class MemoryDB {
 			$content: content,
 			$category: category,
 			$sessionId: sessionId ?? null,
+			$persona: persona,
 			$now: now,
 		});
 	}
 
 	/**
-	 * Get a memory by exact key. Returns null if not found.
+	 * Get a memory by exact key for a specific persona (or global).
+	 * Returns null if not found.
+	 * @param persona Persona name (searches both persona-specific and global memories)
 	 */
-	get(key: string): MemoryEntry | null {
-		const row = this.stmts.get.get({ $key: key }) as any;
+	get(key: string, persona: string | null = null): MemoryEntry | null {
+		const row = this.stmts.get.get({ $key: key, $persona: persona }) as any;
 		return row ? rowToEntry(row) : null;
 	}
 
 	/**
-	 * Delete a memory by key. Returns true if something was deleted.
+	 * Delete a memory by key and persona. Returns true if something was deleted.
+	 * @param persona Persona name (null = delete global memory)
 	 */
-	forget(key: string): boolean {
-		const result = this.stmts.forget.run({ $key: key });
+	forget(key: string, persona: string | null = null): boolean {
+		const result = this.stmts.forget.run({ $key: key, $persona: persona });
 		return result.changes > 0;
 	}
 
 	/**
 	 * Search memories using FTS5 full-text search.
+	 * Searches both persona-specific and global memories.
 	 * Falls back to LIKE search if FTS5 query fails.
+	 * @param persona Persona name (searches both persona-specific and global memories)
 	 */
-	recall(query: string, limit: number = 5): MemoryEntry[] {
+	recall(query: string, persona: string | null = null, limit: number = 5): MemoryEntry[] {
 		const trimmed = query.trim();
 		if (!trimmed) return [];
 
 		// Try FTS5 first
 		try {
 			const ftsQuery = buildFtsQuery(trimmed);
-			const rows = this.stmts.ftsSearch.all({ $query: ftsQuery, $limit: limit }) as any[];
+			const rows = this.stmts.ftsSearch.all({ $query: ftsQuery, $persona: persona, $limit: limit }) as any[];
 			if (rows.length > 0) {
 				return rows.map((row) => ({
 					...rowToEntry(row),
@@ -247,26 +320,28 @@ export class MemoryDB {
 
 		// Fallback: LIKE search on each word
 		const pattern = `%${trimmed}%`;
-		const rows = this.stmts.likeSearch.all({ $pattern: pattern, $limit: limit }) as any[];
+		const rows = this.stmts.likeSearch.all({ $pattern: pattern, $persona: persona, $limit: limit }) as any[];
 		return rows.map((row) => ({ ...rowToEntry(row), score: 1.0 }));
 	}
 
 	/**
 	 * List memories, optionally filtered by category.
+	 * @param persona Persona name (lists both persona-specific and global memories)
 	 */
-	list(category?: MemoryCategory, limit: number = 100): MemoryEntry[] {
+	list(category?: MemoryCategory, persona: string | null = null, limit: number = 100): MemoryEntry[] {
 		const rows = category
-			? (this.stmts.listByCategory.all({ $category: category, $limit: limit }) as any[])
-			: (this.stmts.listAll.all({ $limit: limit }) as any[]);
+			? (this.stmts.listByCategory.all({ $category: category, $persona: persona, $limit: limit }) as any[])
+			: (this.stmts.listAll.all({ $persona: persona, $limit: limit }) as any[]);
 		return rows.map(rowToEntry);
 	}
 
 	/**
 	 * Get memory statistics.
+	 * @param persona Persona name (counts both persona-specific and global memories)
 	 */
-	stats(): MemoryStats {
+	stats(persona: string | null = null): MemoryStats {
 		const total = (this.stmts.count.get() as any)?.count ?? 0;
-		const rows = this.stmts.countByCategory.all() as any[];
+		const rows = this.stmts.countByCategory.all({ $persona: persona }) as any[];
 		const byCategory: Record<string, number> = {};
 		for (const row of rows) {
 			byCategory[row.category] = row.count;
@@ -277,9 +352,10 @@ export class MemoryDB {
 	/**
 	 * Build a memory context preamble for the agent prompt.
 	 * Searches memories relevant to the user's message and formats them.
+	 * @param persona Persona name (searches both persona-specific and global memories)
 	 */
-	buildContext(userMessage: string, limit: number = 5): string {
-		const entries = this.recall(userMessage, limit);
+	buildContext(userMessage: string, persona: string | null = null, limit: number = 5): string {
+		const entries = this.recall(userMessage, persona, limit);
 		if (entries.length === 0) return "";
 
 		const lines = entries.map((e) => `- **${e.key}** (${e.category}): ${e.content}`);
@@ -365,6 +441,7 @@ function rowToEntry(row: any): MemoryEntry {
 		createdAt: row.created_at,
 		updatedAt: row.updated_at,
 		sessionId: row.session_id ?? null,
+		persona: row.persona ?? null,
 	};
 }
 

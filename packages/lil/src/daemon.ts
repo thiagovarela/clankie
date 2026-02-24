@@ -28,8 +28,10 @@ import {
 	getPersonaDir,
 	getWorkspace,
 	type LilConfig,
+	loadChannelPersonaOverrides,
 	loadConfig,
 	resolvePersonaModel,
+	saveChannelPersonaOverrides,
 } from "./config.ts";
 import cronExtension from "./extensions/cron/index.ts";
 import { createPersonaExtension } from "./extensions/persona/index.ts";
@@ -73,6 +75,42 @@ const sessionCache = new Map<string, AgentSession>();
 
 // Track active session name per chat (for /switch command)
 const activeSessionNames = new Map<string, string>();
+
+// Track channel-specific persona overrides (runtime, persisted to ~/.lil/channel-personas.json)
+const channelPersonaOverrides = new Map<string, string>();
+
+/**
+ * Resolve the persona name for a given channel and chat ID.
+ * Resolution order:
+ * 1. Runtime override (channelPersonaOverrides)
+ * 2. Config per-channel mapping (channels.slack.channelPersonas[chatId])
+ * 3. Config channel-level default (channels.slack.persona)
+ * 4. Config global default (agent.persona)
+ * 5. Hardcoded fallback ("default")
+ */
+function resolveChannelPersona(channel: string, chatId: string, config: LilConfig): string {
+	const channelKey = `${channel}_${chatId}`;
+
+	// 1. Runtime override
+	const override = channelPersonaOverrides.get(channelKey);
+	if (override) return override;
+
+	// 2. Config per-channel mapping (Slack only for now)
+	if (channel === "slack") {
+		const slackConfig = config.channels?.slack;
+		const channelMapping = slackConfig?.channelPersonas?.[chatId];
+		if (channelMapping) return channelMapping;
+
+		// 3. Config channel-level default
+		if (slackConfig?.persona) return slackConfig.persona;
+	}
+
+	// 4. Config global default
+	if (config.agent?.persona) return config.agent.persona;
+
+	// 5. Hardcoded fallback
+	return "default";
+}
 
 async function getOrCreateSession(
 	chatKey: string,
@@ -183,6 +221,47 @@ async function getOrCreateSession(
 	return session;
 }
 
+// ─── Session helpers ───────────────────────────────────────────────────────────
+
+/**
+ * List all session names for a given chat identifier.
+ * Scans ~/.lil/sessions/ for directories matching the chatIdentifier prefix.
+ */
+function listSessionNames(chatIdentifier: string): string[] {
+	const sessionsDir = join(getLilDir(), "sessions");
+	if (!existsSync(sessionsDir)) {
+		return [];
+	}
+
+	try {
+		const { readdirSync, statSync } = require("node:fs");
+		const entries = readdirSync(sessionsDir);
+		const sessionNames = new Set<string>();
+
+		for (const entry of entries) {
+			// Session directories are named: {channel}_{chatId}_{personaName}_{sessionName}
+			// We want to extract unique sessionNames for this chatIdentifier
+			if (entry.startsWith(`${chatIdentifier}_`)) {
+				const entryPath = join(sessionsDir, entry);
+				if (statSync(entryPath).isDirectory()) {
+					// Extract session name from: chatIdentifier_personaName_sessionName
+					const parts = entry.substring(chatIdentifier.length + 1).split("_");
+					// parts[0] is personaName, rest is sessionName
+					if (parts.length >= 2) {
+						const sessionName = parts.slice(1).join("_");
+						sessionNames.add(sessionName);
+					}
+				}
+			}
+		}
+
+		return Array.from(sessionNames).sort();
+	} catch (err) {
+		console.error(`[daemon] Error listing session names: ${err instanceof Error ? err.message : String(err)}`);
+		return [];
+	}
+}
+
 // ─── Attachment helpers ────────────────────────────────────────────────────────
 
 const IMAGE_MIME_PREFIXES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -228,6 +307,8 @@ async function saveNonImageAttachments(
 const chatLocks = new Map<string, Promise<void>>();
 
 async function handleMessage(message: InboundMessage, channel: Channel): Promise<void> {
+	const config = loadConfig();
+
 	// Determine session name:
 	// 1. For forum topics (threadId present) → use threadId
 	// 2. For regular chats → use active session name or "default"
@@ -242,11 +323,17 @@ async function handleMessage(message: InboundMessage, channel: Channel): Promise
 		sessionName = activeSessionNames.get(chatIdentifier) ?? "default";
 	}
 
-	const chatKey = `${chatIdentifier}_${sessionName}`;
+	// Resolve persona for this channel
+	const personaName = resolveChannelPersona(message.channel, message.chatId, config);
+
+	// Include persona in chatKey so each persona gets its own session
+	const chatKey = `${chatIdentifier}_${personaName}_${sessionName}`;
 
 	// Serialize messages per chat — wait for previous message to finish
 	const previous = chatLocks.get(chatKey) ?? Promise.resolve();
-	const current = previous.then(() => processMessage(message, channel, chatKey, chatIdentifier, sessionName));
+	const current = previous.then(() =>
+		processMessage(message, channel, chatKey, chatIdentifier, sessionName, personaName),
+	);
 	chatLocks.set(
 		chatKey,
 		current.catch(() => {}),
@@ -260,19 +347,17 @@ async function processMessage(
 	chatKey: string,
 	chatIdentifier: string,
 	sessionName: string,
+	personaName: string,
 ): Promise<void> {
 	const config = loadConfig();
-
-	// Resolve persona: channel config → global config → "default"
-	let personaName = config.agent?.persona ?? "default";
-	if (message.channel === "slack" && config.channels?.slack?.persona) {
-		personaName = config.channels.slack.persona;
-	}
 
 	const attachCount = message.attachments?.length ?? 0;
 	const preview = message.text.slice(0, 100) || (attachCount > 0 ? `[${attachCount} attachment(s)]` : "[empty]");
 	const sessionInfo = sessionName !== "default" ? ` [session:${sessionName}]` : "";
-	console.log(`[daemon] ${message.channel}/${message.chatId}${sessionInfo} (${message.senderName}): ${preview}`);
+	const personaInfo = personaName !== "default" ? ` [persona:${personaName}]` : "";
+	console.log(
+		`[daemon] ${message.channel}/${message.chatId}${sessionInfo}${personaInfo} (${message.senderName}): ${preview}`,
+	);
 
 	// Prepare send options for thread-aware responses
 	// Always reply in a thread: use existing thread or create new one with message.id as parent
@@ -338,6 +423,103 @@ async function processMessage(
 			return;
 		}
 
+		// Handle /persona command — show/switch/reset persona
+		if (trimmed === "/persona" || trimmed.startsWith("/persona ")) {
+			const args = trimmed.substring(8).trim();
+
+			// /persona (no args) — show current persona
+			if (!args) {
+				const channelKey = `${message.channel}_${message.chatId}`;
+				const runtimeOverride = channelPersonaOverrides.get(channelKey);
+				const configChannelPersona =
+					message.channel === "slack" ? config.channels?.slack?.channelPersonas?.[message.chatId] : undefined;
+				const configDefault = config.channels?.slack?.persona ?? config.agent?.persona ?? "default";
+
+				const lines = [`**Current persona:** ${personaName}`];
+				if (runtimeOverride) {
+					lines.push(`  (Runtime override — use \`/persona reset\` to clear)`);
+				} else if (configChannelPersona) {
+					lines.push(`  (From config: \`channels.slack.channelPersonas["${message.chatId}"]\`)`);
+				} else {
+					lines.push(`  (Config default: ${configDefault})`);
+				}
+
+				lines.push("");
+				lines.push("**Commands:**");
+				lines.push("  `/persona <name>` — switch to a different persona");
+				lines.push("  `/persona reset` — reset to the configured default");
+				lines.push("");
+				lines.push("Use `lil persona` to list available personas.");
+
+				await channel.send(message.chatId, lines.join("\n"), sendOptions);
+				return;
+			}
+
+			// /persona reset — remove runtime override
+			if (args === "reset") {
+				const channelKey = `${message.channel}_${message.chatId}`;
+				const hadOverride = channelPersonaOverrides.has(channelKey);
+
+				if (hadOverride) {
+					channelPersonaOverrides.delete(channelKey);
+					// Persist to disk
+					const overrides: Record<string, string> = {};
+					for (const [k, v] of channelPersonaOverrides.entries()) {
+						overrides[k] = v;
+					}
+					saveChannelPersonaOverrides(overrides);
+
+					const newPersona = resolveChannelPersona(message.channel, message.chatId, config);
+					await channel.send(
+						message.chatId,
+						`✅ Reset persona to **${newPersona}** (from config).\n\nNext message will use this persona.`,
+						sendOptions,
+					);
+				} else {
+					await channel.send(
+						message.chatId,
+						"ℹ️ No runtime override is set. Already using the configured default.",
+						sendOptions,
+					);
+				}
+				return;
+			}
+
+			// /persona <name> — switch to a different persona
+			const newPersonaName = args;
+
+			// Validate persona exists
+			try {
+				getPersonaDir(newPersonaName);
+			} catch (err) {
+				await channel.send(
+					message.chatId,
+					`⚠️ Invalid persona name: ${err instanceof Error ? err.message : String(err)}\n\nUse \`lil persona\` to list available personas.`,
+					sendOptions,
+				);
+				return;
+			}
+
+			// Update runtime override
+			const channelKey = `${message.channel}_${message.chatId}`;
+			channelPersonaOverrides.set(channelKey, newPersonaName);
+
+			// Persist to disk
+			const overrides: Record<string, string> = {};
+			for (const [k, v] of channelPersonaOverrides.entries()) {
+				overrides[k] = v;
+			}
+			saveChannelPersonaOverrides(overrides);
+
+			console.log(`[daemon] Switched ${channelKey} to persona "${newPersonaName}"`);
+			await channel.send(
+				message.chatId,
+				`✅ Switched to persona **${newPersonaName}**.\n\nNext message will use this persona.\nUse \`/persona reset\` to revert to the default.`,
+				sendOptions,
+			);
+			return;
+		}
+
 		const session = await getOrCreateSession(chatKey, config, personaName);
 
 		// Build image attachments for the agent (vision-capable models)
@@ -398,6 +580,17 @@ async function processMessage(
 
 export async function startDaemon(): Promise<void> {
 	const config = loadConfig();
+
+	// Load channel persona overrides from disk
+	const overrides = loadChannelPersonaOverrides();
+	channelPersonaOverrides.clear();
+	for (const [key, value] of Object.entries(overrides)) {
+		channelPersonaOverrides.set(key, value);
+	}
+	if (channelPersonaOverrides.size > 0) {
+		console.log(`[daemon] Loaded ${channelPersonaOverrides.size} channel persona override(s)`);
+	}
+
 	const channels: Channel[] = [];
 
 	// Slack

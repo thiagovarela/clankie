@@ -85,10 +85,19 @@ Config paths (dot-separated):
   agent.model.primary               Primary model (provider/model format)
   agent.model.fallbacks             Fallback models (JSON array)
   channels.slack.persona            Persona for Slack (overrides agent.persona)
+  channels.slack.channelPersonas    Per-channel persona mapping (JSON object: {"C123": "engineer"})
   channels.slack.appToken           Slack app token (xapp-...) for Socket Mode
   channels.slack.botToken           Slack bot token (xoxb-...) for API calls
   channels.slack.allowFrom          Allowed Slack user IDs (JSON array of strings)
   channels.slack.enabled            Enable/disable Slack (default: true)
+
+Slack slash commands (when running as daemon):
+  /persona                          Show current persona for this channel
+  /persona <name>                   Switch to a different persona
+  /persona reset                    Reset to the configured default
+  /switch <name>                    Switch to a different session
+  /sessions                         List all sessions
+  /new                              Start a fresh session
 
 Examples:
   lil login
@@ -682,14 +691,28 @@ import { MemoryDB } from "./extensions/persona/memory-db.ts";
 const MEMORY_DB_PATH = join(getLilDir(), "memory.db");
 
 async function cmdMemory(args: string[]): Promise<void> {
-	const [sub, ...rest] = args;
+	// Extract --persona flag
+	let personaName: string | null = null;
+	let filteredArgs = args;
+	const personaIndex = args.indexOf("--persona");
+	if (personaIndex !== -1 && args[personaIndex + 1]) {
+		personaName = args[personaIndex + 1];
+		filteredArgs = [...args.slice(0, personaIndex), ...args.slice(personaIndex + 2)];
+	}
+
+	const [sub, ...rest] = filteredArgs;
 	const db = new MemoryDB(MEMORY_DB_PATH);
 
 	try {
 		// lil memory (or lil memory stats) — show statistics
 		if (!sub || sub === "stats") {
-			const stats = db.stats();
+			const stats = db.stats(personaName);
 			console.log(`Memory database: ${MEMORY_DB_PATH}\n`);
+			if (personaName) {
+				console.log(`  Persona: ${personaName} (includes global memories)`);
+			} else {
+				console.log(`  Scope: All memories (use --persona <name> to filter)`);
+			}
 			console.log(`  Total entries: ${stats.total}`);
 			if (Object.keys(stats.byCategory).length > 0) {
 				console.log(`  By category:`);
@@ -705,17 +728,18 @@ async function cmdMemory(args: string[]): Promise<void> {
 		if (sub === "search") {
 			const query = rest.join(" ").trim();
 			if (!query) {
-				console.error("Usage: lil memory search <query>");
+				console.error("Usage: lil memory search [--persona <name>] <query>");
 				process.exit(1);
 			}
-			const results = db.recall(query, 10);
+			const results = db.recall(query, personaName, 10);
 			if (results.length === 0) {
 				console.log(`No memories found matching: "${query}"`);
 				return;
 			}
 			console.log(`Found ${results.length} result(s):\n`);
 			for (const entry of results) {
-				console.log(`  [${entry.category}] ${entry.key}`);
+				const scope = entry.persona ? ` [${entry.persona}]` : " [global]";
+				console.log(`  [${entry.category}]${scope} ${entry.key}`);
 				console.log(`    ${entry.content}`);
 				console.log(`    updated: ${entry.updatedAt}\n`);
 			}
@@ -725,15 +749,17 @@ async function cmdMemory(args: string[]): Promise<void> {
 		// lil memory list [category]
 		if (sub === "list") {
 			const category = rest[0];
-			const entries = db.list(category, 50);
+			const entries = db.list(category, personaName, 50);
 			if (entries.length === 0) {
 				console.log(category ? `No memories in category "${category}".` : "No memories stored.");
 				return;
 			}
-			console.log(`Memories${category ? ` (${category})` : ""}: ${entries.length}\n`);
+			const scopeLabel = personaName ? ` for persona:${personaName}` : "";
+			console.log(`Memories${category ? ` (${category})` : ""}${scopeLabel}: ${entries.length}\n`);
 			for (const entry of entries) {
+				const scope = entry.persona ? ` [${entry.persona}]` : " [global]";
 				console.log(
-					`  [${entry.category}] ${entry.key}: ${entry.content.slice(0, 80)}${entry.content.length > 80 ? "..." : ""}`,
+					`  [${entry.category}]${scope} ${entry.key}: ${entry.content.slice(0, 80)}${entry.content.length > 80 ? "..." : ""}`,
 				);
 			}
 			console.log();

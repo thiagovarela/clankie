@@ -39,6 +39,8 @@ export interface LilConfig {
 			enabled?: boolean;
 			/** Persona name override for this channel */
 			persona?: string;
+			/** Per-channel persona mapping (Slack channel ID → persona name) */
+			channelPersonas?: Record<string, string>;
 			/** App token from Slack app settings (xapp-...) */
 			appToken?: string;
 			/** Bot token from Slack app settings (xoxb-...) */
@@ -336,5 +338,43 @@ export function resolvePersonaModel(personaName: string): string | undefined {
 		return trimmed || undefined;
 	} catch {
 		return undefined;
+	}
+}
+
+// ─── Channel persona override helpers ──────────────────────────────────────────
+
+const CHANNEL_PERSONA_OVERRIDES_PATH = join(LIL_DIR, "channel-personas.json");
+
+/**
+ * Load channel-specific persona overrides from ~/.lil/channel-personas.json.
+ * Returns a map of channel keys (e.g., "slack_C12345678") to persona names.
+ */
+export function loadChannelPersonaOverrides(): Record<string, string> {
+	if (!existsSync(CHANNEL_PERSONA_OVERRIDES_PATH)) {
+		return {};
+	}
+
+	try {
+		const raw = readFileSync(CHANNEL_PERSONA_OVERRIDES_PATH, "utf-8");
+		const parsed = JSON.parse(raw);
+		return typeof parsed === "object" && parsed !== null ? parsed : {};
+	} catch (err) {
+		console.error(
+			`Warning: failed to parse ${CHANNEL_PERSONA_OVERRIDES_PATH}: ${err instanceof Error ? err.message : String(err)}`,
+		);
+		return {};
+	}
+}
+
+/**
+ * Save channel-specific persona overrides to ~/.lil/channel-personas.json.
+ */
+export function saveChannelPersonaOverrides(overrides: Record<string, string>): void {
+	getLilDir(); // Ensure directory exists
+	writeFileSync(CHANNEL_PERSONA_OVERRIDES_PATH, JSON.stringify(overrides, null, 2), "utf-8");
+	try {
+		chmodSync(CHANNEL_PERSONA_OVERRIDES_PATH, 0o600);
+	} catch {
+		// chmod may not be supported on all platforms; non-fatal
 	}
 }

@@ -123,7 +123,7 @@ export function createPersonaExtension(personaName: string = "default") {
 			// Log loaded state
 			const parts: string[] = sections.map((s) => s.title);
 			try {
-				const stats = getMemoryDb().stats();
+				const stats = getMemoryDb().stats(personaName);
 				if (stats.total > 0) {
 					parts.push(`memory (${stats.total} entries)`);
 				}
@@ -145,12 +145,15 @@ export function createPersonaExtension(personaName: string = "default") {
 				parts.push(sections.map((s) => `### ${s.title}\n\n${s.content}`).join("\n\n"));
 			}
 
-			// Core memories (always included — these are permanent facts)
+			// Core memories (both global and persona-specific)
 			try {
 				const db = getMemoryDb();
-				const coreMemories = db.list("core", 50);
+				const coreMemories = db.list("core", personaName, 50);
 				if (coreMemories.length > 0) {
-					const lines = coreMemories.map((m) => `- **${m.key}**: ${m.content}`);
+					const lines = coreMemories.map((m) => {
+						const scope = m.persona ? ` [${m.persona}]` : " [global]";
+						return `- **${m.key}**${scope}: ${m.content}`;
+					});
 					parts.push(`### Core Memories\n\nImportant facts persisted across sessions:\n\n${lines.join("\n")}`);
 				}
 			} catch {
@@ -175,16 +178,19 @@ export function createPersonaExtension(personaName: string = "default") {
 			label: "Store Memory",
 			description:
 				"Save a fact, preference, or note to persistent memory. Uses upsert — " +
-				"if a memory with the same key already exists, it will be updated.\n\n" +
-				"Categories:\n" +
+				"if a memory with the same key already exists for this scope, it will be updated.\n\n" +
+				"**Scope:**\n" +
+				"- **persona** (default): Stored for this persona only. Use for context specific to this role.\n" +
+				"- **global**: Accessible to all personas. Use for universal facts (user's name, timezone, etc.).\n\n" +
+				"**Categories:**\n" +
 				"- **core**: Permanent facts (user preferences, important context). Always loaded.\n" +
 				"- **daily**: Session notes, what happened today. Auto-pruned after 30 days.\n" +
 				"- **conversation**: Chat context. Auto-pruned after 7 days.\n\n" +
 				"Use 'core' for things worth remembering forever, 'daily' for today's context.\n\n" +
 				"Examples:\n" +
-				'  key: "user_lang", content: "Prefers TypeScript over JavaScript", category: "core"\n' +
-				'  key: "today_project", content: "Working on lil memory system", category: "daily"\n' +
-				'  key: "meeting_notes", content: "Discussed migration to SQLite", category: "daily"',
+				'  key: "user_lang", content: "Prefers TypeScript", category: "core", scope: "persona"\n' +
+				'  key: "user_timezone", content: "GMT-3", category: "core", scope: "global"\n' +
+				'  key: "today_project", content: "Working on lil memory", category: "daily", scope: "persona"',
 			parameters: Type.Object({
 				key: Type.String({
 					description:
@@ -199,21 +205,30 @@ export function createPersonaExtension(personaName: string = "default") {
 						description: "Memory category (default: core)",
 					}),
 				),
+				scope: Type.Optional(
+					StringEnum(["persona", "global"] as const, {
+						description: "Memory scope: persona (default) or global",
+					}),
+				),
 			}),
 			async execute(_toolCallId, params) {
 				try {
 					const db = getMemoryDb();
 					const category = (params.category ?? "core") as MemoryCategory;
-					db.store(params.key, params.content, category);
+					const scope = params.scope ?? "persona";
+					const persona = scope === "global" ? null : personaName;
 
+					db.store(params.key, params.content, category, persona);
+
+					const scopeLabel = scope === "global" ? "global" : `persona:${personaName}`;
 					return {
 						content: [
 							{
 								type: "text" as const,
-								text: `Stored memory: **${params.key}** (${category})`,
+								text: `Stored memory: **${params.key}** (${category}, ${scopeLabel})`,
 							},
 						],
-						details: { key: params.key, category },
+						details: { key: params.key, category, scope: scopeLabel },
 					};
 				} catch (err) {
 					return {
@@ -257,7 +272,8 @@ export function createPersonaExtension(personaName: string = "default") {
 			async execute(_toolCallId, params) {
 				try {
 					const db = getMemoryDb();
-					let entries = db.recall(params.query, params.limit ?? 5);
+					// Search both persona-specific and global memories
+					let entries = db.recall(params.query, personaName, params.limit ?? 5);
 
 					// Filter by category if specified
 					if (params.category) {
@@ -276,7 +292,10 @@ export function createPersonaExtension(personaName: string = "default") {
 						};
 					}
 
-					const lines = entries.map((e, i) => `${i + 1}. **${e.key}** (${e.category}): ${e.content}`);
+					const lines = entries.map((e, i) => {
+						const scope = e.persona ? ` [${e.persona}]` : " [global]";
+						return `${i + 1}. **${e.key}**${scope} (${e.category}): ${e.content}`;
+					});
 
 					return {
 						content: [
@@ -308,8 +327,9 @@ export function createPersonaExtension(personaName: string = "default") {
 			name: "memory_forget",
 			label: "Forget Memory",
 			description:
-				"Remove a memory by its key. Use this to delete outdated facts, " +
-				"incorrect information, or sensitive data the user wants removed.\n\n" +
+				"Remove a memory by its key from this persona's memory. " +
+				"Use this to delete outdated facts, incorrect information, or sensitive data.\n\n" +
+				"Note: This only deletes persona-specific memories. Global memories are preserved.\n\n" +
 				"Use memory_recall first to find the exact key.",
 			parameters: Type.Object({
 				key: Type.String({ description: "The key of the memory to forget" }),
@@ -317,22 +337,25 @@ export function createPersonaExtension(personaName: string = "default") {
 			async execute(_toolCallId, params) {
 				try {
 					const db = getMemoryDb();
-					const forgotten = db.forget(params.key);
+					// Delete persona-specific memory (not global)
+					const forgotten = db.forget(params.key, personaName);
 
 					if (forgotten) {
 						return {
-							content: [{ type: "text" as const, text: `Forgot memory: **${params.key}**` }],
-							details: { key: params.key, forgotten: true },
+							content: [
+								{ type: "text" as const, text: `Forgot memory: **${params.key}** from ${personaName} persona` },
+							],
+							details: { key: params.key, persona: personaName, forgotten: true },
 						};
 					} else {
 						return {
 							content: [
 								{
 									type: "text" as const,
-									text: `No memory found with key: "${params.key}"`,
+									text: `No persona-specific memory found with key: "${params.key}"`,
 								},
 							],
-							details: { key: params.key, forgotten: false },
+							details: { key: params.key, persona: personaName, forgotten: false },
 						};
 					}
 				} catch (err) {
@@ -384,10 +407,10 @@ export function createPersonaExtension(personaName: string = "default") {
 					);
 				}
 
-				// Memory stats
+				// Memory stats (both persona-specific and global)
 				try {
 					const db = getMemoryDb();
-					const stats = db.stats();
+					const stats = db.stats(personaName);
 					details.memoryStats = stats;
 
 					const catLines = Object.entries(stats.byCategory)
@@ -396,7 +419,8 @@ export function createPersonaExtension(personaName: string = "default") {
 
 					parts.push(
 						`**Memory** (${memoryDbPath}):\n` +
-							`  Total entries: ${stats.total}\n` +
+							`  Persona: ${personaName} (includes global memories)\n` +
+							`  Total accessible entries: ${stats.total}\n` +
 							(catLines ? `  By category:\n${catLines}` : "  (empty)"),
 					);
 				} catch (err) {
@@ -492,8 +516,8 @@ export function createPersonaExtension(personaName: string = "default") {
 			name: "remember",
 			label: "Remember",
 			description:
-				"Quick shortcut to save a note to memory (equivalent to memory_store with category=core). " +
-				"Use this when the user tells you something worth remembering for future conversations.",
+				"Quick shortcut to save a note to this persona's memory (equivalent to memory_store with scope=persona, category=core). " +
+				"Use this when the user tells you something worth remembering for future conversations in this persona context.",
 			parameters: Type.Object({
 				note: Type.String({
 					description: 'The thing to remember. Example: "User prefers TypeScript over JavaScript"',
@@ -510,11 +534,12 @@ export function createPersonaExtension(personaName: string = "default") {
 						.slice(0, 4)
 						.join("_");
 
-					db.store(key, params.note, "core");
+					// Store with persona scope
+					db.store(key, params.note, "core", personaName);
 
 					return {
-						content: [{ type: "text", text: `Remembered: "${params.note}"` }],
-						details: { key, note: params.note },
+						content: [{ type: "text", text: `Remembered for ${personaName} persona: "${params.note}"` }],
+						details: { key, note: params.note, persona: personaName },
 					};
 				} catch (err) {
 					return {
