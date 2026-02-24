@@ -1,8 +1,8 @@
-# lil — Security Model
+# clankie — Security Model
 
 ## Threat Surface
 
-lil exposes an agent with **full system access** (bash, read, write, edit) to an external
+clankie exposes an agent with **full system access** (bash, read, write, edit) to an external
 messaging channel (Telegram). This is the core tension: the agent needs power to be useful,
 but inbound messages are **untrusted input**.
 
@@ -30,7 +30,7 @@ Telegram (untrusted)
 - **Telegram user ID allowlist** — only pre-approved user IDs get responses
 - Unknown senders are silently ignored (no error, no acknowledgment)
 - Allowlist stored in `~/.clankie/config.json` with restrictive file permissions (0600)
-- `lil allow <user-id>` to add users, requires local access
+- `clankie allow <user-id>` to add users, requires local access
 
 ### 2. Prompt Injection (Direct)
 **Risk:** An allowed user (or someone who gains access) sends crafted messages to
@@ -44,7 +44,7 @@ manipulate the agent into executing harmful commands.
 **Mitigations (layered):**
 
 #### Layer 1: Tool restrictions (pi extension)
-A built-in lil extension that intercepts `tool_call` events:
+A built-in clankie extension that intercepts `tool_call` events:
 
 - **Dangerous command blocking** — block or require confirmation for:
   - `rm -rf`, `sudo`, `chmod 777`, `curl | sh`, `eval`, etc.
@@ -53,7 +53,7 @@ A built-in lil extension that intercepts `tool_call` events:
 - **Protected path blocking** — block writes to:
   - `~/.ssh/`, `~/.gnupg/`, `~/.aws/`, `~/.clankie/`
   - `.env` files, `/etc/`, system directories
-  - The lil config and credentials themselves
+  - The clankie config and credentials themselves
 - **Read restrictions** — block reads of:
   - Private keys, credentials, tokens
   - `~/.clankie/config.json` (contains bot token, allowlist)
@@ -229,7 +229,7 @@ export default function (pi: ExtensionAPI) {
 
 | Layer | What | Default | Configurable |
 |-------|------|---------|--------------|
-| Access control | Telegram user ID allowlist | Deny all | `lil allow <id>` |
+| Access control | Telegram user ID allowlist | Deny all | `clankie allow <id>` |
 | Tool blocking | Dangerous bash commands | Block | Edit patterns in extension |
 | Path protection | Sensitive file writes | Block | Edit paths in extension |
 | Read protection | Credential/key files | Block | Edit paths in extension |

@@ -195,7 +195,7 @@ export function createPersonaExtension(personaName: string = "default") {
 				key: Type.String({
 					description:
 						"Unique key for this memory. Use snake_case, be descriptive. " +
-						'Examples: "user_name", "preferred_stack", "project_lil_status"',
+						'Examples: "user_name", "preferred_stack", "project_clankie_status"',
 				}),
 				content: Type.String({
 					description: "The information to remember. Be concise but complete.",

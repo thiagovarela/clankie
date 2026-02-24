@@ -1,17 +1,17 @@
-# lil — Project Plan
+# clankie — Project Plan
 
-**lil** is a minimal personal AI assistant inspired by [OpenClaw](./openclaw.md), built on top of [pi](https://github.com/badlogic/pi-mono)'s SDK, agent runtime, and extension system.
+**clankie** is a minimal personal AI assistant inspired by [OpenClaw](./openclaw.md), built on top of [pi](https://github.com/badlogic/pi-mono)'s SDK, agent runtime, and extension system.
 
 ## Philosophy
 
-Where OpenClaw is a full-featured multi-channel assistant with 15+ messaging integrations, voice, canvas, companion apps, and a Gateway control plane — **lil starts with one thing done well**: a single messaging channel backed by pi's agent, using your existing OpenAI Codex subscription.
+Where OpenClaw is a full-featured multi-channel assistant with 15+ messaging integrations, voice, canvas, companion apps, and a Gateway control plane — **clankie starts with one thing done well**: a single messaging channel backed by pi's agent, using your existing OpenAI Codex subscription.
 
 We grow from there, only when needed.
 
 ## Milestone 0 — Foundation
 
 ### Goal
-A running lil process that receives a message, routes it to pi's agent (using OpenAI Codex subscription auth), and returns a response. No UI beyond what pi already provides. No channels yet — just the core loop.
+A running clankie process that receives a message, routes it to pi's agent (using OpenAI Codex subscription auth), and returns a response. No UI beyond what pi already provides. No channels yet — just the core loop.
 
 ### What we build
 1. **Project scaffolding**
@@ -19,7 +19,6 @@ A running lil process that receives a message, routes it to pi's agent (using Op
    - `package.json` with `@mariozechner/pi-coding-agent` and `grammy` as dependencies
    - `tsconfig.json`
    - Basic `src/` structure
-   - **Single-file executable** via `bun build --compile` (see [Distribution](#distribution))
 
 2. **Agent session wrapper** (`src/agent.ts`)
    - Uses pi's SDK (`createAgentSession`) to create a session
@@ -28,9 +27,9 @@ A running lil process that receives a message, routes it to pi's agent (using Op
    - Exposes a simple `send(message: string) → Promise<string>` interface
 
 3. **CLI entry point** (`src/cli.ts`)
-   - `lil send "message"` — send a message, print response, exit (uses pi's print mode under the hood)
-   - `lil chat` — interactive mode (delegates to pi's interactive mode directly)
-   - `lil login` — authenticate with OpenAI Codex subscription
+   - `clankie send "message"` — send a message, print response, exit (uses pi's print mode under the hood)
+   - `clankie chat` — interactive mode (delegates to pi's interactive mode directly)
+   - `clankie login` — authenticate with OpenAI Codex subscription
 
 4. **Configuration** (`src/config.ts`)
    - `~/.clankie/config.json` — provider, model, default channel (future)
@@ -54,10 +53,10 @@ OpenClaw uses pi as a low-level runtime — it calls `createAgentSession` but pr
 tools, system prompt, and extension loading, effectively bypassing pi's `DefaultResourceLoader`.
 It has its own parallel skill system (clawhub, workspace skills) and tool system.
 
-**lil does the opposite**: we lean on pi's standard discovery so the entire pi extension
+**clankie does the opposite**: we lean on pi's standard discovery so the entire pi extension
 ecosystem works out of the box. Users can `pi install` packages, drop extensions in
 `~/.pi/agent/extensions/`, add skills to `~/.agents/skills/`, and it all just loads.
-lil is a thin wrapper, not a replacement.
+clankie is a thin wrapper, not a replacement.
 
 ### What we DON'T build yet
 - ❌ Gateway / control plane
@@ -93,21 +92,21 @@ Receive and respond to Telegram messages via a single, always-on process.
    - Designed so WhatsApp/Signal/Discord can be added later with same interface
 
 3. **Daemon mode** (`src/daemon.ts`)
-   - `lil start` — run as background process
-   - `lil stop` — stop the daemon
-   - `lil status` — check if running
+   - `clankie start` — run as background process
+   - `clankie stop` — stop the daemon
+   - `clankie status` — check if running
    - Simple process management (no systemd/launchd yet)
 
 4. **Security defaults**
    - Allowlist by Telegram user ID (you set your own ID in config)
    - Unknown senders are ignored
-   - `lil allow <telegram-user-id>` to add a user
+   - `clankie allow <telegram-user-id>` to add a user
    - Allowlist persisted in `~/.clankie/config.json`
 
 ## Milestone 2 — Memory & Context
 
 ### Goal
-lil remembers things across sessions and can be given persistent instructions.
+clankie remembers things across sessions and can be given persistent instructions.
 
 ### What we build
 1. **Persistent sessions** — use pi's `SessionManager` with file persistence
@@ -135,8 +134,8 @@ Add channels one at a time using the channel abstraction from M1:
 
 ```
 ┌──────────────────────────────────┐
-│           lil CLI                │
-│  lil send / lil chat / lil login│
+│        clankie CLI               │
+│  clankie send / clankie chat / clankie login│
 └──────────────┬───────────────────┘
                │
                ▼
@@ -177,52 +176,26 @@ Telegram (grammY, long polling)
 └──────────────────────────────────┘
 ```
 
-## Distribution
-
-lil ships as a **single-file executable** using [Bun's compile feature](https://bun.sh/docs/bundler/executables).
-
-### How it works
-```bash
-bun build --compile --minify src/cli.ts --outfile lil
-```
-
-This bundles all TypeScript, all dependencies (`@mariozechner/pi-coding-agent`, `grammy`,
-etc.), and the Bun runtime into a single binary. No Node.js, no `npm install`, no `node_modules`.
-
-### Verified
-- `@mariozechner/pi-coding-agent` (1603 modules) bundles and runs correctly ✓
-- `grammy` bundles and runs correctly ✓
-- Both together: ~138MB with `--minify` ✓
-- Cross-compilation works: `--target=bun-linux-x64`, `--target=bun-linux-arm64`, etc.
-
-### Build targets
-```bash
-# macOS (Apple Silicon)
-bun build --compile --minify src/cli.ts --outfile dist/lil-darwin-arm64
-
-# macOS (Intel)
-bun build --compile --minify src/cli.ts --outfile dist/lil-darwin-x64 --target=bun-darwin-x64
-
-# Linux (x64)
-bun build --compile --minify src/cli.ts --outfile dist/lil-linux-x64 --target=bun-linux-x64
-
-# Linux (ARM64) — Raspberry Pi, cloud VMs
-bun build --compile --minify src/cli.ts --outfile dist/lil-linux-arm64 --target=bun-linux-arm64
-
-# Windows (x64)
-bun build --compile --minify src/cli.ts --outfile dist/lil-windows-x64.exe --target=bun-windows-x64
-```
+## Installation
 
 ### Install flow (user perspective)
 ```bash
-# Download a single binary
-curl -fsSL https://github.com/thiagovarela/lil/releases/latest/download/lil-$(uname -s | tr A-Z a-z)-$(uname -m) -o lil
-chmod +x lil
-./lil login    # authenticate with OpenAI Codex
-./lil chat     # start chatting
-```
+# Clone the repository
+git clone https://github.com/thiagovarela/lil
+cd lil
 
-No runtime dependencies. No package manager. Just a binary.
+# Install dependencies
+bun install
+
+# Link globally (optional)
+bun link --cwd packages/clankie
+
+# Authenticate with AI provider
+clankie login
+
+# Start chatting
+clankie chat
+```
 
 ### Development flow
 During development, run directly with Bun (no compile step):
@@ -234,7 +207,7 @@ bun run src/cli.ts chat
 ## File Structure (Milestone 0)
 
 ```
-lil/
+clankie/
 ├── package.json
 ├── tsconfig.json
 ├── src/

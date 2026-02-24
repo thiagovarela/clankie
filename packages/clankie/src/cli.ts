@@ -457,7 +457,7 @@ async function cmdPersona(args: string[]): Promise<void> {
 	const [sub, ...rest] = args;
 	const personasDir = getPersonasDir();
 
-	// lil persona (no subcommand) — list all personas
+	// clankie persona (no subcommand) — list all personas
 	if (!sub || sub === "list") {
 		const personas = existsSync(personasDir)
 			? readdirSync(personasDir).filter((name) => {
@@ -495,7 +495,7 @@ async function cmdPersona(args: string[]): Promise<void> {
 		return;
 	}
 
-	// lil persona show [name] — show persona files
+	// clankie persona show [name] — show persona files
 	if (sub === "show") {
 		const personaName = rest[0] ?? loadConfig().agent?.persona ?? "default";
 
@@ -532,11 +532,11 @@ async function cmdPersona(args: string[]): Promise<void> {
 		return;
 	}
 
-	// lil persona create <name> — create a new persona
+	// clankie persona create <name> — create a new persona
 	if (sub === "create") {
 		const personaName = rest[0];
 		if (!personaName) {
-			console.error("Usage: lil persona create <name>");
+			console.error("Usage: clankie persona create <name>");
 			process.exit(1);
 		}
 
@@ -567,7 +567,7 @@ async function cmdPersona(args: string[]): Promise<void> {
 		return;
 	}
 
-	// lil persona edit [name] [file] — edit persona files
+	// clankie persona edit [name] [file] — edit persona files
 	if (sub === "edit") {
 		const editor = process.env.EDITOR || process.env.VISUAL || "nano";
 		let personaName = rest[0];
@@ -615,11 +615,11 @@ async function cmdPersona(args: string[]): Promise<void> {
 		return;
 	}
 
-	// lil persona remove <name> — delete a persona
+	// clankie persona remove <name> — delete a persona
 	if (sub === "remove") {
 		const personaName = rest[0];
 		if (!personaName) {
-			console.error("Usage: lil persona remove <name>");
+			console.error("Usage: clankie persona remove <name>");
 			process.exit(1);
 		}
 
@@ -660,7 +660,7 @@ async function cmdPersona(args: string[]): Promise<void> {
 		return;
 	}
 
-	// lil persona path [name] — show persona directory
+	// clankie persona path [name] — show persona directory
 	if (sub === "path") {
 		const personaName = rest[0] ?? loadConfig().agent?.persona ?? "default";
 		try {
@@ -704,7 +704,7 @@ async function cmdMemory(args: string[]): Promise<void> {
 	const db = new MemoryDB(MEMORY_DB_PATH);
 
 	try {
-		// lil memory (or lil memory stats) — show statistics
+		// clankie memory (or clankie memory stats) — show statistics
 		if (!sub || sub === "stats") {
 			const stats = db.stats(personaName);
 			console.log(`Memory database: ${MEMORY_DB_PATH}\n`);

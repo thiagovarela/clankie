@@ -1,8 +1,8 @@
-# lil — Personal AI Assistant
+# clankie — Personal AI Assistant
 
-A minimal, focused AI assistant that lives in Slack. Built on [pi](https://github.com/badlogic/pi-mono)'s SDK, lil gives you a personal AI teammate that runs on your machine with your credentials.
+A minimal, focused AI assistant that lives in Slack. Built on [pi](https://github.com/badlogic/pi-mono)'s SDK, clankie gives you a personal AI teammate that runs on your machine with your credentials.
 
-## What Can lil Do?
+## What Can clankie Do?
 
 - 💬 **Natural conversations in Slack threads** — @mention once, then chat naturally
 - 🧠 **Remember things** — Built-in memory system (facts, preferences, project context)
@@ -36,10 +36,10 @@ bun install
 ### 3. Link Globally (Optional)
 
 ```bash
-bun link --cwd packages/lil
+bun link --cwd packages/clankie
 ```
 
-Now `lil` is available from anywhere. If you skip this, use `bun run packages/lil/src/cli.ts` instead of `lil`.
+Now `clankie` is available from anywhere. If you skip this, use `bun run packages/clankie/src/cli.ts` instead of `clankie`.
 
 ## Slack Setup
 
@@ -73,12 +73,12 @@ Now `lil` is available from anywhere. If you skip this, use `bun run packages/li
 2. Click the three dots (**⋯**) → **Copy member ID**
 3. Save this ID (looks like `U01ABC23DEF`)
 
-### Step 5: Configure lil
+### Step 5: Configure clankie
 
 ```bash
-lil config set channels.slack.appToken "xapp-1-A0AG6UWU92B-..."
-lil config set channels.slack.botToken "xoxb-10594563095936-..."
-lil config set channels.slack.allowFrom '["U01ABC23DEF"]'
+clankie config set channels.slack.appToken "xapp-1-A0AG6UWU92B-..."
+clankie config set channels.slack.botToken "xoxb-10594563095936-..."
+clankie config set channels.slack.allowFrom '["U01ABC23DEF"]'
 ```
 
 Replace:
@@ -89,37 +89,37 @@ Replace:
 ### Step 6: Authenticate with AI Provider
 
 ```bash
-lil login
+clankie login
 ```
 
 Choose your provider (Anthropic, OpenAI, etc.) and authenticate. Credentials are stored securely in `~/.clankie/auth.json`.
 
-### Step 7: Start lil
+### Step 7: Start clankie
 
 ```bash
-lil start
+clankie start
 ```
 
 You should see:
 ```
-[daemon] Starting lil daemon (pid 12345)...
+[daemon] Starting clankie daemon (pid 12345)...
 [daemon] Workspace: /Users/you/.clankie/workspace
 [daemon] Channels: slack
-[slack] Connected as @lil (U01XYZ...)
+[slack] Connected as @clankie (U01XYZ...)
 [daemon] Ready. Waiting for messages...
 ```
 
 ### Step 8: Test in Slack
 
-1. **Invite the bot to a channel**: Type `/invite @lil` in any channel
-2. **@mention it**: `@lil hello!`
+1. **Invite the bot to a channel**: Type `/invite @clankie` in any channel
+2. **@mention it**: `@clankie hello!`
 3. Bot creates a thread and replies
 4. **Continue the conversation** (no more @mentions needed): `what's 2+2?`
 5. Bot responds in the same thread
 
 🎉 **You're all set!**
 
-## Using lil
+## Using clankie
 
 ### In Slack
 
@@ -128,7 +128,7 @@ You should see:
 @mention the bot anywhere:
 ```
 Channel: #general
-You: @lil what's the weather in SF?
+You: @clankie what's the weather in SF?
   Thread 🧵
   Bot: It's 68°F and sunny
   You: and tomorrow?
@@ -141,7 +141,7 @@ After the first @mention, the bot responds to all your messages in that thread a
 
 Just message the bot directly — no @mention needed:
 ```
-DM with @lil
+DM with @clankie
 You: analyze this data [uploads file]
 Bot: Sure! Here's what I found...
 You: can you summarize it?
@@ -152,7 +152,7 @@ Bot: Here's a summary...
 
 Upload files directly in a conversation:
 ```
-You: @lil review this code
+You: @clankie review this code
 [uploads code.py]
 Bot: I'll analyze it...
 [provides feedback]
@@ -162,29 +162,29 @@ The bot can read images (with vision models), documents, code files, etc.
 
 ### CLI Commands
 
-Even though lil lives in Slack, you also have CLI access:
+Even though clankie lives in Slack, you also have CLI access:
 
 ```bash
 # Interactive chat session (local terminal, uses pi's TUI)
-lil chat
+clankie chat
 
 # Send a one-off message (prints response and exits)
-lil send "What files are in the current directory?"
+clankie send "What files are in the current directory?"
 
 # Shorthand (no subcommand needed)
-lil "Summarize recent git commits"
+clankie "Summarize recent git commits"
 
 # Check daemon status
-lil status
+clankie status
 
 # Stop daemon
-lil stop
+clankie stop
 
 # View configuration
-lil config show
+clankie config show
 
 # Set a config value
-lil config set agent.model.primary "anthropic/claude-sonnet-4-5"
+clankie config set agent.model.primary "anthropic/claude-sonnet-4-5"
 ```
 
 ## Configuration
@@ -195,19 +195,19 @@ Config file: `~/.clankie/clankie.json` (JSON5 format — comments and trailing c
 
 ```bash
 # Slack credentials
-lil config set channels.slack.appToken "xapp-..."
-lil config set channels.slack.botToken "xoxb-..."
-lil config set channels.slack.allowFrom '["U12345678"]'
+clankie config set channels.slack.appToken "xapp-..."
+clankie config set channels.slack.botToken "xoxb-..."
+clankie config set channels.slack.allowFrom '["U12345678"]'
 
 # AI model
-lil config set agent.model.primary "anthropic/claude-sonnet-4-5"
-lil config set agent.model.fallbacks '["openai/gpt-4o"]'
+clankie config set agent.model.primary "anthropic/claude-sonnet-4-5"
+clankie config set agent.model.fallbacks '["openai/gpt-4o"]'
 
 # Default persona
-lil config set agent.persona "default"
+clankie config set agent.persona "default"
 
 # Workspace (where agent works)
-lil config set agent.workspace "~/projects"
+clankie config set agent.workspace "~/projects"
 ```
 
 ### Config Paths
@@ -225,28 +225,28 @@ lil config set agent.workspace "~/projects"
 
 ## Personas
 
-Personas let you customize lil's personality, knowledge, and behavior for different contexts. Each persona is a set of markdown files that shape the system prompt.
+Personas let you customize clankie's personality, knowledge, and behavior for different contexts. Each persona is a set of markdown files that shape the system prompt.
 
 ### Built-in Persona: "default"
 
-lil ships with a minimal default persona. You can customize it:
+clankie ships with a minimal default persona. You can customize it:
 
 ```bash
 # View persona files
-lil persona show default
+clankie persona show default
 
 # Edit persona
-lil persona edit default
+clankie persona edit default
 ```
 
 ### Create a New Persona
 
 ```bash
 # Create a new persona
-lil persona create coding
+clankie persona create coding
 
 # Edit its files
-lil persona edit coding
+clankie persona edit coding
 ```
 
 This creates `~/.clankie/personas/coding/` with these files:
@@ -255,7 +255,7 @@ This creates `~/.clankie/personas/coding/` with these files:
 ```markdown
 # Identity
 
-You are **lil (coding)**, a personal AI coding assistant.
+You are **clankie (coding)**, a personal AI coding assistant.
 
 - You're an expert in software engineering
 - You prefer working solutions over perfect ones
@@ -280,7 +280,7 @@ You are **lil (coding)**, a personal AI coding assistant.
 
 - Name: Thiago
 - Stack: TypeScript, Bun, React
-- Current project: lil (AI assistant)
+- Current project: clankie (AI assistant)
 - Prefers: Functional programming, immutability
 ```
 
@@ -296,54 +296,54 @@ You are **lil (coding)**, a personal AI coding assistant.
 
 ```bash
 # Set as default
-lil config set agent.persona "coding"
+clankie config set agent.persona "coding"
 
 # Use for a specific session
-lil chat --persona coding
-lil send --persona coding "Review this code"
+clankie chat --persona coding
+clankie send --persona coding "Review this code"
 
 # Use for Slack only
-lil config set channels.slack.persona "work"
+clankie config set channels.slack.persona "work"
 ```
 
 ### Manage Personas
 
 ```bash
 # List all personas
-lil persona
+clankie persona
 
 # Show persona files
-lil persona show coding
+clankie persona show coding
 
 # Edit persona
-lil persona edit coding
+clankie persona edit coding
 
 # Edit specific file
-lil persona edit coding identity.md
+clankie persona edit coding identity.md
 
 # Get persona directory path
-lil persona path coding
+clankie persona path coding
 
 # Remove persona
-lil persona remove coding
+clankie persona remove coding
 ```
 
 ## Memory
 
-lil has a built-in memory system powered by SQLite FTS5 (full-text search). The bot can remember facts, preferences, and context across conversations.
+clankie has a built-in memory system powered by SQLite FTS5 (full-text search). The bot can remember facts, preferences, and context across conversations.
 
 ### How It Works
 
-When you tell lil to remember something:
+When you tell clankie to remember something:
 ```
-You: @lil remember my timezone is PST
+You: @clankie remember my timezone is PST
 Bot: Got it, I'll remember that.
 ```
 
-Behind the scenes, lil uses the `remember` tool (provided by the persona extension) to store this in `~/.clankie/memory.db`. Later:
+Behind the scenes, clankie uses the `remember` tool (provided by the persona extension) to store this in `~/.clankie/memory.db`. Later:
 
 ```
-You: @lil what time is it for me?
+You: @clankie what time is it for me?
 Bot: Since you're in PST, it's currently 3:45 PM.
 ```
 
@@ -359,44 +359,44 @@ Memories are automatically categorized:
 
 ```bash
 # Show memory stats
-lil memory
+clankie memory
 
 # Search memories
-lil memory search "timezone"
+clankie memory search "timezone"
 
 # List all memories (or by category)
-lil memory list
-lil memory list preference
+clankie memory list
+clankie memory list preference
 
 # Export core memories as JSON
-lil memory export > memories.json
+clankie memory export > memories.json
 
 # Forget a specific memory
-lil memory forget "timezone"
+clankie memory forget "timezone"
 ```
 
-### How lil Uses Memory
+### How clankie Uses Memory
 
 The persona extension automatically:
 1. **Injects relevant memories** into the system prompt based on the current conversation
 2. **Uses FTS5 search** to find contextually relevant memories
-3. **Provides the `remember` tool** so lil can store new information
+3. **Provides the `remember` tool** so clankie can store new information
 
-You don't need to do anything special — just tell lil to remember things naturally.
+You don't need to do anything special — just tell clankie to remember things naturally.
 
 ## Running as a Service
 
-Instead of running `lil start` manually, you can install lil as a system service that starts automatically on boot.
+Instead of running `clankie start` manually, you can install clankie as a system service that starts automatically on boot.
 
 ### Install Service
 
 ```bash
-lil daemon install
+clankie daemon install
 ```
 
 This installs:
 - **macOS**: launchd agent (`~/Library/LaunchAgents/ai.clankie.daemon.plist`)
-- **Linux**: systemd user service (`~/.config/systemd/user/lil.service`)
+- **Linux**: systemd user service (`~/.config/systemd/user/clankie.service`)
 
 The daemon starts immediately and runs on boot.
 
@@ -404,20 +404,20 @@ The daemon starts immediately and runs on boot.
 
 ```bash
 # Check service status
-lil daemon status
+clankie daemon status
 
 # View logs
-lil daemon logs
+clankie daemon logs
 
 # Uninstall service
-lil daemon uninstall
+clankie daemon uninstall
 ```
 
 Logs are stored in `~/.clankie/logs/daemon.log`.
 
 ## Security
 
-lil includes a built-in security extension that protects against common mistakes:
+clankie includes a built-in security extension that protects against common mistakes:
 
 ### What It Blocks
 
@@ -442,7 +442,7 @@ The agent sees `[REDACTED:...]` instead of the actual value.
 - Run most bash commands
 - Access the internet
 
-**Don't give lil credentials to production systems or sensitive environments.**
+**Don't give clankie credentials to production systems or sensitive environments.**
 
 For the full threat model, see `docs/security.md` (if you've added this).
 
@@ -450,15 +450,15 @@ For the full threat model, see `docs/security.md` (if you've added this).
 
 ### Cron Jobs (Scheduled Tasks)
 
-lil can schedule periodic tasks (not yet documented — coming soon).
+clankie can schedule periodic tasks (not yet documented — coming soon).
 
 ### Heartbeat
 
-lil can check `~/.clankie/heartbeat.md` periodically and take proactive actions (not yet documented — coming soon).
+clankie can check `~/.clankie/heartbeat.md` periodically and take proactive actions (not yet documented — coming soon).
 
 ### pi Extensions
 
-lil works with all pi extensions out of the box. Extensions are loaded from:
+clankie works with all pi extensions out of the box. Extensions are loaded from:
 - `~/.pi/agent/extensions/`
 - `.pi/extensions/` (in your project)
 
@@ -483,13 +483,13 @@ See pi's documentation for the skills system.
 
 ### "No channels configured" error
 
-**Problem**: `lil start` fails with "No channels configured".
+**Problem**: `clankie start` fails with "No channels configured".
 
 **Solution**: Configure Slack credentials:
 ```bash
-lil config set channels.slack.appToken "xapp-..."
-lil config set channels.slack.botToken "xoxb-..."
-lil config set channels.slack.allowFrom '["U12345678"]'
+clankie config set channels.slack.appToken "xapp-..."
+clankie config set channels.slack.botToken "xoxb-..."
+clankie config set channels.slack.allowFrom '["U12345678"]'
 ```
 
 ### Bot responds to everyone
@@ -498,8 +498,8 @@ lil config set channels.slack.allowFrom '["U12345678"]'
 
 **Solution**: Set `allowFrom` to only include your user ID:
 ```bash
-lil config get channels.slack.allowFrom
-lil config set channels.slack.allowFrom '["U12345678"]'
+clankie config get channels.slack.allowFrom
+clankie config set channels.slack.allowFrom '["U12345678"]'
 ```
 
 ### "Failed to run git: fatal: 'main' is already used by worktree"
@@ -514,22 +514,22 @@ lil config set channels.slack.allowFrom '["U12345678"]'
 
 **Solution**: Check service status:
 ```bash
-lil daemon status
-lil daemon logs
+clankie daemon status
+clankie daemon logs
 ```
 
 If the service isn't running, reinstall:
 ```bash
-lil daemon uninstall
-lil daemon install
+clankie daemon uninstall
+clankie daemon install
 ```
 
 ## Development
 
 ```bash
 # Run directly with Bun (no build step)
-bun run packages/lil/src/cli.ts chat
-bun run packages/lil/src/cli.ts send "hello"
+bun run packages/clankie/src/cli.ts chat
+bun run packages/clankie/src/cli.ts send "hello"
 
 # Code quality checks
 bun run check        # Run linter
@@ -539,12 +539,12 @@ bun run format       # Format code
 
 ## Philosophy
 
-lil is a **thin wrapper around pi**, not a replacement. It reuses the entire pi ecosystem:
+clankie is a **thin wrapper around pi**, not a replacement. It reuses the entire pi ecosystem:
 - Extensions, skills, and prompt templates just work
 - Same agent runtime, same resource loaders
 - Authentication shared with `pi` CLI
 
-Where other assistants try to be everything, lil focuses on **one thing done well**: giving you a personal AI teammate in Slack that reuses proven infrastructure.
+Where other assistants try to be everything, clankie focuses on **one thing done well**: giving you a personal AI teammate in Slack that reuses proven infrastructure.
 
 ## Credits
 

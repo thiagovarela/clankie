@@ -82,9 +82,9 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 	const authStorage = AuthStorage.create(getAuthPath());
 	const modelRegistry = new ModelRegistry(authStorage);
 
-	// DefaultResourceLoader with standard pi discovery + lil's security extension.
+	// DefaultResourceLoader with standard pi discovery + clankie's security extension.
 	// Using extensionFactories (not additionalExtensionPaths) so the security
-	// extension is bundled and works correctly in both dev and compiled binary modes.
+	// extension is bundled and works correctly.
 	const loader = new DefaultResourceLoader({
 		cwd,
 		agentDir,

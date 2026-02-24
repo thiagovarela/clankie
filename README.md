@@ -1,10 +1,10 @@
-# lil — your personal AI assistant
+# clankie — your personal AI assistant
 
-**lil** is a minimal, focused personal AI assistant that lives in Slack. It's built on [pi](https://github.com/badlogic/pi-mono)'s SDK and reuses the entire pi ecosystem (extensions, skills, prompt templates).
+**clankie** is a minimal, focused personal AI assistant that lives in Slack. It's built on [pi](https://github.com/badlogic/pi-mono)'s SDK and reuses the entire pi ecosystem (extensions, skills, prompt templates).
 
-## What is lil?
+## What is clankie?
 
-Think of lil as your personal AI teammate that:
+Think of clankie as your personal AI teammate that:
 - ✅ Lives in Slack (no extra apps to install)
 - ✅ Has continuous conversations in threads (no @mentioning after first message)
 - ✅ Runs on your machine with your credentials (privacy by default)
@@ -22,28 +22,28 @@ Think of lil as your personal AI teammate that:
 
 2. **Authenticate**:
    ```bash
-   bun run packages/lil/src/cli.ts login
+   bun run packages/clankie/src/cli.ts login
    ```
 
-3. **Set up Slack** (see [Setup Guide](packages/lil/README.md#slack-setup)):
+3. **Set up Slack** (see [Setup Guide](packages/clankie/README.md#slack-setup)):
    - Create Slack app with Socket Mode
    - Configure credentials
    - Start daemon
 
-4. **Chat with lil in Slack**!
+4. **Chat with clankie in Slack**!
 
 ## Documentation
 
-See [packages/lil/README.md](packages/lil/README.md) for the complete user guide including:
+See [packages/clankie/README.md](packages/clankie/README.md) for the complete user guide including:
 - Slack app setup (step-by-step)
 - Configuration
-- Personas (customize lil's personality per use case)
+- Personas (customize clankie's personality per use case)
 - Memory system
 - CLI commands
 
 ## Architecture
 
-- `packages/lil/` — CLI daemon + agent runtime (Slack integration)
+- `packages/clankie/` — CLI daemon + agent runtime (Slack integration)
 - Built on pi's SDK, agent core, and resource loaders
 - Slack-only by design (focused, simple)
 
