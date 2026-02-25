@@ -52,6 +52,8 @@ export function ChatInput() {
 			<div className="flex gap-2">
 				<Textarea
 					ref={textareaRef}
+					id="chat-input"
+					name="message"
 					value={message}
 					onChange={(e) => setMessage(e.target.value)}
 					onKeyDown={handleKeyDown}
