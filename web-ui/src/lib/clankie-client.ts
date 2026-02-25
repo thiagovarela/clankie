@@ -66,6 +66,15 @@ export class ClankieClient {
 		return response as { sessionId: string; cancelled: boolean };
 	}
 
+	async listSessions(): Promise<{
+		sessions: Array<{ sessionId: string; name?: string; model?: ModelInfo; messageCount: number }>;
+	}> {
+		const response = await this.sendCommand({ type: "list_sessions" });
+		return response as {
+			sessions: Array<{ sessionId: string; name?: string; model?: ModelInfo; messageCount: number }>;
+		};
+	}
+
 	async prompt(sessionId: string, message: string): Promise<void> {
 		await this.sendCommand({ type: "prompt", message }, sessionId);
 	}
