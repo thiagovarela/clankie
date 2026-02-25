@@ -15,7 +15,6 @@
 	"dependencies": {
 		"@mariozechner/pi-ai": "^0.54.0",
 		"@mariozechner/pi-coding-agent": "^0.54.0",
-		"@sinclair/typebox": "^0.34.48",
 		"@slack/socket-mode": "^2.0.0",
 		"@slack/web-api": "^7.0.0",
 		"json5": "^2.2.3"

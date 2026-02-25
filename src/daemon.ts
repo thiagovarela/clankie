@@ -27,17 +27,10 @@ import {
 	getAppDir,
 	getAuthPath,
 	getConfigPath,
-	getPersonaDir,
 	getWorkspace,
-	loadChannelPersonaOverrides,
 	loadConfig,
-	resolvePersonaModel,
-	saveChannelPersonaOverrides,
 } from "./config.ts";
-import cronExtension from "./extensions/cron/index.ts";
-import { createPersonaExtension } from "./extensions/persona/index.ts";
 import securityExtension from "./extensions/security.ts";
-import { HeartbeatService } from "./heartbeat.ts";
 
 // ─── PID file management ──────────────────────────────────────────────────────
 
@@ -77,68 +70,14 @@ const sessionCache = new Map<string, AgentSession>();
 // Track active session name per chat (for /switch command)
 const activeSessionNames = new Map<string, string>();
 
-// Track channel-specific persona overrides (runtime, persisted to ~/.clankie/channel-personas.json)
-const channelPersonaOverrides = new Map<string, string>();
-
 // ─── Daemon state tracking (for config reload) ────────────────────────────────
 
 let activeChannels: Channel[] = [];
-let activeHeartbeat: HeartbeatService | null = null;
 let configWatcher: ReturnType<typeof watch> | null = null;
-let lastActiveChannel: Channel | null = null;
-let lastActiveChatId: string | null = null;
-let lastActiveThreadId: string | null = null;
 
-/**
- * Resolve the persona name for a given channel and chat ID.
- * Resolution order:
- * 1. Runtime override (channelPersonaOverrides)
- * 2. Config per-channel mapping (channels.slack.channelPersonas[chatId])
- * 3. Config channel-level default (channels.slack.persona)
- * 4. Config global default (agent.persona)
- * 5. Hardcoded fallback ("default")
- */
-function resolveChannelPersona(channel: string, chatId: string, config: AppConfig): string {
-	const channelKey = `${channel}_${chatId}`;
-
-	// 1. Runtime override
-	const override = channelPersonaOverrides.get(channelKey);
-	if (override) return override;
-
-	// 2. Config per-channel mapping (Slack only for now)
-	if (channel === "slack") {
-		const slackConfig = config.channels?.slack;
-		const channelMapping = slackConfig?.channelPersonas?.[chatId];
-		if (channelMapping) return channelMapping;
-
-		// 3. Config channel-level default
-		if (slackConfig?.persona) return slackConfig.persona;
-	}
-
-	// 4. Config global default
-	if (config.agent?.persona) return config.agent.persona;
-
-	// 5. Hardcoded fallback
-	return "default";
-}
-
-async function getOrCreateSession(
-	chatKey: string,
-	config: AppConfig,
-	personaName: string = "default",
-): Promise<AgentSession> {
+async function getOrCreateSession(chatKey: string, config: AppConfig): Promise<AgentSession> {
 	const cached = sessionCache.get(chatKey);
 	if (cached) return cached;
-
-	// Validate persona name early
-	try {
-		getPersonaDir(personaName);
-	} catch (err) {
-		console.error(
-			`[daemon] Invalid persona name "${personaName}": ${err instanceof Error ? err.message : String(err)}`,
-		);
-		throw err;
-	}
 
 	const agentDir = getAgentDir(config);
 	const cwd = getWorkspace(config);
@@ -149,7 +88,7 @@ async function getOrCreateSession(
 	const loader = new DefaultResourceLoader({
 		cwd,
 		agentDir,
-		extensionFactories: [securityExtension, createPersonaExtension(personaName), cronExtension],
+		extensionFactories: [securityExtension],
 	});
 	await loader.reload();
 
@@ -158,9 +97,8 @@ async function getOrCreateSession(
 
 	const sessionManager = SessionManager.continueRecent(cwd, sessionDir);
 
-	// Resolve model: persona config → global config → pi auto-detection
-	const personaModel = resolvePersonaModel(personaName);
-	const modelSpec = personaModel ?? config.agent?.model?.primary;
+	// Resolve model from config → pi auto-detection
+	const modelSpec = config.agent?.model?.primary;
 	let model: ReturnType<typeof modelRegistry.find> | undefined;
 	if (modelSpec) {
 		const slash = modelSpec.indexOf("/");
@@ -169,8 +107,7 @@ async function getOrCreateSession(
 			const modelId = modelSpec.substring(slash + 1);
 			model = modelRegistry.find(provider, modelId);
 			if (!model) {
-				const source = personaModel ? `persona "${personaName}"` : "config";
-				console.warn(`[daemon] Warning: model "${modelSpec}" from ${source} not found, falling back to auto-detection`);
+				console.warn(`[daemon] Warning: model "${modelSpec}" from config not found, falling back to auto-detection`);
 			}
 		}
 	}
@@ -317,7 +254,7 @@ async function saveNonImageAttachments(
 const chatLocks = new Map<string, Promise<void>>();
 
 async function handleMessage(message: InboundMessage, channel: Channel): Promise<void> {
-	const config = loadConfig();
+	const _config = loadConfig();
 
 	// Determine session name:
 	// 1. For forum topics (threadId present) → use threadId
@@ -333,17 +270,11 @@ async function handleMessage(message: InboundMessage, channel: Channel): Promise
 		sessionName = activeSessionNames.get(chatIdentifier) ?? "default";
 	}
 
-	// Resolve persona for this channel
-	const personaName = resolveChannelPersona(message.channel, message.chatId, config);
-
-	// Include persona in chatKey so each persona gets its own session
-	const chatKey = `${chatIdentifier}_${personaName}_${sessionName}`;
+	const chatKey = `${chatIdentifier}_${sessionName}`;
 
 	// Serialize messages per chat — wait for previous message to finish
 	const previous = chatLocks.get(chatKey) ?? Promise.resolve();
-	const current = previous.then(() =>
-		processMessage(message, channel, chatKey, chatIdentifier, sessionName, personaName),
-	);
+	const current = previous.then(() => processMessage(message, channel, chatKey, chatIdentifier, sessionName));
 	chatLocks.set(
 		chatKey,
 		current.catch(() => {}),
@@ -357,17 +288,13 @@ async function processMessage(
 	chatKey: string,
 	chatIdentifier: string,
 	sessionName: string,
-	personaName: string,
 ): Promise<void> {
 	const config = loadConfig();
 
 	const attachCount = message.attachments?.length ?? 0;
 	const preview = message.text.slice(0, 100) || (attachCount > 0 ? `[${attachCount} attachment(s)]` : "[empty]");
 	const sessionInfo = sessionName !== "default" ? ` [session:${sessionName}]` : "";
-	const personaInfo = personaName !== "default" ? ` [persona:${personaName}]` : "";
-	console.log(
-		`[daemon] ${message.channel}/${message.chatId}${sessionInfo}${personaInfo} (${message.senderName}): ${preview}`,
-	);
+	console.log(`[daemon] ${message.channel}/${message.chatId}${sessionInfo} (${message.senderName}): ${preview}`);
 
 	// Prepare send options for thread-aware responses
 	// Always reply in a thread: use existing thread or create new one with message.id as parent
@@ -433,104 +360,7 @@ async function processMessage(
 			return;
 		}
 
-		// Handle /persona command — show/switch/reset persona
-		if (trimmed === "/persona" || trimmed.startsWith("/persona ")) {
-			const args = trimmed.substring(8).trim();
-
-			// /persona (no args) — show current persona
-			if (!args) {
-				const channelKey = `${message.channel}_${message.chatId}`;
-				const runtimeOverride = channelPersonaOverrides.get(channelKey);
-				const configChannelPersona =
-					message.channel === "slack" ? config.channels?.slack?.channelPersonas?.[message.chatId] : undefined;
-				const configDefault = config.channels?.slack?.persona ?? config.agent?.persona ?? "default";
-
-				const lines = [`**Current persona:** ${personaName}`];
-				if (runtimeOverride) {
-					lines.push(`  (Runtime override — use \`/persona reset\` to clear)`);
-				} else if (configChannelPersona) {
-					lines.push(`  (From config: \`channels.slack.channelPersonas["${message.chatId}"]\`)`);
-				} else {
-					lines.push(`  (Config default: ${configDefault})`);
-				}
-
-				lines.push("");
-				lines.push("**Commands:**");
-				lines.push("  `/persona <name>` — switch to a different persona");
-				lines.push("  `/persona reset` — reset to the configured default");
-				lines.push("");
-				lines.push("Use `clankie persona` to list available personas.");
-
-				await channel.send(message.chatId, lines.join("\n"), sendOptions);
-				return;
-			}
-
-			// /persona reset — remove runtime override
-			if (args === "reset") {
-				const channelKey = `${message.channel}_${message.chatId}`;
-				const hadOverride = channelPersonaOverrides.has(channelKey);
-
-				if (hadOverride) {
-					channelPersonaOverrides.delete(channelKey);
-					// Persist to disk
-					const overrides: Record<string, string> = {};
-					for (const [k, v] of channelPersonaOverrides.entries()) {
-						overrides[k] = v;
-					}
-					saveChannelPersonaOverrides(overrides);
-
-					const newPersona = resolveChannelPersona(message.channel, message.chatId, config);
-					await channel.send(
-						message.chatId,
-						`✅ Reset persona to **${newPersona}** (from config).\n\nNext message will use this persona.`,
-						sendOptions,
-					);
-				} else {
-					await channel.send(
-						message.chatId,
-						"ℹ️ No runtime override is set. Already using the configured default.",
-						sendOptions,
-					);
-				}
-				return;
-			}
-
-			// /persona <name> — switch to a different persona
-			const newPersonaName = args;
-
-			// Validate persona exists
-			try {
-				getPersonaDir(newPersonaName);
-			} catch (err) {
-				await channel.send(
-					message.chatId,
-					`⚠️ Invalid persona name: ${err instanceof Error ? err.message : String(err)}\n\nUse \`clankie persona\` to list available personas.`,
-					sendOptions,
-				);
-				return;
-			}
-
-			// Update runtime override
-			const channelKey = `${message.channel}_${message.chatId}`;
-			channelPersonaOverrides.set(channelKey, newPersonaName);
-
-			// Persist to disk
-			const overrides: Record<string, string> = {};
-			for (const [k, v] of channelPersonaOverrides.entries()) {
-				overrides[k] = v;
-			}
-			saveChannelPersonaOverrides(overrides);
-
-			console.log(`[daemon] Switched ${channelKey} to persona "${newPersonaName}"`);
-			await channel.send(
-				message.chatId,
-				`✅ Switched to persona **${newPersonaName}**.\n\nNext message will use this persona.\nUse \`/persona reset\` to revert to the default.`,
-				sendOptions,
-			);
-			return;
-		}
-
-		const session = await getOrCreateSession(chatKey, config, personaName);
+		const session = await getOrCreateSession(chatKey, config);
 
 		// Build image attachments for the agent (vision-capable models)
 		const images = toImageContents(message.attachments);
@@ -589,21 +419,11 @@ async function processMessage(
 // ─── Daemon lifecycle ──────────────────────────────────────────────────────────
 
 /**
- * Initialize channels and heartbeat from current config.
+ * Initialize channels from current config.
  * Stores references in module-level state for restart capability.
  */
-async function initializeChannelsAndHeartbeat(): Promise<void> {
+async function initializeChannels(): Promise<void> {
 	const config = loadConfig();
-
-	// Load channel persona overrides from disk
-	const overrides = loadChannelPersonaOverrides();
-	channelPersonaOverrides.clear();
-	for (const [key, value] of Object.entries(overrides)) {
-		channelPersonaOverrides.set(key, value);
-	}
-	if (channelPersonaOverrides.size > 0) {
-		console.log(`[daemon] Loaded ${channelPersonaOverrides.size} channel persona override(s)`);
-	}
 
 	const channels: Channel[] = [];
 
@@ -631,68 +451,15 @@ async function initializeChannelsAndHeartbeat(): Promise<void> {
 		process.exit(1);
 	}
 
-	// ─── Heartbeat service ──────────────────────────────────────────────
-
-	const heartbeat = new HeartbeatService(config);
-
-	heartbeat.setHandler(async (prompt: string) => {
-		// Use last active channel to deliver heartbeat results
-		if (!lastActiveChannel || !lastActiveChatId) {
-			console.log("[heartbeat] No active channel — skipping delivery");
-			return;
-		}
-
-		const chatKey = `heartbeat_${lastActiveChatId}${lastActiveThreadId ? `_${lastActiveThreadId}` : "_default"}`;
-		const personaName = config.agent?.persona ?? "default";
-		const session = await getOrCreateSession(chatKey, config, personaName);
-
-		try {
-			await session.prompt(prompt, { source: "rpc" });
-
-			const state = session.state;
-			const lastMessage = state.messages[state.messages.length - 1];
-
-			if (lastMessage?.role === "assistant") {
-				const textParts: string[] = [];
-				for (const content of lastMessage.content) {
-					if (content.type === "text" && content.text.trim()) {
-						textParts.push(content.text);
-					}
-				}
-
-				const responseText = textParts.join("\n").trim();
-				// Don't send "all clear" messages — only actionable results
-				if (responseText && !responseText.match(/^all\s+clear\.?$/i)) {
-					const sendOptions = lastActiveThreadId ? { threadId: lastActiveThreadId } : undefined;
-					await lastActiveChannel.send(lastActiveChatId, `🔔 ${responseText}`, sendOptions);
-				}
-			}
-		} catch (err) {
-			console.error(`[heartbeat] Error processing:`, err instanceof Error ? err.message : String(err));
-		}
-	});
-
-	// ─── Start channels ──────────────────────────────────────────────────
-
 	console.log(`[daemon] Workspace: ${getWorkspace(config)}`);
 	console.log(`[daemon] Channels: ${channels.length > 0 ? channels.map((c) => c.name).join(", ") : "(none)"}`);
 
 	for (const ch of channels) {
-		await ch.start((msg) => {
-			// Track last active channel for heartbeat delivery
-			lastActiveChannel = ch;
-			lastActiveChatId = msg.chatId;
-			lastActiveThreadId = msg.threadId ?? null;
-			return handleMessage(msg, ch);
-		});
+		await ch.start((msg) => handleMessage(msg, ch));
 	}
-
-	// Start heartbeat after channels are ready
-	heartbeat.start();
 
 	// Store in module state
 	activeChannels = channels;
-	activeHeartbeat = heartbeat;
 
 	console.log("[daemon] Ready. Waiting for messages...");
 }
@@ -703,12 +470,7 @@ async function initializeChannelsAndHeartbeat(): Promise<void> {
 async function restartDaemon(): Promise<void> {
 	console.log("[daemon] Config changed — restarting...");
 
-	// Stop existing channels and heartbeat
-	if (activeHeartbeat) {
-		activeHeartbeat.stop();
-		activeHeartbeat = null;
-	}
-
+	// Stop existing channels
 	for (const ch of activeChannels) {
 		await ch.stop().catch((err) => {
 			console.error(`[daemon] Error stopping channel ${ch.name}:`, err);
@@ -720,7 +482,7 @@ async function restartDaemon(): Promise<void> {
 	sessionCache.clear();
 
 	// Reinitialize with fresh config
-	await initializeChannelsAndHeartbeat();
+	await initializeChannels();
 
 	console.log("[daemon] Restart complete.");
 }
@@ -732,7 +494,7 @@ export async function startDaemon(): Promise<void> {
 	console.log(`[daemon] Starting clankie daemon (pid ${process.pid})...`);
 
 	// Initial startup
-	await initializeChannelsAndHeartbeat();
+	await initializeChannels();
 
 	// ─── Config file watcher ──────────────────────────────────────────────
 
@@ -765,10 +527,7 @@ export async function startDaemon(): Promise<void> {
 			configWatcher = null;
 		}
 
-		// Stop heartbeat and channels
-		if (activeHeartbeat) {
-			activeHeartbeat.stop();
-		}
+		// Stop channels
 		for (const ch of activeChannels) {
 			await ch.stop().catch(() => {});
 		}

@@ -5,9 +5,7 @@ A minimal, focused AI assistant that lives in Slack. Built on [pi](https://githu
 ## What Can clankie Do?
 
 - 💬 **Natural conversations in Slack threads** — @mention once, then chat naturally
-- 🧠 **Remember things** — Built-in memory system (facts, preferences, project context)
-- 🎭 **Multiple personas** — Different personalities for different contexts (work, coding, personal)
-- 🛠️ **Use tools** — Read/write files, run bash commands, search memory
+- 🛠️ **Use tools** — Read/write files, run bash commands, and more
 - 🔌 **pi ecosystem** — Works with all pi extensions, skills, and prompt templates
 - 🔒 **Privacy-first** — Runs on your machine, your credentials, your data
 
@@ -203,9 +201,6 @@ clankie config set channels.slack.allowFrom '["U12345678"]'
 clankie config set agent.model.primary "anthropic/claude-sonnet-4-5"
 clankie config set agent.model.fallbacks '["openai/gpt-4o"]'
 
-# Default persona
-clankie config set agent.persona "default"
-
 # Workspace (where agent works)
 clankie config set agent.workspace "~/projects"
 ```
@@ -214,175 +209,13 @@ clankie config set agent.workspace "~/projects"
 
 | Path | Description | Example |
 |------|-------------|---------|
-| `agent.persona` | Default persona name | `"default"`, `"coding"`, `"work"` |
 | `agent.workspace` | Agent working directory | `"~/projects"` |
 | `agent.model.primary` | Primary AI model | `"anthropic/claude-sonnet-4-5"` |
 | `agent.model.fallbacks` | Fallback models (array) | `["openai/gpt-4o"]` |
 | `channels.slack.appToken` | Socket Mode app token | `"xapp-..."` |
 | `channels.slack.botToken` | Bot token for API calls | `"xoxb-..."` |
 | `channels.slack.allowFrom` | Allowed user IDs (array) | `["U12345678"]` |
-| `channels.slack.persona` | Override persona for Slack | `"work"` |
 
-## Personas
-
-Personas let you customize clankie's personality, knowledge, and behavior for different contexts. Each persona is a set of markdown files that shape the system prompt.
-
-### Built-in Persona: "default"
-
-clankie ships with a minimal default persona. You can customize it:
-
-```bash
-# View persona files
-clankie persona show default
-
-# Edit persona
-clankie persona edit default
-```
-
-### Create a New Persona
-
-```bash
-# Create a new persona
-clankie persona create coding
-
-# Edit its files
-clankie persona edit coding
-```
-
-This creates `~/.clankie/personas/coding/` with these files:
-
-#### `identity.md` — Who the assistant is
-```markdown
-# Identity
-
-You are **clankie (coding)**, a personal AI coding assistant.
-
-- You're an expert in software engineering
-- You prefer working solutions over perfect ones
-- You're concise but thorough with explanations
-- You use modern best practices
-```
-
-#### `instructions.md` — How to behave
-```markdown
-# Instructions
-
-- Write clean, readable code with comments
-- Explain complex concepts simply
-- Run tests before claiming something works
-- Use git for version control
-- Ask for clarification on ambiguous requirements
-```
-
-#### `knowledge.md` — User context
-```markdown
-# User Knowledge
-
-- Name: Thiago
-- Stack: TypeScript, Bun, React
-- Current project: clankie (AI assistant)
-- Prefers: Functional programming, immutability
-```
-
-#### `persona.json` — Model override (optional)
-```json
-{
-  // Override the global model for this persona
-  "model": "anthropic/claude-sonnet-4-5"
-}
-```
-
-### Use a Persona
-
-```bash
-# Set as default
-clankie config set agent.persona "coding"
-
-# Use for a specific session
-clankie chat --persona coding
-clankie send --persona coding "Review this code"
-
-# Use for Slack only
-clankie config set channels.slack.persona "work"
-```
-
-### Manage Personas
-
-```bash
-# List all personas
-clankie persona
-
-# Show persona files
-clankie persona show coding
-
-# Edit persona
-clankie persona edit coding
-
-# Edit specific file
-clankie persona edit coding identity.md
-
-# Get persona directory path
-clankie persona path coding
-
-# Remove persona
-clankie persona remove coding
-```
-
-## Memory
-
-clankie has a built-in memory system powered by SQLite FTS5 (full-text search). The bot can remember facts, preferences, and context across conversations.
-
-### How It Works
-
-When you tell clankie to remember something:
-```
-You: @clankie remember my timezone is PST
-Bot: Got it, I'll remember that.
-```
-
-Behind the scenes, clankie uses the `remember` tool (provided by the persona extension) to store this in `~/.clankie/memory.db`. Later:
-
-```
-You: @clankie what time is it for me?
-Bot: Since you're in PST, it's currently 3:45 PM.
-```
-
-### Memory Categories
-
-Memories are automatically categorized:
-- **preference** — User preferences, settings
-- **fact** — Objective facts about the user, project, etc.
-- **context** — Project context, working memory
-- **note** — General notes, ideas
-
-### CLI Commands
-
-```bash
-# Show memory stats
-clankie memory
-
-# Search memories
-clankie memory search "timezone"
-
-# List all memories (or by category)
-clankie memory list
-clankie memory list preference
-
-# Export core memories as JSON
-clankie memory export > memories.json
-
-# Forget a specific memory
-clankie memory forget "timezone"
-```
-
-### How clankie Uses Memory
-
-The persona extension automatically:
-1. **Injects relevant memories** into the system prompt based on the current conversation
-2. **Uses FTS5 search** to find contextually relevant memories
-3. **Provides the `remember` tool** so clankie can store new information
-
-You don't need to do anything special — just tell clankie to remember things naturally.
 
 ## Running as a Service
 
@@ -447,14 +280,6 @@ The agent sees `[REDACTED:...]` instead of the actual value.
 For the full threat model, see `docs/security.md` (if you've added this).
 
 ## Advanced Features
-
-### Cron Jobs (Scheduled Tasks)
-
-clankie can schedule periodic tasks (not yet documented — coming soon).
-
-### Heartbeat
-
-clankie can check `~/.clankie/heartbeat.md` periodically and take proactive actions (not yet documented — coming soon).
 
 ### pi Extensions
 

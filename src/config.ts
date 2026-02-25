@@ -18,8 +18,6 @@ import JSON5 from "json5";
 export interface AppConfig {
 	/** Agent runtime settings */
 	agent?: {
-		/** Default persona name (default: "default") */
-		persona?: string;
 		/** Working directory for the agent (default: ~/.clankie/workspace) */
 		workspace?: string;
 		/** Override for pi's agent dir (default: ~/.clankie) */
@@ -37,10 +35,6 @@ export interface AppConfig {
 	channels?: {
 		slack?: {
 			enabled?: boolean;
-			/** Persona name override for this channel */
-			persona?: string;
-			/** Per-channel persona mapping (Slack channel ID → persona name) */
-			channelPersonas?: Record<string, string>;
 			/** App token from Slack app settings (xapp-...) */
 			appToken?: string;
 			/** Bot token from Slack app settings (xoxb-...) */
@@ -50,19 +44,6 @@ export interface AppConfig {
 			/** Allowed Slack channel IDs (empty = allow all) */
 			allowedChannelIds?: string[];
 		};
-	};
-
-	/** Cron / scheduled jobs */
-	cron?: {
-		enabled?: boolean;
-	};
-
-	/** Heartbeat — periodic task execution */
-	heartbeat?: {
-		/** Enable heartbeat (default: true when daemon is running) */
-		enabled?: boolean;
-		/** Check interval in minutes (default: 30, min: 5) */
-		intervalMinutes?: number;
 	};
 }
 
@@ -246,137 +227,5 @@ function migrateFromLegacy(): void {
 		console.log(`Migrated config: ${LEGACY_CONFIG_PATH} → ${CONFIG_PATH}`);
 	} catch {
 		// Migration failed — non-fatal
-	}
-}
-
-// ─── Persona helpers ──────────────────────────────────────────────────────────
-
-/** Returns the path to the personas directory (~/.clankie/personas/), creating it if needed. */
-export function getPersonasDir(): string {
-	const dir = join(getAppDir(), "personas");
-	if (!existsSync(dir)) {
-		mkdirSync(dir, { recursive: true, mode: 0o700 });
-	}
-	return dir;
-}
-
-/**
- * Validate and sanitize a persona name.
- * Only allows alphanumeric, underscore, hyphen, and dot.
- * Throws if invalid to prevent path traversal.
- */
-function validatePersonaName(name: string): void {
-	if (!name || typeof name !== "string") {
-		throw new Error("Persona name must be a non-empty string");
-	}
-
-	const trimmed = name.trim();
-	if (!trimmed) {
-		throw new Error("Persona name cannot be empty or whitespace-only");
-	}
-
-	// Only allow safe characters: alphanumeric, underscore, hyphen, dot
-	if (!/^[a-zA-Z0-9._-]+$/.test(trimmed)) {
-		throw new Error(
-			`Invalid persona name "${name}". Only alphanumeric characters, dots, underscores, and hyphens are allowed.`,
-		);
-	}
-
-	// Prevent names that look like path traversal
-	if (trimmed.includes("..") || trimmed.startsWith(".") || trimmed.startsWith("-")) {
-		throw new Error(`Invalid persona name "${name}". Cannot start with dot or hyphen, or contain ".."`);
-	}
-}
-
-/**
- * Returns the path to a specific persona directory.
- * Validates the persona name and ensures the resolved path stays within the personas directory.
- */
-export function getPersonaDir(personaName: string): string {
-	validatePersonaName(personaName);
-
-	const personasDir = getPersonasDir();
-	const personaDir = join(personasDir, personaName);
-
-	// Ensure the resolved path is actually under the personas directory (prevent traversal)
-	const { realpathSync } = require("node:fs");
-	try {
-		const canonicalPersonasDir = realpathSync(personasDir);
-		const canonicalPersonaDir = existsSync(personaDir)
-			? realpathSync(personaDir)
-			: join(canonicalPersonasDir, personaName); // Use join for non-existent paths
-
-		if (!canonicalPersonaDir.startsWith(canonicalPersonasDir + require("node:path").sep)) {
-			throw new Error(`Persona path "${personaDir}" escapes personas directory`);
-		}
-	} catch (_err) {
-		// If personas dir doesn't exist yet, just validate the constructed path
-		if (!personaDir.startsWith(personasDir + require("node:path").sep)) {
-			throw new Error(`Invalid persona path: would escape personas directory`);
-		}
-	}
-
-	return personaDir;
-}
-
-/**
- * Load persona-specific model configuration from persona.json.
- * Returns the model spec (provider/model) if set, otherwise undefined.
- */
-export function resolvePersonaModel(personaName: string): string | undefined {
-	const configPath = join(getPersonaDir(personaName), "persona.json");
-	if (!existsSync(configPath)) return undefined;
-
-	try {
-		const raw = readFileSync(configPath, "utf-8");
-		const config = JSON5.parse(raw) as { model?: unknown };
-
-		// Validate that model is a non-empty string
-		if (typeof config.model !== "string") {
-			return undefined;
-		}
-
-		const trimmed = config.model.trim();
-		return trimmed || undefined;
-	} catch {
-		return undefined;
-	}
-}
-
-// ─── Channel persona override helpers ──────────────────────────────────────────
-
-const CHANNEL_PERSONA_OVERRIDES_PATH = join(APP_DIR, "channel-personas.json");
-
-/**
- * Load channel-specific persona overrides from ~/.clankie/channel-personas.json.
- * Returns a map of channel keys (e.g., "slack_C12345678") to persona names.
- */
-export function loadChannelPersonaOverrides(): Record<string, string> {
-	if (!existsSync(CHANNEL_PERSONA_OVERRIDES_PATH)) {
-		return {};
-	}
-
-	try {
-		const raw = readFileSync(CHANNEL_PERSONA_OVERRIDES_PATH, "utf-8");
-		const parsed = JSON.parse(raw);
-		return typeof parsed === "object" && parsed !== null ? parsed : {};
-	} catch (err) {
-		console.error(
-			`Warning: failed to parse ${CHANNEL_PERSONA_OVERRIDES_PATH}: ${err instanceof Error ? err.message : String(err)}`,
-		);
-		return {};
-	}
-}
-
-/**
- * Save channel-specific persona overrides to ~/.clankie/channel-personas.json.
- */
-export function saveChannelPersonaOverrides(overrides: Record<string, string>): void {
-	getAppDir(); // Ensure directory exists
-	writeFileSync(CHANNEL_PERSONA_OVERRIDES_PATH, JSON.stringify(overrides, null, 2), "utf-8");
-	try {
-		chmodSync(CHANNEL_PERSONA_OVERRIDES_PATH, 0o600);
-	} catch {
-		// chmod may not be supported on all platforms; non-fatal
 	}
 }
