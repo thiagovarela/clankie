@@ -35,3 +35,44 @@ git push && git push --tags
 
 echo "✓ Published $NEW_VERSION"
 """
+
+[tasks.release-web-ui]
+description = "Build web-ui and publish to GitHub Releases"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+
+VERSION="${1:-$(node -p "require('./package.json').version")}"
+TAG="web-ui-v${VERSION}"
+TARBALL="web-ui-${VERSION}.tar.gz"
+
+echo "==> Releasing web-ui ${VERSION} (tag: ${TAG})"
+
+# Ensure working directory is clean
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "Error: Working directory is not clean. Commit or stash changes first."
+  exit 1
+fi
+
+# Install & build
+echo "==> Installing web-ui dependencies…"
+(cd web-ui && bun install --frozen-lockfile)
+
+echo "==> Building web-ui…"
+(cd web-ui && bun run build)
+
+# Package
+echo "==> Packaging .output → ${TARBALL}…"
+tar -czf "${TARBALL}" -C web-ui .output
+
+# Release
+echo "==> Creating GitHub release ${TAG}…"
+gh release create "${TAG}" "${TARBALL}" \
+  --title "web-ui v${VERSION}" \
+  --generate-notes
+
+# Cleanup
+rm -f "${TARBALL}"
+
+echo "✓ Released web-ui v${VERSION} → https://github.com/thiagovarela/lil/releases/tag/${TAG}"
+"""
