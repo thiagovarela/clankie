@@ -27,8 +27,8 @@ bun --version
 ### 2. Clone and Install
 
 ```bash
-git clone https://github.com/thiagovarela/lil
-cd lil
+git clone https://github.com/thiagovarela/clankie
+cd clankie
 bun install
 ```
 
