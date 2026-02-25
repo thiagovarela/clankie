@@ -5,6 +5,7 @@ A minimal AI assistant that lives in Slack. Built on [pi](https://github.com/bad
 ## What Can clankie Do?
 
 - 💬 **Slack conversations** — @mention to start, then chat naturally in threads
+- 🌐 **Web UI** — Browser-based chat interface with real-time streaming ([web-ui/](./web-ui/))
 - 📎 **Handle attachments** — Upload images (vision models), documents, code files
 - 🔄 **Session management** — Switch between conversations with `/switch`, `/sessions`, `/new` commands
 - 🔌 **pi ecosystem** — Works with all pi extensions, skills, and prompt templates
