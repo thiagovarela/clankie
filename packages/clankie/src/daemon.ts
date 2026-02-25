@@ -601,6 +601,7 @@ export async function startDaemon(): Promise<void> {
 				appToken: slack.appToken,
 				botToken: slack.botToken,
 				allowedUsers: slack.allowFrom ?? [],
+				allowedChannelIds: slack.allowedChannelIds,
 			}),
 		);
 	}

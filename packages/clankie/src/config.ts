@@ -47,6 +47,8 @@ export interface AppConfig {
 			botToken?: string;
 			/** Allowed Slack user IDs */
 			allowFrom?: string[];
+			/** Allowed Slack channel IDs (empty = allow all) */
+			allowedChannelIds?: string[];
 		};
 	};
 
