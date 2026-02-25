@@ -10,19 +10,15 @@
  *   clankie start                       Start the daemon (channels + agent)
  *   clankie stop                        Stop the daemon
  *   clankie status                      Check daemon status
+ *   clankie daemon install              Install as a system service (systemd/launchd)
+ *   clankie daemon uninstall            Remove the system service
+ *   clankie daemon logs                 Show daemon logs
+ *   clankie daemon status               Show service status
  *   clankie config show                 Show current configuration
  *   clankie config get <path>           Get a config value by dot-path
  *   clankie config set <path> <value>   Set a config value by dot-path
  *   clankie config unset <path>         Remove a config value
- *   clankie persona                     Show loaded persona files
- *   clankie persona init                Create starter persona files
- *   clankie persona edit <file>         Open a persona file in $EDITOR
- *   clankie memory                      Show memory statistics
- *   clankie memory search <query>       Search memories
- *   clankie memory list [category]      List memories
- *   clankie memory export               Export core memories as JSON
- *   clankie cron list                   List scheduled jobs
- *   clankie cron remove <id>            Remove a scheduled job
+ *   clankie config path                 Show config file path
  */
 
 import { readFileSync } from "node:fs";

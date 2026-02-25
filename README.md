@@ -1,11 +1,12 @@
 # clankie — Personal AI Assistant
 
-A minimal, focused AI assistant that lives in Slack. Built on [pi](https://github.com/badlogic/pi-mono)'s SDK, clankie gives you a personal AI teammate that runs on your machine with your credentials.
+A minimal AI assistant that lives in Slack. Built on [pi](https://github.com/badlogic/pi-mono)'s SDK, clankie gives you a personal AI teammate that runs on your machine with your credentials.
 
 ## What Can clankie Do?
 
-- 💬 **Natural conversations in Slack threads** — @mention once, then chat naturally
-- 🛠️ **Use tools** — Read/write files, run bash commands, and more
+- 💬 **Slack conversations** — @mention to start, then chat naturally in threads
+- 📎 **Handle attachments** — Upload images (vision models), documents, code files
+- 🔄 **Session management** — Switch between conversations with `/switch`, `/sessions`, `/new` commands
 - 🔌 **pi ecosystem** — Works with all pi extensions, skills, and prompt templates
 - 🔒 **Privacy-first** — Runs on your machine, your credentials, your data
 
@@ -123,24 +124,24 @@ You should see:
 
 #### Start a Conversation
 
-@mention the bot anywhere:
+@mention the bot in any channel:
 ```
 Channel: #general
-You: @clankie what's the weather in SF?
+You: @clankie what files are in my workspace?
   Thread 🧵
-  Bot: It's 68°F and sunny
-  You: and tomorrow?
-  Bot: Tomorrow will be 72°F
+  Bot: Here are the files...
+  You: can you summarize README.md?
+  Bot: Here's a summary...
 ```
 
-After the first @mention, the bot responds to all your messages in that thread automatically.
+After the first @mention, the bot responds to all your messages in that thread automatically. Threads remain active across daemon restarts for 7 days.
 
 #### Direct Messages
 
 Just message the bot directly — no @mention needed:
 ```
 DM with @clankie
-You: analyze this data [uploads file]
+You: analyze this code [uploads file]
 Bot: Sure! Here's what I found...
 You: can you summarize it?
 Bot: Here's a summary...
@@ -150,13 +151,38 @@ Bot: Here's a summary...
 
 Upload files directly in a conversation:
 ```
-You: @clankie review this code
-[uploads code.py]
-Bot: I'll analyze it...
-[provides feedback]
+You: @clankie review this screenshot
+[uploads image.png]
+Bot: I can see... [describes image with vision model]
 ```
 
 The bot can read images (with vision models), documents, code files, etc.
+
+#### Session Management (Slash Commands)
+
+Manage multiple conversations in the same channel:
+
+```
+/switch <name>    Switch to a different session
+/sessions         List all sessions
+/new              Start a fresh session (clears context)
+```
+
+**Example:**
+```
+You: /switch coding
+Bot: 💬 Switched to session "coding"
+     Use /sessions to see all sessions.
+
+You: /sessions
+Bot: 📋 Available sessions:
+     • default
+     • coding ✓ (active)
+     
+     Switch with: /switch <name>
+```
+
+Each session maintains its own conversation history. Sessions persist across daemon restarts.
 
 ### CLI Commands
 
@@ -181,6 +207,9 @@ clankie stop
 # View configuration
 clankie config show
 
+# Get config path
+clankie config path
+
 # Set a config value
 clankie config set agent.model.primary "anthropic/claude-sonnet-4-5"
 ```
@@ -188,6 +217,8 @@ clankie config set agent.model.primary "anthropic/claude-sonnet-4-5"
 ## Configuration
 
 Config file: `~/.clankie/clankie.json` (JSON5 format — comments and trailing commas allowed)
+
+The daemon watches the config file and automatically restarts when changes are detected.
 
 ### Common Settings
 
@@ -197,25 +228,29 @@ clankie config set channels.slack.appToken "xapp-..."
 clankie config set channels.slack.botToken "xoxb-..."
 clankie config set channels.slack.allowFrom '["U12345678"]'
 
+# Restrict to specific channels (optional)
+clankie config set channels.slack.allowedChannelIds '["C01ABC123", "C02DEF456"]'
+
 # AI model
 clankie config set agent.model.primary "anthropic/claude-sonnet-4-5"
-clankie config set agent.model.fallbacks '["openai/gpt-4o"]'
 
 # Workspace (where agent works)
 clankie config set agent.workspace "~/projects"
 ```
 
-### Config Paths
+### Config Reference
 
 | Path | Description | Example |
 |------|-------------|---------|
 | `agent.workspace` | Agent working directory | `"~/projects"` |
 | `agent.model.primary` | Primary AI model | `"anthropic/claude-sonnet-4-5"` |
-| `agent.model.fallbacks` | Fallback models (array) | `["openai/gpt-4o"]` |
 | `channels.slack.appToken` | Socket Mode app token | `"xapp-..."` |
 | `channels.slack.botToken` | Bot token for API calls | `"xoxb-..."` |
 | `channels.slack.allowFrom` | Allowed user IDs (array) | `["U12345678"]` |
+| `channels.slack.allowedChannelIds` | Allowed channel IDs (array, empty = all) | `["C01ABC123"]` |
+| `channels.slack.enabled` | Enable/disable Slack channel | `true` (default) |
 
+**Note:** The daemon automatically restarts when you change `~/.clankie/clankie.json`.
 
 ## Running as a Service
 
@@ -248,24 +283,18 @@ clankie daemon uninstall
 
 Logs are stored in `~/.clankie/logs/daemon.log`.
 
-## Advanced Features
+## Development
 
-### pi Extensions
+```bash
+# Run directly with Bun (no build step)
+bun run src/cli.ts chat
+bun run src/cli.ts send "hello"
 
-clankie works with all pi extensions out of the box. Extensions are loaded from:
-- `~/.pi/agent/extensions/`
-- `.pi/extensions/` (in your project)
-
-See pi's documentation for creating extensions.
-
-### Skills
-
-Skills are reusable CLI tools the agent can create and invoke. They're loaded from:
-- `~/.agents/skills/` (global)
-- `~/.pi/agent/skills/` (pi shared)
-- `.pi/skills/` (project-specific)
-
-See pi's documentation for the skills system.
+# Code quality checks
+bun run check        # Run linter
+bun run check:fix    # Auto-fix issues
+bun run format       # Format code
+```
 
 ## Troubleshooting
 
@@ -296,12 +325,6 @@ clankie config get channels.slack.allowFrom
 clankie config set channels.slack.allowFrom '["U12345678"]'
 ```
 
-### "Failed to run git: fatal: 'main' is already used by worktree"
-
-**Problem**: Git worktree conflicts when trying to merge.
-
-**Solution**: Merge from the main worktree directory, not a branch worktree.
-
 ### Daemon won't start after reboot
 
 **Problem**: Daemon doesn't auto-start after reboot (when installed as service).
@@ -318,27 +341,18 @@ clankie daemon uninstall
 clankie daemon install
 ```
 
-## Development
-
-```bash
-# Run directly with Bun (no build step)
-bun run src/cli.ts chat
-bun run src/cli.ts send "hello"
-
-# Code quality checks
-bun run check        # Run linter
-bun run check:fix    # Auto-fix issues
-bun run format       # Format code
-```
-
-## Philosophy
+## How It Works
 
 clankie is a **thin wrapper around pi**, not a replacement. It reuses the entire pi ecosystem:
 - Extensions, skills, and prompt templates just work
 - Same agent runtime, same resource loaders
 - Authentication shared with `pi` CLI
 
-Where other assistants try to be everything, clankie focuses on **one thing done well**: giving you a personal AI teammate in Slack that reuses proven infrastructure.
+The architecture:
+1. **Slack channel** connects via Socket Mode (no public URL needed)
+2. **Daemon** routes messages to persistent agent sessions (one per chat)
+3. **Agent** uses pi's SDK with full tool access (read/write files, run commands, etc.)
+4. **Sessions** persist across restarts, stored in `~/.clankie/sessions/`
 
 ## Credits
 
