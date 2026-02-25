@@ -31,10 +31,12 @@ function ChatPage() {
 	// Auto-create first session when connected
 	useEffect(() => {
 		if (isConnected && sessions.length === 0 && !isCreatingSession) {
+			console.log("[ChatPage] Auto-creating first session");
 			setIsCreatingSession(true);
 			clientManager
 				.createNewSession()
-				.then(() => {
+				.then((sessionId) => {
+					console.log("[ChatPage] Session created:", sessionId);
 					setIsCreatingSession(false);
 				})
 				.catch((err) => {
@@ -63,7 +65,7 @@ function ChatPage() {
 		);
 	}
 
-	if (isCreatingSession) {
+	if (isCreatingSession && sessions.length === 0) {
 		return (
 			<div className="flex h-full items-center justify-center">
 				<div className="text-center space-y-2">

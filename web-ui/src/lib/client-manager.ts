@@ -271,7 +271,16 @@ class ClientManager {
 				return null;
 			}
 
-			// Session will be added to the list via session_start event
+			// Optimistically add session to the list immediately
+			// (session_start event will update metadata later)
+			addSession({
+				sessionId: result.sessionId,
+				name: undefined,
+				model: undefined,
+				messageCount: 0,
+				createdAt: Date.now(),
+			});
+
 			// Set it as active
 			setActiveSession(result.sessionId);
 
