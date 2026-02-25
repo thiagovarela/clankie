@@ -30,7 +30,6 @@ import {
 	getWorkspace,
 	loadConfig,
 } from "./config.ts";
-import securityExtension from "./extensions/security.ts";
 
 // ─── PID file management ──────────────────────────────────────────────────────
 
@@ -88,7 +87,6 @@ async function getOrCreateSession(chatKey: string, config: AppConfig): Promise<A
 	const loader = new DefaultResourceLoader({
 		cwd,
 		agentDir,
-		extensionFactories: [securityExtension],
 	});
 	await loader.reload();
 

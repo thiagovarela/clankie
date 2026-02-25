@@ -5,9 +5,6 @@
  * discovery — skills, extensions, prompt templates, context files all
  * load from the standard pi directories (~/.pi/agent/, .pi/, etc.).
  *
- * The app's own security and persona extensions are loaded in addition to
- * any user extensions.
- *
  * Model is resolved from ~/.clankie/clankie.json → agent.model.primary (provider/model format).
  * If not set, falls back to pi's default resolution (settings → first available).
  */
@@ -21,7 +18,6 @@ import {
 	SessionManager,
 } from "@mariozechner/pi-coding-agent";
 import { getAgentDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
-import securityExtension from "./extensions/security.ts";
 
 export interface SessionOptions {
 	/**
@@ -52,7 +48,7 @@ export interface SessionOptions {
  *
  * Uses pi's DefaultResourceLoader so the entire pi extension ecosystem
  * (~/.pi/agent/extensions/, ~/.agents/skills/, AGENTS.md, etc.) is
- * automatically available. The app's security extension is always loaded.
+ * automatically available.
  */
 export async function createSession(options: SessionOptions = {}): Promise<CreateAgentSessionResult> {
 	const config = loadConfig();
@@ -63,13 +59,10 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 	const authStorage = AuthStorage.create(getAuthPath());
 	const modelRegistry = new ModelRegistry(authStorage);
 
-	// DefaultResourceLoader with standard pi discovery + clankie's security extension.
-	// Using extensionFactories (not additionalExtensionPaths) so the security
-	// extension is bundled and works correctly.
+	// DefaultResourceLoader with standard pi discovery
 	const loader = new DefaultResourceLoader({
 		cwd,
 		agentDir,
-		extensionFactories: [securityExtension],
 	});
 	await loader.reload();
 

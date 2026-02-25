@@ -248,37 +248,6 @@ clankie daemon uninstall
 
 Logs are stored in `~/.clankie/logs/daemon.log`.
 
-## Security
-
-clankie includes a built-in security extension that protects against common mistakes:
-
-### What It Blocks
-
-- **Dangerous bash commands**: `rm -rf /`, `sudo`, `curl | sh`, `eval`
-- **Sensitive file writes**: `~/.ssh/`, `~/.aws/`, `.env` files, system directories
-- **Credential reads**: SSH keys, AWS credentials, API keys, `~/.clankie/auth.json`
-- **Network exfiltration**: Patterns that suggest data theft
-
-### What It Redacts
-
-When the agent reads files, it automatically redacts:
-- Private keys (PEM, SSH)
-- API keys (OpenAI, Anthropic, AWS, GitHub, etc.)
-- Tokens and secrets
-
-The agent sees `[REDACTED:...]` instead of the actual value.
-
-### Limitations
-
-⚠️ **The security extension is not a sandbox.** It's a safety net for common mistakes, not a security boundary. The agent runs with your user permissions and can still:
-- Write to most files in your home directory
-- Run most bash commands
-- Access the internet
-
-**Don't give clankie credentials to production systems or sensitive environments.**
-
-For the full threat model, see `docs/security.md` (if you've added this).
-
 ## Advanced Features
 
 ### pi Extensions
