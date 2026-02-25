@@ -7,7 +7,7 @@
  * Each chat gets its own persistent session (keyed by channel+chatId).
  */
 
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync, watch, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { ImageContent } from "@mariozechner/pi-ai";
 import {
@@ -26,6 +26,7 @@ import {
 	getAgentDir,
 	getAppDir,
 	getAuthPath,
+	getConfigPath,
 	getPersonaDir,
 	getWorkspace,
 	loadChannelPersonaOverrides,
@@ -78,6 +79,15 @@ const activeSessionNames = new Map<string, string>();
 
 // Track channel-specific persona overrides (runtime, persisted to ~/.clankie/channel-personas.json)
 const channelPersonaOverrides = new Map<string, string>();
+
+// ─── Daemon state tracking (for config reload) ────────────────────────────────
+
+let activeChannels: Channel[] = [];
+let activeHeartbeat: HeartbeatService | null = null;
+let configWatcher: ReturnType<typeof watch> | null = null;
+let lastActiveChannel: Channel | null = null;
+let lastActiveChatId: string | null = null;
+let lastActiveThreadId: string | null = null;
 
 /**
  * Resolve the persona name for a given channel and chat ID.
@@ -578,7 +588,11 @@ async function processMessage(
 
 // ─── Daemon lifecycle ──────────────────────────────────────────────────────────
 
-export async function startDaemon(): Promise<void> {
+/**
+ * Initialize channels and heartbeat from current config.
+ * Stores references in module-level state for restart capability.
+ */
+async function initializeChannelsAndHeartbeat(): Promise<void> {
 	const config = loadConfig();
 
 	// Load channel persona overrides from disk
@@ -617,26 +631,18 @@ export async function startDaemon(): Promise<void> {
 		process.exit(1);
 	}
 
-	// Write PID file
-	writePidFile();
-
 	// ─── Heartbeat service ──────────────────────────────────────────────
 
 	const heartbeat = new HeartbeatService(config);
 
-	// Track last active channel for heartbeat responses
-	let lastChannel: Channel | null = null;
-	let lastChatId: string | null = null;
-	let lastThreadId: string | null = null;
-
 	heartbeat.setHandler(async (prompt: string) => {
 		// Use last active channel to deliver heartbeat results
-		if (!lastChannel || !lastChatId) {
+		if (!lastActiveChannel || !lastActiveChatId) {
 			console.log("[heartbeat] No active channel — skipping delivery");
 			return;
 		}
 
-		const chatKey = `heartbeat_${lastChatId}${lastThreadId ? `_${lastThreadId}` : "_default"}`;
+		const chatKey = `heartbeat_${lastActiveChatId}${lastActiveThreadId ? `_${lastActiveThreadId}` : "_default"}`;
 		const personaName = config.agent?.persona ?? "default";
 		const session = await getOrCreateSession(chatKey, config, personaName);
 
@@ -657,8 +663,8 @@ export async function startDaemon(): Promise<void> {
 				const responseText = textParts.join("\n").trim();
 				// Don't send "all clear" messages — only actionable results
 				if (responseText && !responseText.match(/^all\s+clear\.?$/i)) {
-					const sendOptions = lastThreadId ? { threadId: lastThreadId } : undefined;
-					await lastChannel.send(lastChatId, `🔔 ${responseText}`, sendOptions);
+					const sendOptions = lastActiveThreadId ? { threadId: lastActiveThreadId } : undefined;
+					await lastActiveChannel.send(lastActiveChatId, `🔔 ${responseText}`, sendOptions);
 				}
 			}
 		} catch (err) {
@@ -666,33 +672,17 @@ export async function startDaemon(): Promise<void> {
 		}
 	});
 
-	// ─── Graceful shutdown ────────────────────────────────────────────────
-
-	const shutdown = async (signal: string) => {
-		console.log(`\n[daemon] Received ${signal}, shutting down...`);
-		heartbeat.stop();
-		for (const ch of channels) {
-			await ch.stop().catch(() => {});
-		}
-		cleanupPidFile();
-		process.exit(0);
-	};
-
-	process.on("SIGINT", () => shutdown("SIGINT"));
-	process.on("SIGTERM", () => shutdown("SIGTERM"));
-
 	// ─── Start channels ──────────────────────────────────────────────────
 
-	console.log(`[daemon] Starting clankie daemon (pid ${process.pid})...`);
 	console.log(`[daemon] Workspace: ${getWorkspace(config)}`);
 	console.log(`[daemon] Channels: ${channels.length > 0 ? channels.map((c) => c.name).join(", ") : "(none)"}`);
 
 	for (const ch of channels) {
 		await ch.start((msg) => {
 			// Track last active channel for heartbeat delivery
-			lastChannel = ch;
-			lastChatId = msg.chatId;
-			lastThreadId = msg.threadId ?? null;
+			lastActiveChannel = ch;
+			lastActiveChatId = msg.chatId;
+			lastActiveThreadId = msg.threadId ?? null;
 			return handleMessage(msg, ch);
 		});
 	}
@@ -700,7 +690,95 @@ export async function startDaemon(): Promise<void> {
 	// Start heartbeat after channels are ready
 	heartbeat.start();
 
+	// Store in module state
+	activeChannels = channels;
+	activeHeartbeat = heartbeat;
+
 	console.log("[daemon] Ready. Waiting for messages...");
+}
+
+/**
+ * Restart the daemon by stopping all channels, clearing cache, and reinitializing.
+ */
+async function restartDaemon(): Promise<void> {
+	console.log("[daemon] Config changed — restarting...");
+
+	// Stop existing channels and heartbeat
+	if (activeHeartbeat) {
+		activeHeartbeat.stop();
+		activeHeartbeat = null;
+	}
+
+	for (const ch of activeChannels) {
+		await ch.stop().catch((err) => {
+			console.error(`[daemon] Error stopping channel ${ch.name}:`, err);
+		});
+	}
+	activeChannels = [];
+
+	// Clear session cache (sessions are persisted to disk, so no data loss)
+	sessionCache.clear();
+
+	// Reinitialize with fresh config
+	await initializeChannelsAndHeartbeat();
+
+	console.log("[daemon] Restart complete.");
+}
+
+export async function startDaemon(): Promise<void> {
+	// Write PID file
+	writePidFile();
+
+	console.log(`[daemon] Starting clankie daemon (pid ${process.pid})...`);
+
+	// Initial startup
+	await initializeChannelsAndHeartbeat();
+
+	// ─── Config file watcher ──────────────────────────────────────────────
+
+	const configPath = getConfigPath();
+	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+	try {
+		configWatcher = watch(configPath, (_eventType) => {
+			// Debounce: config writes often trigger multiple events (write + chmod)
+			if (debounceTimer) clearTimeout(debounceTimer);
+			debounceTimer = setTimeout(() => {
+				restartDaemon().catch((err) => {
+					console.error("[daemon] Restart failed:", err instanceof Error ? err.message : String(err));
+				});
+			}, 1000);
+		});
+		console.log(`[daemon] Watching config file: ${configPath}`);
+	} catch (err) {
+		console.warn(`[daemon] Could not watch config file: ${err instanceof Error ? err.message : String(err)}`);
+	}
+
+	// ─── Graceful shutdown ────────────────────────────────────────────────
+
+	const shutdown = async (signal: string) => {
+		console.log(`\n[daemon] Received ${signal}, shutting down...`);
+
+		// Close config watcher
+		if (configWatcher) {
+			configWatcher.close();
+			configWatcher = null;
+		}
+
+		// Stop heartbeat and channels
+		if (activeHeartbeat) {
+			activeHeartbeat.stop();
+		}
+		for (const ch of activeChannels) {
+			await ch.stop().catch(() => {});
+		}
+
+		cleanupPidFile();
+		process.exit(0);
+	};
+
+	process.on("SIGINT", () => shutdown("SIGINT"));
+	process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 export function stopDaemon(): boolean {

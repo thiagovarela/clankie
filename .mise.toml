@@ -1,0 +1,37 @@
+[tasks.publish]
+description = "Bump version and publish to npm"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+
+BUMP="${1:-patch}"
+
+if [[ "$BUMP" != "patch" && "$BUMP" != "minor" && "$BUMP" != "major" ]]; then
+  echo "Usage: mise run publish [patch|minor|major]"
+  echo "Default: patch"
+  exit 1
+fi
+
+# Ensure working directory is clean
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "Error: Working directory is not clean. Commit or stash changes first."
+  exit 1
+fi
+
+# Bump version (updates package.json and creates git tag)
+NEW_VERSION=$(npm version "$BUMP" --no-git-tag-version)
+echo "Bumped to $NEW_VERSION"
+
+# Commit and tag
+git add package.json
+git commit -m "release: $NEW_VERSION"
+git tag "$NEW_VERSION"
+
+# Publish to npm
+npm publish --access public
+
+# Push commit and tag
+git push && git push --tags
+
+echo "✓ Published $NEW_VERSION"
+"""

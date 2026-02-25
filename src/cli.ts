@@ -113,7 +113,14 @@ Credentials are stored at ~/.clankie/auth.json (separate from pi's auth).
 }
 
 function printVersion(): void {
-	console.log("clankie 0.1.0");
+	// Read version from package.json at repo root (../ from src/)
+	const packagePath = join(import.meta.dir, "..", "package.json");
+	try {
+		const pkg = JSON.parse(readFileSync(packagePath, "utf-8"));
+		console.log(`clankie ${pkg.version}`);
+	} catch {
+		console.log("clankie (version unknown)");
+	}
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
