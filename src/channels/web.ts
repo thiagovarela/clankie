@@ -48,6 +48,7 @@ type RpcCommand =
 	| { id?: string; type: "follow_up"; message: string; images?: ImageContent[] }
 	| { id?: string; type: "abort" }
 	| { id?: string; type: "new_session"; parentSession?: string }
+	| { id?: string; type: "list_sessions" }
 	| { id?: string; type: "get_state" }
 	| { id?: string; type: "set_model"; provider: string; modelId: string }
 	| { id?: string; type: "cycle_model" }
@@ -314,6 +315,25 @@ export class WebChannel implements Channel {
 				command.type === "auth_logout"
 			) {
 				await this.handleAuthCommand(ws, command, commandId);
+				return;
+			}
+
+			// Special case: list_sessions doesn't need a sessionId
+			if (command.type === "list_sessions") {
+				const sessions = Array.from(this.sessions.entries()).map(([sessionId, session]) => ({
+					sessionId,
+					name: session.sessionName,
+					model: session.model,
+					messageCount: session.messages.length,
+				}));
+
+				this.sendResponse(ws, undefined, {
+					id: commandId,
+					type: "response",
+					command: "list_sessions",
+					success: true,
+					data: { sessions },
+				});
 				return;
 			}
 

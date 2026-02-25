@@ -4,10 +4,11 @@ import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessages } from "@/components/chat-messages";
+import { SessionSidebar } from "@/components/session-sidebar";
 import { Button } from "@/components/ui/button";
 import { clientManager } from "@/lib/client-manager";
 import { connectionStore } from "@/stores/connection";
-import { sessionStore, setSessionId } from "@/stores/session";
+import { sessionsListStore } from "@/stores/sessions-list";
 
 export const Route = createFileRoute("/")({
 	component: ChatPage,
@@ -18,37 +19,30 @@ function ChatPage() {
 		status: state.status,
 	}));
 
-	const { sessionId } = useStore(sessionStore, (state) => ({
-		sessionId: state.sessionId,
+	const { sessions, activeSessionId } = useStore(sessionsListStore, (state) => ({
+		sessions: state.sessions,
+		activeSessionId: state.activeSessionId,
 	}));
 
 	const [isCreatingSession, setIsCreatingSession] = useState(false);
 
 	const isConnected = status === "connected";
 
-	// Auto-create session when connected
+	// Auto-create first session when connected
 	useEffect(() => {
-		if (isConnected && !sessionId && !isCreatingSession) {
+		if (isConnected && sessions.length === 0 && !isCreatingSession) {
 			setIsCreatingSession(true);
-			const client = clientManager.getClient();
-			if (client) {
-				client
-					.newSession()
-					.then((result) => {
-						// The RPC response is the authoritative source for sessionId —
-						// it matches the key the server uses in this.sessions.
-						if (result?.sessionId) {
-							setSessionId(result.sessionId);
-						}
-						setIsCreatingSession(false);
-					})
-					.catch((err) => {
-						console.error("Failed to create session:", err);
-						setIsCreatingSession(false);
-					});
-			}
+			clientManager
+				.createNewSession()
+				.then(() => {
+					setIsCreatingSession(false);
+				})
+				.catch((err) => {
+					console.error("Failed to create initial session:", err);
+					setIsCreatingSession(false);
+				});
 		}
-	}, [isConnected, sessionId, isCreatingSession]);
+	}, [isConnected, sessions.length, isCreatingSession]);
 
 	if (!isConnected) {
 		return (
@@ -81,9 +75,12 @@ function ChatPage() {
 	}
 
 	return (
-		<div className="flex h-full flex-col">
-			<ChatMessages />
-			<ChatInput />
+		<div className="flex h-full">
+			<SessionSidebar />
+			<div className="flex flex-1 flex-col">
+				<ChatMessages />
+				<ChatInput />
+			</div>
 		</div>
 	);
 }
