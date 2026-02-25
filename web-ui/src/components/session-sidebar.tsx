@@ -63,13 +63,8 @@ export function SessionSidebar() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-sidebar-foreground truncate">
-                      {session.name || 'New chat'}
+                      {session.title || 'New chat'}
                     </p>
-                    {session.model && (
-                      <p className="text-xs text-sidebar-foreground/60 truncate">
-                        {session.model.name}
-                      </p>
-                    )}
                   </div>
                   {session.messageCount > 0 && (
                     <span className="text-xs text-sidebar-foreground/50 shrink-0">

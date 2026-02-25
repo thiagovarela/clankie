@@ -37,7 +37,7 @@ export class ClankieClient {
 		this.ws = new WebSocketClient({
 			url: options.url,
 			authToken: options.authToken,
-			onMessage: (data) => this.handleMessage(data as OutboundWebMessage),
+			onMessage: (data) => this.handleMessage(data as OutboundWebMessage | RpcResponse),
 			onStateChange: options.onStateChange,
 		});
 	}
@@ -67,11 +67,11 @@ export class ClankieClient {
 	}
 
 	async listSessions(): Promise<{
-		sessions: Array<{ sessionId: string; name?: string; model?: ModelInfo; messageCount: number }>;
+		sessions: Array<{ sessionId: string; title?: string; messageCount: number }>;
 	}> {
 		const response = await this.sendCommand({ type: "list_sessions" });
 		return response as {
-			sessions: Array<{ sessionId: string; name?: string; model?: ModelInfo; messageCount: number }>;
+			sessions: Array<{ sessionId: string; title?: string; messageCount: number }>;
 		};
 	}
 
@@ -173,31 +173,55 @@ export class ClankieClient {
 
 	// ─── Internal ──────────────────────────────────────────────────────────────
 
-	private handleMessage(message: OutboundWebMessage): void {
-		const { sessionId, event } = message;
-
-		// Check if it's a response to a pending request
-		if (event.type === "response" && event.id) {
-			const pending = this.pendingRequests.get(event.id);
+	private handleMessage(message: OutboundWebMessage | RpcResponse): void {
+		// Handle raw RpcResponse (for commands without sessionId like list_sessions)
+		if ("type" in message && message.type === "response" && "id" in message) {
+			const response = message as RpcResponse;
+			const pending = this.pendingRequests.get(response.id);
 			if (pending) {
-				this.pendingRequests.delete(event.id);
-				if (event.success) {
-					pending.resolve(event.data);
+				this.pendingRequests.delete(response.id);
+				if (response.success) {
+					pending.resolve(response.data);
 				} else {
-					pending.reject(new Error(event.error));
+					pending.reject(new Error(response.error));
 				}
 				return;
 			}
-		}
-
-		// Check if it's an auth event (sessionId === "_auth")
-		if (sessionId === "_auth" && event.type === "auth_event") {
-			this.options.onAuthEvent(event);
+			// If no pending request, ignore
 			return;
 		}
 
-		// Otherwise, it's a session event - forward to the event handler
-		this.options.onEvent(sessionId, event);
+		// Handle wrapped OutboundWebMessage (for commands with sessionId)
+		if ("sessionId" in message && "event" in message) {
+			const { sessionId, event } = message as OutboundWebMessage;
+
+			// Check if it's a response to a pending request
+			if (event.type === "response" && event.id) {
+				const pending = this.pendingRequests.get(event.id);
+				if (pending) {
+					this.pendingRequests.delete(event.id);
+					if (event.success) {
+						pending.resolve(event.data);
+					} else {
+						pending.reject(new Error(event.error));
+					}
+					return;
+				}
+			}
+
+			// Check if it's an auth event (sessionId === "_auth")
+			if (sessionId === "_auth" && event.type === "auth_event") {
+				this.options.onAuthEvent(event);
+				return;
+			}
+
+			// Otherwise, it's a session event - forward to the event handler
+			this.options.onEvent(sessionId, event);
+			return;
+		}
+
+		// Unknown message format
+		console.warn("[clankie-client] Unknown message format:", message);
 	}
 
 	private async sendCommand(command: RpcCommand, sessionId?: string): Promise<unknown> {
@@ -207,7 +231,7 @@ export class ClankieClient {
 
 		const id = `req-${++this.requestIdCounter}`;
 		const message: InboundWebMessage = {
-			sessionId,
+			...(sessionId !== undefined && { sessionId }),
 			command: { ...command, id },
 		};
 

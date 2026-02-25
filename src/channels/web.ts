@@ -10,11 +10,13 @@
  */
 
 import * as crypto from "node:crypto";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 import type { ImageContent, OAuthLoginCallbacks } from "@mariozechner/pi-ai";
 import { type AgentSession, type AgentSessionEvent, AuthStorage } from "@mariozechner/pi-coding-agent";
 import type { ServerWebSocket } from "bun";
-import { getAuthPath, loadConfig } from "../config.ts";
+import { getAppDir, getAuthPath, loadConfig } from "../config.ts";
 import { getOrCreateSession } from "../sessions.ts";
 import type { Channel, MessageHandler } from "./channel.ts";
 
@@ -291,16 +293,16 @@ export class WebChannel implements Channel {
 				const options = command.parentSession ? { parentSession: command.parentSession } : undefined;
 				const cancelled = !(await session.newSession(options));
 
-				// Subscribe AFTER newSession() — sessionId changes during newSession(),
-				// so we must use the final ID for tracking in this.sessions
-				this.subscribeToSession(session, ws);
+				// Subscribe using the chatKey (not session.sessionId) for consistency
+				this.subscribeToSessionWithKey(chatKey, session, ws);
 
-				this.sendResponse(ws, session.sessionId, {
+				// Return the chatKey as sessionId so client uses it for future commands
+				this.sendResponse(ws, chatKey, {
 					id: commandId,
 					type: "response",
 					command: "new_session",
 					success: true,
-					data: { sessionId: session.sessionId, cancelled },
+					data: { sessionId: chatKey, cancelled },
 				});
 				return;
 			}
@@ -320,12 +322,7 @@ export class WebChannel implements Channel {
 
 			// Special case: list_sessions doesn't need a sessionId
 			if (command.type === "list_sessions") {
-				const sessions = Array.from(this.sessions.entries()).map(([sessionId, session]) => ({
-					sessionId,
-					name: session.sessionName,
-					model: session.model,
-					messageCount: session.messages.length,
-				}));
+				const sessions = await this.listAllSessions();
 
 				this.sendResponse(ws, undefined, {
 					id: commandId,
@@ -345,13 +342,20 @@ export class WebChannel implements Channel {
 
 			const sessionId = inbound.sessionId;
 
-			// Get or create session
-			const session = this.sessions.get(sessionId);
+			// Get existing session or try to restore from disk
+			// Note: sessionId here is the chatKey (web_xxx), not the internal session ID
+			let session = this.sessions.get(sessionId);
 			if (!session) {
 				// Try to restore session from disk
-				// For now, return error - client should use new_session first
-				this.sendError(ws, sessionId, command.type, `Session not found: ${sessionId}`, commandId);
-				return;
+				try {
+					const config = loadConfig();
+					session = await getOrCreateSession(sessionId, config);
+					this.subscribeToSessionWithKey(sessionId, session, ws);
+					console.log(`[web] Restored session from disk: ${sessionId}`);
+				} catch (err) {
+					this.sendError(ws, sessionId, command.type, `Session not found: ${sessionId}`, commandId);
+					return;
+				}
 			}
 
 			// Execute command (mirrors rpc-mode.ts logic)
@@ -857,27 +861,30 @@ export class WebChannel implements Channel {
 
 	// ─── Session subscription ──────────────────────────────────────────────────
 
-	private subscribeToSession(session: AgentSession, ws: ServerWebSocket<ConnectionData>): void {
-		const sessionId = session.sessionId;
-
-		// Track session
-		this.sessions.set(sessionId, session);
+	private subscribeToSessionWithKey(chatKey: string, session: AgentSession, ws: ServerWebSocket<ConnectionData>): void {
+		// Track session with the chatKey (web_xxx)
+		this.sessions.set(chatKey, session);
 
 		// Add connection to subscription set
-		let subscribers = this.sessionSubscriptions.get(sessionId);
+		let subscribers = this.sessionSubscriptions.get(chatKey);
 		if (!subscribers) {
 			subscribers = new Set();
-			this.sessionSubscriptions.set(sessionId, subscribers);
+			this.sessionSubscriptions.set(chatKey, subscribers);
 		}
 		subscribers.add(ws);
 
 		// Subscribe to session events if not already subscribed
-		if (!this.sessionUnsubscribers.has(sessionId)) {
+		if (!this.sessionUnsubscribers.has(chatKey)) {
 			const unsubscribe = session.subscribe((event) => {
-				this.broadcastEvent(sessionId, event);
+				this.broadcastEvent(chatKey, event);
 			});
-			this.sessionUnsubscribers.set(sessionId, unsubscribe);
+			this.sessionUnsubscribers.set(chatKey, unsubscribe);
 		}
+	}
+
+	private subscribeToSession(session: AgentSession, ws: ServerWebSocket<ConnectionData>): void {
+		// Legacy method - uses session.sessionId (kept for backwards compatibility if needed)
+		this.subscribeToSessionWithKey(session.sessionId, session, ws);
 	}
 
 	private broadcastEvent(sessionId: string, event: AgentSessionEvent): void {
@@ -916,6 +923,85 @@ export class WebChannel implements Channel {
 	}
 
 	// ─── Helpers ───────────────────────────────────────────────────────────────
+
+	private async listAllSessions(): Promise<
+		Array<{ sessionId: string; title?: string; messageCount: number }>
+	> {
+		const sessions: Array<{ sessionId: string; title?: string; messageCount: number }> = [];
+		const sessionsDir = join(getAppDir(), "sessions");
+
+		if (!existsSync(sessionsDir)) {
+			return sessions;
+		}
+
+		try {
+			// Get all web_* session directories
+			const dirs = readdirSync(sessionsDir);
+			const webSessions = dirs
+				.filter((dir) => dir.startsWith("web_"))
+				.map((dir) => ({ sessionId: dir, path: join(sessionsDir, dir) }))
+				.filter(({ path }) => {
+					try {
+						return statSync(path).isDirectory();
+					} catch {
+						return false;
+					}
+				})
+				// Sort by modification time, newest first
+				.sort((a, b) => {
+					try {
+						const aMtime = statSync(a.path).mtime.getTime();
+						const bMtime = statSync(b.path).mtime.getTime();
+						return bMtime - aMtime;
+					} catch {
+						return 0;
+					}
+				});
+
+			// For each session directory, check if it's in memory or load metadata
+			for (const { sessionId } of webSessions) {
+				const inMemorySession = this.sessions.get(sessionId);
+
+				if (inMemorySession) {
+					// Use in-memory session data
+					// Get the last user message as the title (like pi's /resume command)
+					const lastUserMessage = [...inMemorySession.messages]
+						.reverse()
+						.find((msg) => msg.role === "user");
+					
+					let title: string | undefined;
+					if (lastUserMessage) {
+						// Extract text from content array
+						const textContent = lastUserMessage.content
+							?.filter((c: any) => c.type === "text")
+							.map((c: any) => c.text)
+							.join(" ");
+						title = textContent?.substring(0, 100) || inMemorySession.sessionName;
+					} else {
+						title = inMemorySession.sessionName;
+					}
+
+					sessions.push({
+						sessionId,
+						title,
+						messageCount: inMemorySession.messages.length,
+					});
+				} else {
+					// For sessions not in memory, we can't easily get metadata without loading them
+					// Just include the sessionId for now - they'll be loaded on demand
+					sessions.push({
+						sessionId,
+						title: undefined,
+						messageCount: 0,
+					});
+				}
+			}
+		} catch (err) {
+			console.error("[web] Failed to list sessions:", err);
+		}
+
+		return sessions;
+	}
 
 	private sendResponse(
 		ws: ServerWebSocket<ConnectionData>,

@@ -55,7 +55,13 @@ class ClientManager {
 			authToken: settings.authToken,
 			onEvent: (sessionId, event) => this.handleEvent(sessionId, event),
 			onAuthEvent: (event) => this.handleAuthEvent(event),
-			onStateChange: (state, error) => updateConnectionStatus(state, error),
+			onStateChange: (state, error) => {
+				updateConnectionStatus(state, error);
+				// Restore or create session when connection is established
+				if (state === "connected") {
+					this.restoreOrCreateSession();
+				}
+			},
 		});
 
 		this.client.connect();
@@ -70,6 +76,67 @@ class ClientManager {
 		clearSessions();
 		resetSession();
 		clearMessages();
+		// Note: We keep the session ID in localStorage so it can be restored on reconnect
+	}
+
+	private async restoreOrCreateSession(): Promise<void> {
+		if (!this.client) {
+			console.error("[client-manager] Cannot restore session: not connected");
+			return;
+		}
+
+		try {
+			// First, load all available sessions from the server
+			await this.loadAllSessions();
+
+			// Try to restore the last active session from localStorage
+			const savedSessionId = localStorage.getItem("clankie-last-session-id");
+			
+			if (savedSessionId) {
+				console.log(`[client-manager] Attempting to restore session: ${savedSessionId}`);
+				try {
+					// Try to switch to the saved session (this will fail if session doesn't exist)
+					await this.switchSession(savedSessionId);
+					console.log(`[client-manager] Successfully restored session: ${savedSessionId}`);
+					return;
+				} catch (err) {
+					console.warn(`[client-manager] Failed to restore session ${savedSessionId}, creating new:`, err);
+					// Clear the invalid session ID
+					localStorage.removeItem("clankie-last-session-id");
+				}
+			}
+
+			// No saved session or restoration failed - create a new one
+			console.log("[client-manager] Creating new session");
+			await this.createNewSession();
+		} catch (err) {
+			console.error("[client-manager] Failed to restore or create session:", err);
+		}
+	}
+
+	private async loadAllSessions(): Promise<void> {
+		if (!this.client) {
+			console.error("[client-manager] Cannot load sessions: not connected");
+			return;
+		}
+
+		try {
+			const { sessions } = await this.client.listSessions();
+			console.log(`[client-manager] Loaded ${sessions.length} sessions from server`);
+
+			// Add all sessions to the store (clear first to avoid duplicates)
+			clearSessions();
+			for (const session of sessions) {
+				addSession({
+					sessionId: session.sessionId,
+					title: session.title,
+					messageCount: session.messageCount,
+					createdAt: Date.now(),
+				});
+			}
+		} catch (err) {
+			console.error("[client-manager] Failed to load sessions:", err);
+		}
 	}
 
 	getClient(): ClankieClient | null {
@@ -97,8 +164,7 @@ class ClientManager {
 				// Add new session to the list
 				addSession({
 					sessionId,
-					name: undefined,
-					model: undefined,
+					title: undefined,
 					messageCount: 0,
 					createdAt: Date.now(),
 				});
@@ -110,9 +176,6 @@ class ClientManager {
 				break;
 
 			case "session_name_changed":
-				// Update session list metadata for any session
-				updateSessionMeta(sessionId, { name: event.name });
-
 				// Update single-session store only if active
 				if (isActiveSession) {
 					setSessionName(event.name);
@@ -120,9 +183,6 @@ class ClientManager {
 				break;
 
 			case "model_changed":
-				// Update session list metadata for any session
-				updateSessionMeta(sessionId, { model: event.model });
-
 				// Update single-session store only if active
 				if (isActiveSession) {
 					setModel(event.model);
@@ -203,8 +263,20 @@ class ClientManager {
 			}
 
 			case "message_end":
-				if (isActiveSession && event.message?.role === "assistant") {
-					endAssistantMessage();
+				if (isActiveSession) {
+					if (event.message?.role === "assistant") {
+						endAssistantMessage();
+					} else if (event.message?.role === "user") {
+						// Update session title with the latest user message
+						const textContent = event.message.content
+							?.filter((c: any) => c.type === "text")
+							.map((c: any) => c.text)
+							.join(" ");
+						if (textContent) {
+							const title = textContent.substring(0, 100);
+							updateSessionMeta(sessionId, { title });
+						}
+					}
 				}
 				break;
 
@@ -275,14 +347,16 @@ class ClientManager {
 			// (session_start event will update metadata later)
 			addSession({
 				sessionId: result.sessionId,
-				name: undefined,
-				model: undefined,
+				title: undefined,
 				messageCount: 0,
 				createdAt: Date.now(),
 			});
 
 			// Set it as active
 			setActiveSession(result.sessionId);
+
+			// Save to localStorage for persistence across page refreshes
+			localStorage.setItem("clankie-last-session-id", result.sessionId);
 
 			// Clear messages for the new session
 			clearMessages();
@@ -304,6 +378,9 @@ class ClientManager {
 			// Set as active session
 			setActiveSession(sessionId);
 
+			// Save to localStorage for persistence across page refreshes
+			localStorage.setItem("clankie-last-session-id", sessionId);
+
 			// Clear current messages
 			clearMessages();
 
@@ -321,9 +398,37 @@ class ClientManager {
 			}
 			updateSessionState(state);
 
+			// Add to sessions list if not already there
+			const { sessions } = sessionsListStore.state;
+			if (!sessions.some(s => s.sessionId === sessionId)) {
+				// Get the last user message as the title
+				const lastUserMessage = [...messages]
+					.reverse()
+					.find((msg) => msg.role === "user");
+				
+				let title: string | undefined;
+				if (lastUserMessage) {
+					const textContent = lastUserMessage.content
+						?.filter((c: any) => c.type === "text")
+						.map((c: any) => c.text)
+						.join(" ");
+					title = textContent?.substring(0, 100) || state.sessionName;
+				} else {
+					title = state.sessionName;
+				}
+
+				addSession({
+					sessionId,
+					title,
+					messageCount: state.messageCount,
+					createdAt: Date.now(),
+				});
+			}
+
 			console.log(`[client-manager] Switched to session ${sessionId}`);
 		} catch (err) {
 			console.error("[client-manager] Failed to switch session:", err);
+			throw err; // Re-throw so restoreOrCreateSession can handle it
 		}
 	}
 }

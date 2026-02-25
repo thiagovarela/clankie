@@ -1,12 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useStore } from "@tanstack/react-store";
 import { Settings } from "lucide-react";
-import { useEffect, useState } from "react";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessages } from "@/components/chat-messages";
 import { SessionSidebar } from "@/components/session-sidebar";
 import { Button } from "@/components/ui/button";
-import { clientManager } from "@/lib/client-manager";
 import { connectionStore } from "@/stores/connection";
 import { sessionsListStore } from "@/stores/sessions-list";
 
@@ -24,27 +22,7 @@ function ChatPage() {
 		activeSessionId: state.activeSessionId,
 	}));
 
-	const [isCreatingSession, setIsCreatingSession] = useState(false);
-
 	const isConnected = status === "connected";
-
-	// Auto-create first session when connected
-	useEffect(() => {
-		if (isConnected && sessions.length === 0 && !isCreatingSession) {
-			console.log("[ChatPage] Auto-creating first session");
-			setIsCreatingSession(true);
-			clientManager
-				.createNewSession()
-				.then((sessionId) => {
-					console.log("[ChatPage] Session created:", sessionId);
-					setIsCreatingSession(false);
-				})
-				.catch((err) => {
-					console.error("Failed to create initial session:", err);
-					setIsCreatingSession(false);
-				});
-		}
-	}, [isConnected, sessions.length, isCreatingSession]);
 
 	if (!isConnected) {
 		return (
@@ -65,12 +43,13 @@ function ChatPage() {
 		);
 	}
 
-	if (isCreatingSession && sessions.length === 0) {
+	// Show loading state while waiting for initial session
+	if (isConnected && sessions.length === 0) {
 		return (
 			<div className="flex h-full items-center justify-center">
 				<div className="text-center space-y-2">
 					<div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent" />
-					<p className="text-sm text-muted-foreground">Creating session...</p>
+					<p className="text-sm text-muted-foreground">Loading sessions...</p>
 				</div>
 			</div>
 		);

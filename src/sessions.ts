@@ -5,7 +5,7 @@
  * to create and cache agent sessions per chat.
  */
 
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { ImageContent } from "@mariozechner/pi-ai";
 import {
@@ -50,6 +50,11 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 
 	// Use a stable session directory per chat so conversations persist across restarts
 	const sessionDir = join(getAppDir(), "sessions", chatKey);
+
+	// Ensure session directory exists
+	if (!existsSync(sessionDir)) {
+		mkdirSync(sessionDir, { recursive: true });
+	}
 
 	const sessionManager = SessionManager.continueRecent(cwd, sessionDir);
 

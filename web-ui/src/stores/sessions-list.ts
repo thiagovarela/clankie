@@ -4,12 +4,10 @@
  */
 
 import { Store } from '@tanstack/store'
-import type { ModelInfo } from '@/lib/types'
 
 export interface SessionListItem {
   sessionId: string
-  name?: string
-  model?: ModelInfo
+  title?: string
   messageCount: number
   createdAt: number
 }
