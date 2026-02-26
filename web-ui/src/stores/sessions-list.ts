@@ -3,86 +3,91 @@
  * and tracks which one is currently active.
  */
 
-import { Store } from "@tanstack/store";
+import { Store } from '@tanstack/store'
 
 export interface SessionListItem {
-	sessionId: string;
-	title?: string;
-	messageCount: number;
-	createdAt: number;
-	updatedAt?: number; // When the session was last accessed
+  sessionId: string
+  title?: string
+  messageCount: number
+  createdAt: number
+  updatedAt?: number // When the session was last accessed
 }
 
 export interface SessionsListStore {
-	sessions: Array<SessionListItem>;
-	activeSessionId: string | null;
+  sessions: Array<SessionListItem>
+  activeSessionId: string | null
 }
 
 const INITIAL_STATE: SessionsListStore = {
-	sessions: [],
-	activeSessionId: null,
-};
+  sessions: [],
+  activeSessionId: null,
+}
 
-export const sessionsListStore = new Store<SessionsListStore>(INITIAL_STATE);
+export const sessionsListStore = new Store<SessionsListStore>(INITIAL_STATE)
 
 // ─── Actions ───────────────────────────────────────────────────────────────────
 
 export function addSession(session: SessionListItem): void {
-	sessionsListStore.setState((state) => {
-		// Don't add duplicates
-		if (state.sessions.some((s) => s.sessionId === session.sessionId)) {
-			console.log(`[sessions-list] Skipping duplicate session: ${session.sessionId}`);
-			return state;
-		}
+  sessionsListStore.setState((state) => {
+    // Don't add duplicates
+    if (state.sessions.some((s) => s.sessionId === session.sessionId)) {
+      console.log(
+        `[sessions-list] Skipping duplicate session: ${session.sessionId}`,
+      )
+      return state
+    }
 
-		console.log(`[sessions-list] Adding session: ${session.sessionId}`, session);
-		return {
-			...state,
-			sessions: [...state.sessions, session],
-		};
-	});
+    console.log(`[sessions-list] Adding session: ${session.sessionId}`, session)
+    return {
+      ...state,
+      sessions: [...state.sessions, session],
+    }
+  })
 }
 
 export function removeSession(sessionId: string): void {
-	sessionsListStore.setState((state) => ({
-		...state,
-		sessions: state.sessions.filter((s) => s.sessionId !== sessionId),
-		// Clear active if removing active session
-		activeSessionId: state.activeSessionId === sessionId ? null : state.activeSessionId,
-	}));
+  sessionsListStore.setState((state) => ({
+    ...state,
+    sessions: state.sessions.filter((s) => s.sessionId !== sessionId),
+    // Clear active if removing active session
+    activeSessionId:
+      state.activeSessionId === sessionId ? null : state.activeSessionId,
+  }))
 }
 
 export function setActiveSession(sessionId: string): void {
-	console.log(`[sessions-list] Setting active session: ${sessionId}`);
-	sessionsListStore.setState((state) => ({
-		...state,
-		activeSessionId: sessionId,
-	}));
+  console.log(`[sessions-list] Setting active session: ${sessionId}`)
+  sessionsListStore.setState((state) => ({
+    ...state,
+    activeSessionId: sessionId,
+  }))
 }
 
 export function touchSessionActivity(sessionId: string): void {
-	const now = Date.now();
-	sessionsListStore.setState((state) => ({
-		...state,
-		sessions: state.sessions.map((s) =>
-			s.sessionId === sessionId ? { ...s, updatedAt: now } : s
-		),
-	}));
+  const now = Date.now()
+  sessionsListStore.setState((state) => ({
+    ...state,
+    sessions: state.sessions.map((s) =>
+      s.sessionId === sessionId ? { ...s, updatedAt: now } : s,
+    ),
+  }))
 }
 
 export function updateSessionMeta(
-	sessionId: string,
-	updates: Partial<Omit<SessionListItem, "sessionId" | "createdAt">>,
+  sessionId: string,
+  updates: Partial<Omit<SessionListItem, 'sessionId' | 'createdAt'>>,
 ): void {
-	sessionsListStore.setState((state) => ({
-		...state,
-		sessions: state.sessions.map((s) => (s.sessionId === sessionId ? { ...s, ...updates } : s)),
-	}));
+  sessionsListStore.setState((state) => ({
+    ...state,
+    sessions: state.sessions.map((s) =>
+      s.sessionId === sessionId ? { ...s, ...updates } : s,
+    ),
+  }))
 }
 
 export function clearSessions(): void {
-	console.log("[sessions-list] Clearing all sessions");
-	sessionsListStore.setState(() => INITIAL_STATE);
+  console.log('[sessions-list] Clearing all sessions')
+  sessionsListStore.setState(() => INITIAL_STATE)
 }
 
 // ─── Selectors ─────────────────────────────────────────────────────────────────
@@ -90,10 +95,12 @@ export function clearSessions(): void {
 /**
  * Get sessions sorted by most recent (updatedAt or createdAt)
  */
-export function getSortedSessions(sessions: SessionListItem[]): SessionListItem[] {
-	return [...sessions].sort((a, b) => {
-		const aTime = a.updatedAt ?? a.createdAt;
-		const bTime = b.updatedAt ?? b.createdAt;
-		return bTime - aTime; // Descending order (most recent first)
-	});
+export function getSortedSessions(
+  sessions: Array<SessionListItem>,
+): Array<SessionListItem> {
+  return [...sessions].sort((a, b) => {
+    const aTime = a.updatedAt ?? a.createdAt
+    const bTime = b.updatedAt ?? b.createdAt
+    return bTime - aTime // Descending order (most recent first)
+  })
 }
