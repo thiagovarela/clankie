@@ -15,12 +15,12 @@ A minimal AI assistant that lives in Slack. Built on [pi](https://github.com/bad
 
 ### 1. Install Dependencies
 
-**Runtime:** [Node.js](https://nodejs.org) v22.6.0+ (for native TypeScript support)  
+**Runtime:** [Node.js](https://nodejs.org) v18+ (TypeScript support via `tsx`)  
 **Build:** [Bun](https://bun.sh) (for faster package installation and web-ui builds)
 
 ```bash
 # Check Node version
-node --version  # Should be >= v22.6.0
+node --version  # Should be >= v18.0.0
 
 # Install Bun (if not already installed)
 curl -fsSL https://bun.sh/install | bash
@@ -46,9 +46,9 @@ npm install
 npm link
 ```
 
-Now `clankie` is available from anywhere. If you skip `npm link`, use `node --experimental-strip-types src/cli.ts` instead of `clankie`.
+Now `clankie` is available from anywhere. If you skip `npm link`, use `tsx src/cli.ts` instead of `clankie`.
 
-**Note:** Bun is used for faster package installation and building the web-ui. The runtime requires Node.js v22.6.0+.
+**Note:** Bun is used for faster package installation and building the web-ui. The runtime uses `tsx` (Node.js v18+).
 
 ## Slack Setup
 
@@ -296,9 +296,9 @@ Logs are stored in `~/.clankie/logs/daemon.log`.
 ## Development
 
 ```bash
-# Run directly with Node.js (no build step, native TypeScript support)
-node --experimental-strip-types src/cli.ts chat
-node --experimental-strip-types src/cli.ts send "hello"
+# Run directly with tsx (no build step)
+tsx src/cli.ts chat
+tsx src/cli.ts send "hello"
 
 # Or use npm scripts
 npm run dev -- chat
@@ -310,7 +310,7 @@ npm run check:fix    # Auto-fix issues
 npm run format       # Format code
 ```
 
-**Note:** Bun is used for package installation and building the web-ui. The runtime requires Node.js v22.6.0+ with native TypeScript support.
+**Note:** Bun is used for package installation and building the web-ui. The runtime uses `tsx` for TypeScript support (Node.js v18+).
 
 ## Troubleshooting
 
