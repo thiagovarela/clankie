@@ -248,6 +248,7 @@ async function initializeChannels(): Promise<void> {
 				port: web.port ?? 3100,
 				authToken: web.authToken,
 				allowedOrigins: web.allowedOrigins,
+				staticDir: web.staticDir,
 			}),
 		);
 	}

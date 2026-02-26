@@ -52,6 +52,8 @@ export interface AppConfig {
 			authToken?: string;
 			/** Allowed origins for CORS-like validation (empty = allow all) */
 			allowedOrigins?: string[];
+			/** Path to built web-ui static files (enables same-origin serving) */
+			staticDir?: string;
 		};
 	};
 }

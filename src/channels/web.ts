@@ -29,6 +29,8 @@ export interface WebChannelOptions {
 	authToken: string;
 	/** Allowed origins for CORS-like validation (empty = allow all) */
 	allowedOrigins?: string[];
+	/** Path to built web-ui static files (enables same-origin serving) */
+	staticDir?: string;
 }
 
 /** Inbound message from client */
@@ -177,39 +179,81 @@ export class WebChannel implements Channel {
 				close: (ws) => this.handleClose(ws),
 			},
 			fetch: (req, server) => {
-				// Validate auth token from Authorization header or URL query param
-				const authHeader = req.headers.get("Authorization");
-				const headerToken = authHeader?.replace(/^Bearer\s+/i, "");
+				const isWebSocket = req.headers.get("Upgrade")?.toLowerCase() === "websocket";
 
-				// Also check URL query param (for browser WebSocket clients that can't send headers)
-				const url = new URL(req.url, `http://${req.headers.get("host")}`);
-				const queryToken = url.searchParams.get("token");
+				// ─── WebSocket upgrade path ───────────────────────────────────────
 
-				const token = headerToken || queryToken;
+				if (isWebSocket) {
+					// Validate auth token from Authorization header or URL query param
+					const authHeader = req.headers.get("Authorization");
+					const headerToken = authHeader?.replace(/^Bearer\s+/i, "");
 
-				if (token !== this.options.authToken) {
-					return new Response("Unauthorized", { status: 401 });
-				}
+					// Also check URL query param (for browser WebSocket clients that can't send headers)
+					const url = new URL(req.url, `http://${req.headers.get("host")}`);
+					const queryToken = url.searchParams.get("token");
 
-				// Validate origin if configured
-				if (this.options.allowedOrigins && this.options.allowedOrigins.length > 0) {
-					const origin = req.headers.get("Origin");
-					if (!origin || !this.options.allowedOrigins.includes(origin)) {
-						return new Response("Forbidden", { status: 403 });
+					const token = headerToken || queryToken;
+
+					if (token !== this.options.authToken) {
+						return new Response("Unauthorized", { status: 401 });
 					}
+
+					// ─── Origin validation ────────────────────────────────────────
+
+					// When staticDir is set, enforce same-origin by comparing Origin vs Host
+					if (this.options.staticDir) {
+						const origin = req.headers.get("Origin");
+						const host = req.headers.get("Host");
+
+						if (!origin || !host) {
+							return new Response("Forbidden - missing headers", { status: 403 });
+						}
+
+						try {
+							const originHost = new URL(origin).host;
+							// Compare hostnames (ignoring scheme — reverse proxy handles TLS)
+							if (originHost !== host) {
+								console.warn(`[web] Blocked cross-origin WebSocket: origin=${origin}, host=${host}`);
+								return new Response("Forbidden - cross-origin not allowed", { status: 403 });
+							}
+						} catch (err) {
+							console.error("[web] Invalid Origin header:", err);
+							return new Response("Forbidden - invalid origin", { status: 403 });
+						}
+					}
+					// Legacy allowedOrigins check (still works as override when staticDir is not set)
+					else if (this.options.allowedOrigins && this.options.allowedOrigins.length > 0) {
+						const origin = req.headers.get("Origin");
+						if (!origin || !this.options.allowedOrigins.includes(origin)) {
+							return new Response("Forbidden", { status: 403 });
+						}
+					}
+
+					// Upgrade to WebSocket
+					const upgraded = server.upgrade(req, {
+						data: { authenticated: true } as ConnectionData,
+					});
+
+					if (!upgraded) {
+						return new Response("WebSocket upgrade failed", { status: 400 });
+					}
+
+					// biome-ignore lint/suspicious/noExplicitAny: Bun requires undefined return after upgrade
+					return undefined as any; // upgrade successful
 				}
 
-				// Upgrade to WebSocket
-				const upgraded = server.upgrade(req, {
-					data: { authenticated: true } as ConnectionData,
+				// ─── Static file serving path ─────────────────────────────────────
+
+				if (this.options.staticDir) {
+					return this.serveStaticFile(req);
+				}
+
+				// ─── No static dir configured — reject non-WebSocket requests ─────
+
+				return new Response("Upgrade Required - this endpoint only accepts WebSocket connections", {
+					status: 426,
+					headers: { Upgrade: "websocket" },
 				});
-
-				if (!upgraded) {
-					return new Response("WebSocket upgrade failed", { status: 400 });
-				}
-
-				// biome-ignore lint/suspicious/noExplicitAny: Bun requires undefined return after upgrade
-				return undefined as any; // upgrade successful
 			},
 		});
 
@@ -492,13 +536,13 @@ export class WebChannel implements Channel {
 				console.log(`[web] Setting model for session ${sessionId}:`, model);
 				await session.setModel(model);
 				console.log(`[web] Model set successfully for session ${sessionId}`);
-				
+
 				// Manually broadcast model_changed event (pi SDK may not emit it automatically)
 				this.broadcastEvent(sessionId, {
 					type: "model_changed",
 					model: model,
 				});
-				
+
 				return { id, type: "response", command: "set_model", success: true, data: model };
 			}
 
@@ -514,13 +558,13 @@ export class WebChannel implements Channel {
 
 			case "set_thinking_level": {
 				session.setThinkingLevel(command.level);
-				
+
 				// Manually broadcast thinking_level_changed event
 				this.broadcastEvent(sessionId, {
 					type: "thinking_level_changed",
 					level: command.level,
 				});
-				
+
 				return { id, type: "response", command: "set_thinking_level", success: true };
 			}
 
@@ -1248,5 +1292,69 @@ export class WebChannel implements Channel {
 			error,
 		};
 		this.sendResponse(ws, sessionId, response);
+	}
+
+	// ─── Static file serving ───────────────────────────────────────────────────
+
+	private async serveStaticFile(req: Request): Promise<Response> {
+		if (!this.options.staticDir) {
+			return new Response("Not Found", { status: 404 });
+		}
+
+		try {
+			const url = new URL(req.url);
+			let pathname = url.pathname;
+
+			// Remove leading slash
+			if (pathname.startsWith("/")) {
+				pathname = pathname.substring(1);
+			}
+
+			// Default to index for root
+			if (pathname === "" || pathname === "/") {
+				pathname = "_shell.html";
+			}
+
+			// Try to serve the requested file
+			const filePath = join(this.options.staticDir, pathname);
+
+			// Security: ensure the resolved path is within staticDir (prevent directory traversal)
+			const resolvedPath = Bun.resolveSync(filePath, this.options.staticDir);
+			if (!resolvedPath.startsWith(this.options.staticDir)) {
+				return new Response("Forbidden", { status: 403 });
+			}
+
+			// Check if file exists
+			if (existsSync(resolvedPath) && statSync(resolvedPath).isFile()) {
+				const file = Bun.file(resolvedPath);
+
+				// Set caching headers for hashed assets
+				const headers = new Headers();
+				if (pathname.startsWith("assets/")) {
+					headers.set("Cache-Control", "public, max-age=31536000, immutable");
+				} else {
+					headers.set("Cache-Control", "public, max-age=3600");
+				}
+
+				return new Response(file, { headers });
+			}
+
+			// SPA fallback: serve _shell.html for non-file routes
+			const shellPath = join(this.options.staticDir, "_shell.html");
+			if (existsSync(shellPath)) {
+				const file = Bun.file(shellPath);
+				return new Response(file, {
+					headers: {
+						"Content-Type": "text/html",
+						"Cache-Control": "no-cache",
+					},
+				});
+			}
+
+			return new Response("Not Found", { status: 404 });
+		} catch (err) {
+			console.error("[web] Error serving static file:", err);
+			return new Response("Internal Server Error", { status: 500 });
+		}
 	}
 }
