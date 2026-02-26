@@ -2,8 +2,9 @@
  * Global test setup — runs before all tests
  */
 
+import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";
-import { afterEach, beforeEach } from "vitest";
+import { afterEach, beforeEach, vi } from "vitest";
 import { authStore } from "@/stores/auth";
 import { connectionStore } from "@/stores/connection";
 import { extensionsStore } from "@/stores/extensions";
@@ -88,4 +89,6 @@ beforeEach(() => {
 	resetAllStores();
 	// Clear localStorage
 	localStorage.clear();
+	// Mock scrollIntoView (not implemented in jsdom)
+	Element.prototype.scrollIntoView = vi.fn();
 });
