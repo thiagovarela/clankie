@@ -379,7 +379,7 @@ export class WebChannel implements Channel {
 			}
 
 			// Execute command (mirrors rpc-mode.ts logic)
-			const response = await this.executeCommand(session, command);
+			const response = await this.executeCommand(sessionId, session, command);
 			this.sendResponse(ws, sessionId, response);
 		} catch (err) {
 			console.error("[web] Command error:", err);
@@ -387,7 +387,7 @@ export class WebChannel implements Channel {
 		}
 	}
 
-	private async executeCommand(session: AgentSession, command: RpcCommand): Promise<RpcResponse> {
+	private async executeCommand(sessionId: string, session: AgentSession, command: RpcCommand): Promise<RpcResponse> {
 		const id = command.id;
 
 		switch (command.type) {
