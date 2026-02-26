@@ -12,7 +12,7 @@ import { join } from "node:path";
 import type { Channel, InboundMessage } from "./channels/channel.ts";
 import { SlackChannel } from "./channels/slack.ts";
 import { WebChannel } from "./channels/web.ts";
-import { getAppDir, getConfigPath, getWorkspace, loadConfig } from "./config.ts";
+import { getAppDir, getBundledWebUiDir, getConfigPath, getWorkspace, loadConfig } from "./config.ts";
 import {
 	getActiveSessionName,
 	getOrCreateSession,
@@ -243,12 +243,18 @@ async function initializeChannels(): Promise<void> {
 	// Web
 	const web = config.channels?.web;
 	if (web?.authToken && web.enabled !== false) {
+		// Resolve static dir: explicit config > bundled web-ui > none
+		const staticDir = web.staticDir ?? getBundledWebUiDir();
+		if (staticDir) {
+			console.log(`[daemon] Serving web-ui from: ${staticDir}`);
+		}
+
 		channels.push(
 			new WebChannel({
 				port: web.port ?? 3100,
 				authToken: web.authToken,
 				allowedOrigins: web.allowedOrigins,
-				staticDir: web.staticDir,
+				staticDir,
 			}),
 		);
 	}

@@ -98,6 +98,21 @@ export function getConfigPath(): string {
 	return CONFIG_PATH;
 }
 
+/**
+ * Resolve the path to the bundled web-ui static files.
+ * When installed via npm, these live at <package>/web-ui-dist/ alongside src/.
+ * Returns the path if found, undefined otherwise.
+ */
+export function getBundledWebUiDir(): string | undefined {
+	// import.meta.dir → <package>/src/ at runtime
+	const packageRoot = join(import.meta.dir, "..");
+	const bundledDir = join(packageRoot, "web-ui-dist");
+	if (existsSync(bundledDir) && existsSync(join(bundledDir, "_shell.html"))) {
+		return bundledDir;
+	}
+	return undefined;
+}
+
 // ─── Loading & saving ─────────────────────────────────────────────────────────
 
 /** Load config from ~/.clankie/clankie.json (JSON5). Returns empty config if missing. */

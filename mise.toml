@@ -1,5 +1,5 @@
 [tasks.publish]
-description = "Bump version and publish to npm"
+description = "Bump version and publish to npm (includes bundled web-ui)"
 run = """
 #!/usr/bin/env bash
 set -euo pipefail
@@ -18,6 +18,11 @@ if [[ -n "$(git status --porcelain)" ]]; then
   exit 1
 fi
 
+# Build web-ui and copy to web-ui-dist/
+echo "==> Building web-ui…"
+bun run build:web-ui
+echo "==> Web-ui bundled into web-ui-dist/"
+
 # Bump version (updates package.json and creates git tag)
 NEW_VERSION=$(npm version "$BUMP" --no-git-tag-version)
 echo "Bumped to $NEW_VERSION"
@@ -27,13 +32,16 @@ git add package.json
 git commit -m "release: $NEW_VERSION"
 git tag "$NEW_VERSION"
 
-# Publish to npm
+# Publish to npm (web-ui-dist/ is included via "files" in package.json)
 npm publish --access public
+
+# Cleanup build artifact
+rm -rf web-ui-dist
 
 # Push commit and tag
 git push && git push --tags
 
-echo "✓ Published $NEW_VERSION"
+echo "✓ Published $NEW_VERSION (with bundled web-ui)"
 """
 
 [tasks.release-web-ui]

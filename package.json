@@ -6,8 +6,10 @@
 	"bin": {
 		"clankie": "./src/cli.ts"
 	},
+	"files": ["src/", "web-ui-dist/", "package.json", "README.md"],
 	"scripts": {
 		"dev": "bun run src/cli.ts",
+		"build:web-ui": "cd web-ui && bun install --frozen-lockfile && bun run build && cd .. && rm -rf web-ui-dist && cp -r web-ui/.output/public web-ui-dist",
 		"check": "biome check .",
 		"check:fix": "biome check --fix .",
 		"format": "biome format --write ."
