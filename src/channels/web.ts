@@ -165,6 +165,9 @@ export class WebChannel implements Channel {
 		}
 	>();
 
+	/** Heartbeat interval for keeping WebSocket connections alive */
+	private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+
 	constructor(options: WebChannelOptions) {
 		this.options = options;
 	}
@@ -173,7 +176,7 @@ export class WebChannel implements Channel {
 		const app = new Hono();
 
 		// Create WebSocket adapter
-		const { injectWebSocket, upgradeWebSocket: wsUpgrade } = createNodeWebSocket({ app });
+		const { wss, injectWebSocket, upgradeWebSocket: wsUpgrade } = createNodeWebSocket({ app });
 
 		// ─── WebSocket route ──────────────────────────────────────────────────
 		// Note: upgradeWebSocket() handles WebSocket upgrade requests at the root path
@@ -373,6 +376,35 @@ export class WebChannel implements Channel {
 
 		injectWebSocket(this.server);
 
+		// ─── WebSocket keepalive (ping/pong) ──────────────────────────────────
+
+		const HEARTBEAT_INTERVAL = 30_000; // 30 seconds
+
+		// Track liveness on each raw ws connection
+		wss.on("connection", (ws) => {
+			// biome-ignore lint/suspicious/noExplicitAny: Adding custom property for liveness tracking
+			(ws as any).isAlive = true;
+			ws.on("pong", () => {
+				// biome-ignore lint/suspicious/noExplicitAny: Adding custom property for liveness tracking
+				(ws as any).isAlive = true;
+			});
+		});
+
+		// Ping all clients periodically and terminate unresponsive ones
+		this.heartbeatInterval = setInterval(() => {
+			for (const ws of wss.clients) {
+				// biome-ignore lint/suspicious/noExplicitAny: Reading custom property for liveness tracking
+				if ((ws as any).isAlive === false) {
+					console.log("[web] Terminating unresponsive client");
+					ws.terminate();
+					continue;
+				}
+				// biome-ignore lint/suspicious/noExplicitAny: Setting custom property for liveness tracking
+				(ws as any).isAlive = false;
+				ws.ping();
+			}
+		}, HEARTBEAT_INTERVAL);
+
 		console.log(`[web] WebSocket server listening on port ${this.options.port}`);
 		console.log(`[web] Open in browser: http://localhost:${this.options.port}?token=${this.options.authToken}`);
 	}
@@ -382,6 +414,12 @@ export class WebChannel implements Channel {
 	}
 
 	async stop(): Promise<void> {
+		// Stop heartbeat interval
+		if (this.heartbeatInterval) {
+			clearInterval(this.heartbeatInterval);
+			this.heartbeatInterval = null;
+		}
+
 		if (this.server) {
 			await new Promise<void>((resolve) => {
 				this.server?.close(() => resolve());
