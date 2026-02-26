@@ -26,6 +26,9 @@ fi
 # Activate mise for the current shell so `mise install` shims work immediately
 eval "$(mise activate bash --shims)"
 
+# Ensure bun global bin is in PATH
+export PATH="$HOME/.bun/bin:$PATH"
+
 # ─── 2. Install bun via mise ─────────────────────────────────────────
 if mise ls bun 2>/dev/null | grep -q bun; then
   info "bun is already installed via mise ($(bun --version))"
