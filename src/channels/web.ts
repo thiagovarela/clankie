@@ -487,7 +487,16 @@ export class WebChannel implements Channel {
 						error: `Model not found: ${command.provider}/${command.modelId}`,
 					};
 				}
+				console.log(`[web] Setting model for session ${sessionId}:`, model);
 				await session.setModel(model);
+				console.log(`[web] Model set successfully for session ${sessionId}`);
+				
+				// Manually broadcast model_changed event (pi SDK may not emit it automatically)
+				this.broadcastEvent(sessionId, {
+					type: "model_changed",
+					model: model,
+				});
+				
 				return { id, type: "response", command: "set_model", success: true, data: model };
 			}
 
@@ -503,6 +512,13 @@ export class WebChannel implements Channel {
 
 			case "set_thinking_level": {
 				session.setThinkingLevel(command.level);
+				
+				// Manually broadcast thinking_level_changed event
+				this.broadcastEvent(sessionId, {
+					type: "thinking_level_changed",
+					level: command.level,
+				});
+				
 				return { id, type: "response", command: "set_thinking_level", success: true };
 			}
 
@@ -1033,8 +1049,12 @@ export class WebChannel implements Channel {
 
 	private broadcastEvent(sessionId: string, event: AgentSessionEvent): void {
 		const subscribers = this.sessionSubscriptions.get(sessionId);
-		if (!subscribers) return;
+		if (!subscribers) {
+			console.log(`[web] No subscribers for session ${sessionId}, event ${event.type}`);
+			return;
+		}
 
+		console.log(`[web] Broadcasting event ${event.type} to ${subscribers.size} subscribers for session ${sessionId}`);
 		const message: OutboundWebMessage = { sessionId, event };
 		const json = JSON.stringify(message);
 
