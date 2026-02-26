@@ -3,7 +3,13 @@
  * Mirrors the protocol defined in clankie's src/channels/web.ts
  */
 
-export type ThinkingLevel = 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh'
+export type ThinkingLevel =
+  | 'off'
+  | 'minimal'
+  | 'low'
+  | 'medium'
+  | 'high'
+  | 'xhigh'
 
 export interface ImageContent {
   type: 'image'

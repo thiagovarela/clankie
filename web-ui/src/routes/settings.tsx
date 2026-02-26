@@ -170,10 +170,14 @@ function SettingsPage() {
 }
 
 function ProviderAuthSection() {
-  const { providers, isLoadingProviders } = useStore(authStore, (state) => ({
-    providers: state.providers,
-    isLoadingProviders: state.isLoadingProviders,
-  }))
+  const { providers, isLoadingProviders, loginFlow } = useStore(
+    authStore,
+    (state) => ({
+      providers: state.providers,
+      isLoadingProviders: state.isLoadingProviders,
+      loginFlow: state.loginFlow,
+    }),
+  )
 
   const [loginDialogOpen, setLoginDialogOpen] = useState(false)
   const [apiKeyProviderId, setApiKeyProviderId] = useState<string | null>(null)
@@ -197,6 +201,13 @@ function ProviderAuthSection() {
   useEffect(() => {
     loadProviders()
   }, [loadProviders])
+
+  // Refresh provider list after successful OAuth login
+  useEffect(() => {
+    if (loginFlow?.status === 'complete' && loginFlow.success === true) {
+      loadProviders()
+    }
+  }, [loginFlow?.status, loginFlow?.success, loadProviders])
 
   const handleOAuthLogin = async (providerId: string) => {
     const client = clientManager.getClient()

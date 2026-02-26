@@ -47,7 +47,10 @@ function SessionPage() {
       `[session-page] URL sessionId changed to ${urlSessionId}, switching...`,
     )
     clientManager.switchSession(urlSessionId).catch((err) => {
-      console.error(`[session-page] Failed to load session ${urlSessionId}:`, err)
+      console.error(
+        `[session-page] Failed to load session ${urlSessionId}:`,
+        err,
+      )
       // Redirect to index on error
       navigate({ to: '/' })
     })

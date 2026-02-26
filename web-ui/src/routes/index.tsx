@@ -28,10 +28,11 @@ function IndexPage() {
     if (!isConnected) return
 
     if (activeSessionId) {
-      console.log(
-        `[index] Redirecting to active session: ${activeSessionId}`,
-      )
-      navigate({ to: '/sessions/$sessionId', params: { sessionId: activeSessionId } })
+      console.log(`[index] Redirecting to active session: ${activeSessionId}`)
+      navigate({
+        to: '/sessions/$sessionId',
+        params: { sessionId: activeSessionId },
+      })
     }
   }, [activeSessionId, isConnected, navigate])
 

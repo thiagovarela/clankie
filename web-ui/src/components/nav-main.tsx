@@ -1,15 +1,15 @@
-"use client"
+'use client'
 
-import { useNavigate } from "@tanstack/react-router"
+import { useNavigate } from '@tanstack/react-router'
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { CirclePlusIcon } from "lucide-react"
-import { clientManager } from "@/lib/client-manager"
+} from '@/components/ui/sidebar'
+import { CirclePlusIcon } from 'lucide-react'
+import { clientManager } from '@/lib/client-manager'
 
 export function NavMain() {
   const navigate = useNavigate()

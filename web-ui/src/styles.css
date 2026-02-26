@@ -127,9 +127,9 @@
   html {
     @apply font-sans;
   }
-  
+
   /* Fix sidebar to start below header */
-  [data-slot="sidebar-container"] {
+  [data-slot='sidebar-container'] {
     top: 3.5rem !important;
     height: calc(100vh - 3.5rem) !important;
   }

@@ -1,6 +1,6 @@
 import { useStore } from '@tanstack/react-store'
 import { CheckCircle, ExternalLink, Loader2, XCircle } from 'lucide-react'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { LoginFlowState } from '@/stores/auth'
 import {
   AlertDialog,
@@ -34,6 +34,21 @@ export function AuthLoginDialog({ open, onOpenChange }: AuthLoginDialogProps) {
       clearLoginFlow()
     }
   }, [open, loginFlow])
+
+  // Auto-close dialog after successful login (with a small delay to show success message)
+  useEffect(() => {
+    if (
+      open &&
+      loginFlow?.status === 'complete' &&
+      loginFlow.success === true
+    ) {
+      const timer = setTimeout(() => {
+        onOpenChange(false)
+      }, 1500)
+
+      return () => clearTimeout(timer)
+    }
+  }, [open, loginFlow, onOpenChange])
 
   if (!loginFlow) {
     return null
@@ -84,6 +99,7 @@ export function AuthLoginDialog({ open, onOpenChange }: AuthLoginDialogProps) {
 
 function LoginFlowContent({ flow }: { flow: LoginFlowState }) {
   const client = clientManager.getClient()
+  const autoOpenedUrlRef = useRef<string | null>(null)
 
   const handleManualInput = (value: string) => {
     if (flow.loginFlowId && client) {
@@ -96,6 +112,21 @@ function LoginFlowContent({ flow }: { flow: LoginFlowState }) {
       client.authLoginInput(flow.loginFlowId, value)
     }
   }
+
+  // Auto-open browser when OAuth URL arrives
+  useEffect(() => {
+    if (
+      flow.status === 'waiting_url' &&
+      flow.url &&
+      autoOpenedUrlRef.current !== flow.url
+    ) {
+      autoOpenedUrlRef.current = flow.url
+      // Attempt to auto-open the URL in a new tab
+      // Note: This may be blocked by popup blockers since it's not directly in a click handler,
+      // but it's close enough to the user's "Login" click that most browsers allow it
+      window.open(flow.url, '_blank')
+    }
+  }, [flow.status, flow.url])
 
   // Idle state (just started)
   if (flow.status === 'idle') {
@@ -111,18 +142,11 @@ function LoginFlowContent({ flow }: { flow: LoginFlowState }) {
   if (flow.status === 'waiting_url' && flow.url) {
     return (
       <div className="space-y-4 py-4">
-        <div className="space-y-2">
-          <p className="text-sm">
-            Please complete the authentication in your browser:
-          </p>
-          <Button
-            onClick={() => window.open(flow.url, '_blank')}
-            className="w-full"
-            variant="default"
-          >
-            <ExternalLink className="mr-2 h-4 w-4" />
-            Open in Browser
-          </Button>
+        <div className="flex items-center gap-3">
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <span className="text-sm">
+            Complete the authentication in your browser...
+          </span>
         </div>
 
         {flow.instructions && (
@@ -130,6 +154,16 @@ function LoginFlowContent({ flow }: { flow: LoginFlowState }) {
             {flow.instructions}
           </p>
         )}
+
+        <Button
+          onClick={() => window.open(flow.url, '_blank')}
+          className="w-full"
+          variant="outline"
+          size="sm"
+        >
+          <ExternalLink className="mr-2 h-4 w-4" />
+          Open in Browser
+        </Button>
 
         {flow.showManualInput && (
           <ManualCodeInput onSubmit={handleManualInput} />

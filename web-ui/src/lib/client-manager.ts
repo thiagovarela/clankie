@@ -181,7 +181,10 @@ class ClientManager {
     const { activeSessionId } = sessionsListStore.state
     const isActiveSession = sessionId === activeSessionId
 
-    if (event.type === 'model_changed' || event.type === 'thinking_level_changed') {
+    if (
+      event.type === 'model_changed' ||
+      event.type === 'thinking_level_changed'
+    ) {
       console.log('[client-manager] Event check:', {
         eventType: event.type,
         eventSessionId: sessionId,
