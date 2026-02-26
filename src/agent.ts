@@ -14,10 +14,12 @@ import {
 	type CreateAgentSessionResult,
 	createAgentSession,
 	DefaultResourceLoader,
+	type ExtensionFactory,
 	ModelRegistry,
 	SessionManager,
 } from "@mariozechner/pi-coding-agent";
 import { getAgentDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
+import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
 
 export interface SessionOptions {
 	/**
@@ -59,10 +61,19 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 	const authStorage = AuthStorage.create(getAuthPath());
 	const modelRegistry = new ModelRegistry(authStorage);
 
+	// Build extension factories (workspace jail if enabled)
+	const extensionFactories: ExtensionFactory[] = [];
+	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
+	if (restrictToWorkspace) {
+		const allowedPaths = config.agent?.allowedPaths ?? [];
+		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
+	}
+
 	// DefaultResourceLoader with standard pi discovery
 	const loader = new DefaultResourceLoader({
 		cwd,
 		agentDir,
+		extensionFactories,
 	});
 	await loader.reload();
 

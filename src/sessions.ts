@@ -14,11 +14,13 @@ import {
 	type CreateAgentSessionResult,
 	createAgentSession,
 	DefaultResourceLoader,
+	type ExtensionFactory,
 	ModelRegistry,
 	SessionManager,
 } from "@mariozechner/pi-coding-agent";
 import type { Attachment } from "./channels/channel.ts";
 import { type AppConfig, getAgentDir, getAppDir, getAuthPath, getWorkspace } from "./config.ts";
+import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
 
 // ─── Session cache (one session per chat) ──────────────────────────────────────
 
@@ -47,9 +49,18 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 	const authStorage = AuthStorage.create(getAuthPath());
 	const modelRegistry = new ModelRegistry(authStorage);
 
+	// Build extension factories (workspace jail if enabled)
+	const extensionFactories: ExtensionFactory[] = [];
+	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
+	if (restrictToWorkspace) {
+		const allowedPaths = config.agent?.allowedPaths ?? [];
+		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
+	}
+
 	const loader = new DefaultResourceLoader({
 		cwd,
 		agentDir,
+		extensionFactories,
 	});
 	await loader.reload();
 
