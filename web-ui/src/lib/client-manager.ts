@@ -181,6 +181,15 @@ class ClientManager {
     const { activeSessionId } = sessionsListStore.state
     const isActiveSession = sessionId === activeSessionId
 
+    if (event.type === 'model_changed' || event.type === 'thinking_level_changed') {
+      console.log('[client-manager] Event check:', {
+        eventType: event.type,
+        eventSessionId: sessionId,
+        activeSessionId,
+        isActiveSession,
+      })
+    }
+
     // Handle agent session events (pi-agent-core event protocol)
     switch (event.type) {
       // ─── Session events ────────────────────────────────────────────────
@@ -207,6 +216,11 @@ class ClientManager {
         break
 
       case 'model_changed':
+        console.log('[client-manager] model_changed event:', {
+          sessionId,
+          isActiveSession,
+          model: event.model,
+        })
         // Update single-session store only if active
         if (isActiveSession) {
           setModel(event.model)

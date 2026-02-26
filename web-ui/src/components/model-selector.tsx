@@ -27,16 +27,24 @@ export function ModelSelector() {
   const [isOpen, setIsOpen] = useState(false)
 
   const handleModelSelect = async (provider: string, modelId: string) => {
-    if (!sessionId) return
+    if (!sessionId) {
+      console.log('[ModelSelector] No sessionId')
+      return
+    }
+
+    console.log('[ModelSelector] Changing model:', { provider, modelId, sessionId })
 
     const client = clientManager.getClient()
     if (client) {
       try {
-        await client.setModel(sessionId, provider, modelId)
+        const result = await client.setModel(sessionId, provider, modelId)
+        console.log('[ModelSelector] Model changed successfully:', result)
         setIsOpen(false)
       } catch (err) {
-        console.error('Failed to set model:', err)
+        console.error('[ModelSelector] Failed to set model:', err)
       }
+    } else {
+      console.error('[ModelSelector] No client available')
     }
   }
 
