@@ -788,14 +788,24 @@ export class WebChannel implements Channel {
 
 			case "get_extensions": {
 				const extensionsResult = session.resourceLoader.getExtensions();
-				const extensions = extensionsResult.extensions.map((ext) => ({
-					path: ext.path,
-					resolvedPath: ext.resolvedPath,
-					tools: Array.from(ext.tools.keys()),
-					commands: Array.from(ext.commands.keys()),
-					flags: Array.from(ext.flags.keys()),
-					shortcuts: Array.from(ext.shortcuts.keys()),
-				}));
+				console.log("[web] extensionsResult.extensions:", extensionsResult.extensions);
+				const extensions = extensionsResult.extensions.map((ext) => {
+					console.log("[web] ext.tools type:", typeof ext.tools, "value:", ext.tools);
+					console.log("[web] ext.tools.keys():", ext.tools.keys());
+					const toolsArray = Array.from(ext.tools.keys());
+					console.log("[web] toolsArray:", toolsArray);
+					return {
+						path: ext.path,
+						resolvedPath: ext.resolvedPath,
+						tools: toolsArray,
+						commands: Array.from(ext.commands.keys()),
+						flags: Array.from(ext.flags.keys()),
+						shortcuts: Array.from(ext.shortcuts.keys()),
+					};
+				});
+
+				console.log("[web] final extensions:", extensions);
+				console.log("[web] stringified:", JSON.stringify(extensions));
 
 				return {
 					id,

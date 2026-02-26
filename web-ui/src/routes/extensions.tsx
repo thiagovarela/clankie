@@ -56,6 +56,9 @@ function ExtensionsPage() {
 				client.getSkills(activeSessionId),
 			]);
 
+			console.log("[extensions] extensionsResult:", extensionsResult);
+			console.log("[extensions] skillsResult:", skillsResult);
+
 			setExtensions(extensionsResult.extensions, extensionsResult.errors);
 			setSkills(skillsResult.skills, skillsResult.diagnostics);
 		} catch (err) {
