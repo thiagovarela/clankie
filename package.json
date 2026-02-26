@@ -4,17 +4,19 @@
 	"description": "A minimal personal AI assistant built on pi's SDK",
 	"type": "module",
 	"bin": {
-		"clankie": "./src/cli.ts"
+		"clankie": "./dist/cli.js"
 	},
 	"files": [
-		"src/",
+		"dist/",
 		"web-ui-dist/",
 		"package.json",
 		"README.md"
 	],
 	"scripts": {
-		"dev": "tsx src/cli.ts",
+		"dev": "bun src/cli.ts",
+		"build": "bun build src/cli.ts --outdir dist --target node --format esm && chmod +x dist/cli.js",
 		"build:web-ui": "cd web-ui && bun install && bun run build && cd .. && rm -rf web-ui-dist && cp -r web-ui/.output/public web-ui-dist",
+		"prepublishOnly": "bun run build && bun run build:web-ui",
 		"check": "biome check .",
 		"check:fix": "biome check --fix .",
 		"format": "biome format --write ."
@@ -31,7 +33,6 @@
 		"@slack/web-api": "^7.0.0",
 		"hono": "^4.12.3",
 		"json5": "^2.2.3",
-		"tsx": "^4.21.0",
 		"ws": "^8.18.0"
 	},
 	"devDependencies": {

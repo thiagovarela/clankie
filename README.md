@@ -15,8 +15,8 @@ A minimal AI assistant that lives in Slack. Built on [pi](https://github.com/bad
 
 ### 1. Install Dependencies
 
-**Runtime:** [Node.js](https://nodejs.org) v18+ (TypeScript support via `tsx`)  
-**Build:** [Bun](https://bun.sh) (for faster package installation and web-ui builds)
+**Runtime:** [Node.js](https://nodejs.org) v18+  
+**Build:** [Bun](https://bun.sh) v1.0+ (for bundling and building web-ui)
 
 ```bash
 # Check Node version
@@ -46,9 +46,9 @@ npm install
 npm link
 ```
 
-Now `clankie` is available from anywhere. If you skip `npm link`, use `tsx src/cli.ts` instead of `clankie`.
+Now `clankie` is available from anywhere. If you skip `npm link`, use `bun src/cli.ts` (dev) or `node dist/cli.js` (built) instead of `clankie`.
 
-**Note:** Bun is used for faster package installation and building the web-ui. The runtime uses `tsx` (Node.js v18+).
+**Note:** Bun bundles TypeScript code into JavaScript that runs on Node.js v18+.
 
 ## Slack Setup
 
@@ -296,21 +296,22 @@ Logs are stored in `~/.clankie/logs/daemon.log`.
 ## Development
 
 ```bash
-# Run directly with tsx (no build step)
-tsx src/cli.ts chat
-tsx src/cli.ts send "hello"
+# Run directly with Bun (no build step)
+bun src/cli.ts chat
+bun src/cli.ts send "hello"
 
-# Or use npm scripts
-npm run dev -- chat
-npm run dev -- send "hello"
+# Or use bun scripts
+bun run dev chat
+bun run dev send "hello"
+
+# Build for production
+bun run build        # Bundles TypeScript → JavaScript for Node.js
 
 # Code quality checks
-npm run check        # Run linter
-npm run check:fix    # Auto-fix issues
-npm run format       # Format code
+bun run check        # Run linter
+bun run check:fix    # Auto-fix issues
+bun run format       # Format code
 ```
-
-**Note:** Bun is used for package installation and building the web-ui. The runtime uses `tsx` for TypeScript support (Node.js v18+).
 
 ## Troubleshooting
 
