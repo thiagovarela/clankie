@@ -359,19 +359,16 @@ export class WebChannel implements Channel {
 
 		// ─── Start server ─────────────────────────────────────────────────────
 
-		const serverInfo = await new Promise<{ address: string; port: number; server: Server }>((resolve) => {
-			const _info = serve(
-				{
-					fetch: app.fetch,
-					port: this.options.port,
-				},
-				(info) => {
-					resolve(info as { address: string; port: number; server: Server });
-				},
-			);
-		});
+		this.server = serve(
+			{
+				fetch: app.fetch,
+				port: this.options.port,
+			},
+			(info) => {
+				console.log(`[web] Server started on ${info.address}:${info.port}`);
+			},
+		);
 
-		this.server = serverInfo.server;
 		injectWebSocket(this.server);
 
 		console.log(`[web] WebSocket server listening on port ${this.options.port}`);
