@@ -217,7 +217,12 @@ describe('messages store', () => {
           role: 'assistant' as const,
           content: [
             { type: 'text' as const, text: 'First text' },
-            { type: 'tool_use' as const, id: '1', name: 'bash', input: {} },
+            {
+              type: 'toolCall' as const,
+              id: '1',
+              name: 'bash',
+              arguments: {},
+            },
             { type: 'text' as const, text: 'Second text' },
           ],
         },

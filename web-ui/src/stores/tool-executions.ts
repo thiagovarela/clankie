@@ -41,15 +41,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function isToolUseBlock(block: unknown): block is {
-  type: 'tool_use'
+function isPiToolCallBlock(block: unknown): block is {
+  type: 'toolCall'
   id: string
   name: string
-  input: unknown
+  arguments: unknown
 } {
   return (
     isRecord(block) &&
-    block.type === 'tool_use' &&
+    block.type === 'toolCall' &&
     typeof block.id === 'string' &&
     typeof block.name === 'string'
   )
@@ -212,10 +212,10 @@ export function hydrateToolExecutionsFromMessages(
 
     if (message.role === 'assistant' && Array.isArray(message.content)) {
       for (const block of message.content) {
-        if (!isToolUseBlock(block)) continue
+        if (!isPiToolCallBlock(block)) continue
 
         const historicalResult = toolResultsByCallId.get(block.id)
-        const args = isRecord(block.input) ? block.input : {}
+        const args = isRecord(block.arguments) ? block.arguments : {}
 
         if (!historicalResult) {
           unmatchedToolUses.push(block.id)

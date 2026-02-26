@@ -276,21 +276,21 @@ class ClientManager {
       )
       console.log('[client-manager] getMessages roles summary:', rolesSummary)
 
-      const assistantToolUseSummary = messages
+      const assistantToolCallSummary = messages
         .filter((msg) => msg.role === 'assistant' && Array.isArray(msg.content))
         .map((msg, index) => {
           const content = Array.isArray(msg.content) ? msg.content : []
           return {
             assistantIndex: index,
             contentTypes: content.map((block: any) => block?.type),
-            toolUseIds: content
-              .filter((block: any) => block?.type === 'tool_use')
+            toolCallIds: content
+              .filter((block: any) => block?.type === 'toolCall')
               .map((block: any) => block?.id),
           }
         })
       console.log(
-        '[client-manager] assistant content/tool_use summary:',
-        assistantToolUseSummary,
+        '[client-manager] assistant content/toolCall summary:',
+        assistantToolCallSummary,
       )
 
       setMessages(messages)

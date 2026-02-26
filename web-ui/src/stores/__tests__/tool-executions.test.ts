@@ -19,10 +19,10 @@ describe('tool executions store', () => {
           role: 'assistant',
           content: [
             {
-              type: 'tool_use',
+              type: 'toolCall',
               id: 'call-1',
               name: 'ls',
-              input: { path: '.' },
+              arguments: { path: '.' },
             },
           ],
         },
@@ -63,10 +63,10 @@ describe('tool executions store', () => {
           role: 'assistant',
           content: [
             {
-              type: 'tool_use',
+              type: 'toolCall',
               id: 'call-2',
               name: 'read',
-              input: { path: '/missing.txt' },
+              arguments: { path: '/missing.txt' },
             },
           ],
         },
@@ -93,10 +93,10 @@ describe('tool executions store', () => {
           role: 'assistant',
           content: [
             {
-              type: 'tool_use',
+              type: 'toolCall',
               id: 'call-old',
               name: 'ls',
-              input: { path: '.' },
+              arguments: { path: '.' },
             },
           ],
         },

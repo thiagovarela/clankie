@@ -119,10 +119,10 @@ export interface MessageContentText {
 }
 
 export interface MessageContentToolUse {
-  type: 'tool_use'
+  type: 'toolCall'
   id: string
   name: string
-  input: unknown
+  arguments: Record<string, unknown>
 }
 
 export interface MessageContentToolResult {
