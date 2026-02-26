@@ -1320,8 +1320,9 @@ export class WebChannel implements Channel {
 			const filePath = join(this.options.staticDir, pathname);
 
 			// Security: ensure the resolved path is within staticDir (prevent directory traversal)
-			const resolvedPath = Bun.resolveSync(filePath, this.options.staticDir);
-			if (!resolvedPath.startsWith(this.options.staticDir)) {
+			const { resolve } = await import("node:path");
+			const resolvedPath = resolve(this.options.staticDir, pathname);
+			if (!resolvedPath.startsWith(resolve(this.options.staticDir))) {
 				return new Response("Forbidden", { status: 403 });
 			}
 
