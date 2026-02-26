@@ -113,5 +113,5 @@ export function clearLoginFlow(): void {
 }
 
 export function resetAuth(): void {
-	authStore.setState(INITIAL_STATE);
+	authStore.setState(() => INITIAL_STATE);
 }

@@ -71,5 +71,5 @@ export function updateSessionMeta(
 
 export function clearSessions(): void {
 	console.log("[sessions-list] Clearing all sessions");
-	sessionsListStore.setState(INITIAL_STATE);
+	sessionsListStore.setState(() => INITIAL_STATE);
 }

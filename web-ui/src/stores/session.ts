@@ -98,5 +98,5 @@ export function setCompacting(isCompacting: boolean): void {
 }
 
 export function resetSession(): void {
-	sessionStore.setState(INITIAL_STATE);
+	sessionStore.setState(() => INITIAL_STATE);
 }
