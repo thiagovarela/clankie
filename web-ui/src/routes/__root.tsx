@@ -15,6 +15,7 @@ import {
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { clientManager } from '@/lib/client-manager'
 import { connectionStore, updateConnectionSettings } from '@/stores/connection'
+import { ExtensionUIProvider } from '@/components/extension-ui/provider'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -82,6 +83,7 @@ function RootComponent() {
               <Outlet />
             </div>
           </SidebarInset>
+          <ExtensionUIProvider />
         </SidebarProvider>
       </TooltipProvider>
     </RootDocument>

@@ -4,8 +4,14 @@
 
 import { ClankieClient } from './clankie-client'
 import { handleAuthEvent, handleSessionEvent } from './event-handlers'
+import type { ExtensionUIResponse } from './types'
 import { connectionStore, updateConnectionStatus } from '@/stores/connection'
 import { clearMessages, setMessages } from '@/stores/messages'
+import { clearToolExecutions } from '@/stores/tool-executions'
+import {
+  handleExtensionUIRequest,
+  resetExtensionUI,
+} from '@/stores/extension-ui'
 import {
   resetSession,
   setAvailableModels,
@@ -46,6 +52,7 @@ class ClientManager {
         handleSessionEvent(sessionId, event, activeSessionId)
       },
       onAuthEvent: (event) => handleAuthEvent(event),
+      onExtensionUIRequest: (event) => handleExtensionUIRequest(event),
       onStateChange: (state, error) => {
         updateConnectionStatus(state, error)
         // Restore or create session when connection is established
@@ -67,6 +74,8 @@ class ClientManager {
     clearSessions()
     resetSession()
     clearMessages()
+    clearToolExecutions()
+    resetExtensionUI()
     // Note: We keep the session ID in localStorage so it can be restored on reconnect
   }
 
@@ -148,6 +157,10 @@ class ClientManager {
     return this.client
   }
 
+  sendExtensionUIResponse(response: ExtensionUIResponse): void {
+    this.client?.sendExtensionUIResponse(response)
+  }
+
   isConnected(): boolean {
     return this.client?.getConnectionState() === 'connected'
   }
@@ -193,6 +206,7 @@ class ClientManager {
 
       // Clear messages for the new session
       clearMessages()
+      clearToolExecutions()
 
       // Fetch session state to get model and thinking level
       try {
@@ -238,6 +252,7 @@ class ClientManager {
 
       // Clear current messages
       clearMessages()
+      clearToolExecutions()
 
       // Fetch messages for the new session
       console.log(

@@ -6,6 +6,11 @@
 import type { AgentSessionEvent, AuthEvent, RpcResponse } from '@/lib/types'
 import { updateLoginFlow } from '@/stores/auth'
 import {
+  finishToolExecution,
+  startToolExecution,
+  updateToolExecution,
+} from '@/stores/tool-executions'
+import {
   appendStreamToken,
   appendThinkingToken,
   endAssistantMessage,
@@ -202,14 +207,28 @@ export function handleSessionEvent(
     // ─── Tool execution ────────────────────────────────────────────────
     case 'tool_execution_start':
       if (isActiveSession) {
-        console.log('[event-handlers] Tool execution:', event.toolName)
+        startToolExecution({
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+          args: event.args ?? {},
+        })
       }
       break
 
     case 'tool_execution_update':
+      if (isActiveSession) {
+        updateToolExecution(event.toolCallId, event.partialResult ?? {})
+      }
       break
 
     case 'tool_execution_end':
+      if (isActiveSession) {
+        finishToolExecution({
+          toolCallId: event.toolCallId,
+          result: event.result ?? {},
+          isError: event.isError,
+        })
+      }
       break
 
     // ─── Compaction ────────────────────────────────────────────────────

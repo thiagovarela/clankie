@@ -1,11 +1,11 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ModelSelector } from '../model-selector'
+import type { ModelInfo } from '@/lib/types'
 import { clientManager } from '@/lib/client-manager'
 import { sessionStore } from '@/stores/session'
 import { makeModelInfo } from '@/test/fixtures'
-import type { ModelInfo } from '@/lib/types'
 
 // Mock the client manager
 vi.mock('@/lib/client-manager', () => ({

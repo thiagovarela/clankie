@@ -1,6 +1,7 @@
 import { Bot, Loader2, User } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { ToolExecutionList } from './tool-execution-list'
 import type { DisplayMessage } from '@/stores/messages'
 import { cn } from '@/lib/utils'
 
@@ -40,11 +41,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {isUser ? (
           <p className="whitespace-pre-wrap">{message.content}</p>
         ) : (
-          <div className="prose prose-sm dark:prose-invert max-w-none">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {message.content || '...'}
-            </ReactMarkdown>
-          </div>
+          <>
+            <ToolExecutionList messageId={message.id} />
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                {message.content || '...'}
+              </ReactMarkdown>
+            </div>
+          </>
         )}
 
         {message.isStreaming && !isUser && (

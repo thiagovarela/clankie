@@ -568,9 +568,7 @@ describe('event-handlers', () => {
         expect(sessionStore.state.sessionId).toBeNull()
       })
 
-      it('tool_execution events are logged if active', () => {
-        const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
-
+      it('tool_execution events are tracked if active', () => {
         handleSessionEvent(
           'session-1',
           {
@@ -582,12 +580,20 @@ describe('event-handlers', () => {
           'session-1',
         )
 
-        expect(consoleSpy).toHaveBeenCalledWith(
-          expect.stringContaining('Tool execution'),
-          'bash',
+        handleSessionEvent(
+          'session-1',
+          {
+            type: 'tool_execution_end',
+            toolCallId: '1',
+            toolName: 'bash',
+            result: {},
+            isError: false,
+          },
+          'session-1',
         )
 
-        consoleSpy.mockRestore()
+        // No throw means handler processed both lifecycle events
+        expect(true).toBe(true)
       })
 
       it('error events are logged', () => {

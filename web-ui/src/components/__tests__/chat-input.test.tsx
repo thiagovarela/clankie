@@ -1,6 +1,6 @@
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatInput } from '../chat-input'
 import { clientManager } from '@/lib/client-manager'
 import { messagesStore } from '@/stores/messages'
@@ -337,9 +337,7 @@ describe('ChatInput', () => {
 
       render(<ChatInput />)
 
-      const textarea = screen.getByPlaceholderText(
-        /Send a message/i,
-      ) as HTMLTextAreaElement
+      const textarea = screen.getByPlaceholderText(/Send a message/i)
       await user.type(textarea, 'Test')
 
       const sendButton = screen.getByRole('button', { name: /Send message/i })

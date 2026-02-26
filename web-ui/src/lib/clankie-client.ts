@@ -8,6 +8,8 @@ import type {
   AgentSessionEvent,
   AuthEvent,
   AuthProvider,
+  ExtensionUIRequest,
+  ExtensionUIResponse,
   ImageContent,
   InboundWebMessage,
   Message,
@@ -25,6 +27,7 @@ export interface ClankieClientOptions {
   authToken: string
   onEvent: (sessionId: string, event: AgentSessionEvent | RpcResponse) => void
   onAuthEvent: (event: AuthEvent) => void
+  onExtensionUIRequest: (event: ExtensionUIRequest) => void
   onStateChange: (state: ConnectionState, error?: string) => void
 }
 
@@ -229,6 +232,10 @@ export class ClankieClient {
     this.ws.send(message)
   }
 
+  sendExtensionUIResponse(response: ExtensionUIResponse): void {
+    this.ws.send(response)
+  }
+
   async authLogout(providerId: string): Promise<void> {
     await this.sendCommand({ type: 'auth_logout', providerId })
   }
@@ -308,7 +315,7 @@ export class ClankieClient {
 
   private handleMessage(message: OutboundWebMessage | RpcResponse): void {
     // Handle raw RpcResponse (for commands without sessionId like list_sessions)
-    if ('type' in message && message.type === 'response' && 'id' in message) {
+    if ('type' in message && !('sessionId' in message)) {
       const response = message
       if (!response.id) return // Skip responses without id
       const pending = this.pendingRequests.get(response.id)
@@ -349,11 +356,13 @@ export class ClankieClient {
         return
       }
 
-      // Otherwise, it's a session event - forward to the event handler
-      // Filter out auth events (type narrowing)
-      if (event.type !== 'auth_event') {
-        this.options.onEvent(sessionId, event)
+      if (event.type === 'extension_ui_request') {
+        this.options.onExtensionUIRequest(event)
+        return
       }
+
+      // Otherwise, it's a session event - forward to the event handler
+      this.options.onEvent(sessionId, event as AgentSessionEvent | RpcResponse)
       return
     }
 
