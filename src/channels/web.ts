@@ -373,6 +373,8 @@ export class WebChannel implements Channel {
 					return;
 				}
 			} else {
+				// Ensure this ws is subscribed (handles reconnection with new ws)
+				this.subscribeToSessionWithKey(sessionId, session, ws);
 				console.log(
 					`[web] Using cached session - chatKey: ${sessionId}, session.sessionId: ${session.sessionId}, sessionFile: ${session.sessionFile}`,
 				);
