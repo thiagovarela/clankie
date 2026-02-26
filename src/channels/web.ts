@@ -258,6 +258,7 @@ export class WebChannel implements Channel {
 		});
 
 		console.log(`[web] WebSocket server listening on port ${this.options.port}`);
+		console.log(`[web] Open in browser: http://localhost:${this.options.port}?token=${this.options.authToken}`);
 	}
 
 	async send(_chatId: string, _text: string, _options?: { threadId?: string }): Promise<void> {

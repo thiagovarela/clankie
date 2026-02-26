@@ -4,7 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { clientManager } from "@/lib/client-manager";
-import { connectionStore } from "@/stores/connection";
+import { connectionStore, updateConnectionSettings } from "@/stores/connection";
 import appCss from "../styles.css?url";
 
 export const Route = createRootRoute({
@@ -33,8 +33,25 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
-	// Auto-connect on startup if saved credentials exist
+	// Auto-detect token from URL query parameter and auto-connect
 	useEffect(() => {
+		// Check for ?token= query parameter
+		if (typeof window !== "undefined") {
+			const params = new URLSearchParams(window.location.search);
+			const token = params.get("token");
+
+			if (token) {
+				// Save token to connection store (persists to localStorage)
+				updateConnectionSettings({ authToken: token });
+
+				// Strip token from URL to avoid it lingering in browser history/address bar
+				window.history.replaceState(null, "", window.location.pathname);
+
+				console.log("[root] Detected auth token from URL, saved to localStorage");
+			}
+		}
+
+		// Auto-connect if auth token is configured
 		const { settings } = connectionStore.state;
 		if (settings.authToken && !clientManager.isConnected()) {
 			clientManager.connect();

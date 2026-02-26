@@ -21,6 +21,7 @@
  *   clankie config path                 Show config file path
  */
 
+import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as readline from "node:readline/promises";
@@ -39,6 +40,7 @@ function printHelp(): void {
 Usage:
   clankie send "<message>"          Send a message, print response, exit
   clankie chat                      Start interactive chat session
+  clankie init                      Set up clankie (generates auth token, configures web channel)
   clankie login                     Authenticate with your AI provider
   clankie start [--foreground]      Start the daemon (foreground by default)
   clankie stop                      Stop the daemon
@@ -76,21 +78,24 @@ Slack slash commands (when running as daemon):
   /new                              Start a fresh session
 
 Examples:
-  clankie login
+  # Quick start
+  clankie init                          # generates token, configures web channel
+  clankie login                         # authenticate with AI provider
+  clankie start                         # starts daemon, prints connect URL
   
   # Slack setup
   clankie config set channels.slack.appToken "xapp-..."
   clankie config set channels.slack.botToken "xoxb-..."
   clankie config set channels.slack.allowFrom ["U12345678"]
   
-  # Web channel setup
+  # Manual web channel setup (optional if using init)
   clankie config set channels.web.authToken "your-secret-token"
   clankie config set channels.web.port 3100
   
   # VPS deployment (same-origin, serve web-ui from daemon)
   clankie config set channels.web.staticDir "/path/to/web-ui/.output/public"
   
-  clankie start                         # run in foreground
+  # System service
   clankie daemon install                # install as system service (auto-start on boot)
   clankie daemon logs                   # tail daemon logs
 
@@ -237,6 +242,57 @@ async function cmdLogin(_args: string[]): Promise<void> {
 			process.exit(1);
 		}
 	}
+
+	rl.close();
+}
+
+async function cmdInit(_args: string[]): Promise<void> {
+	const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+
+	console.log("clankie setup — configuring web channel\n");
+
+	const config = loadConfig();
+	const existingToken = config.channels?.web?.authToken;
+
+	let authToken: string;
+
+	if (existingToken) {
+		console.log("✓ Web channel auth token already configured.\n");
+		const answer = await rl.question("Regenerate token? (y/N): ");
+
+		if (answer.trim().toLowerCase() === "y") {
+			authToken = randomBytes(32).toString("base64url");
+			console.log("\n✓ Generated new auth token.\n");
+		} else {
+			authToken = existingToken;
+			console.log("\n✓ Keeping existing token.\n");
+		}
+	} else {
+		authToken = randomBytes(32).toString("base64url");
+		console.log("✓ Generated auth token for web channel.\n");
+	}
+
+	// Save web channel defaults to config
+	const updated = {
+		...config,
+		channels: {
+			...config.channels,
+			web: {
+				...config.channels?.web,
+				authToken,
+				port: config.channels?.web?.port ?? 3100,
+				enabled: config.channels?.web?.enabled ?? true,
+			},
+		},
+	};
+
+	saveConfig(updated);
+
+	console.log(`Configuration saved to ${getConfigPath()}\n`);
+	console.log("Next steps:");
+	console.log("  1. Run 'clankie login' to authenticate with an AI provider");
+	console.log("  2. Run 'clankie start' to start the daemon");
+	console.log("  3. Open the connect URL printed by the daemon\n");
 
 	rl.close();
 }
@@ -401,6 +457,10 @@ async function main(): Promise<void> {
 
 		case "chat":
 			await cmdChat(rest);
+			break;
+
+		case "init":
+			await cmdInit(rest);
 			break;
 
 		case "login":
