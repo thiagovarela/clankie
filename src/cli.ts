@@ -67,6 +67,7 @@ Config paths (dot-separated):
   channels.web.authToken            Web channel auth token (required, shared secret)
   channels.web.port                 Web channel port (default: 3100)
   channels.web.allowedOrigins       Allowed origins (JSON array, empty = allow all)
+  channels.web.staticDir            Path to built web-ui files (serves UI on same port)
   channels.web.enabled              Enable/disable web channel (default: true)
 
 Slack slash commands (when running as daemon):
@@ -85,6 +86,9 @@ Examples:
   # Web channel setup
   clankie config set channels.web.authToken "your-secret-token"
   clankie config set channels.web.port 3100
+  
+  # VPS deployment (same-origin, serve web-ui from daemon)
+  clankie config set channels.web.staticDir "/path/to/web-ui/.output/public"
   
   clankie start                         # run in foreground
   clankie daemon install                # install as system service (auto-start on boot)
