@@ -9,6 +9,7 @@
  *   clankie login                       Authenticate with your AI provider
  *   clankie start                       Start the daemon (channels + agent)
  *   clankie stop                        Stop the daemon
+ *   clankie restart                     Restart the daemon
  *   clankie status                      Check daemon status
  *   clankie daemon install              Install as a system service (systemd/launchd)
  *   clankie daemon uninstall            Remove the system service
@@ -29,7 +30,7 @@ import { AuthStorage, InteractiveMode, runPrintMode } from "@mariozechner/pi-cod
 import JSON5 from "json5";
 import { createSession } from "./agent.ts";
 import { getAuthPath, getByPath, getConfigPath, loadConfig, saveConfig, setByPath, unsetByPath } from "./config.ts";
-import { isRunning, startDaemon, stopDaemon } from "./daemon.ts";
+import { isRunning, restartDaemon, startDaemon, stopDaemon } from "./daemon.ts";
 import { installService, showServiceLogs, showServiceStatus, uninstallService } from "./service.ts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ Usage:
   clankie login                     Authenticate with your AI provider
   clankie start [--foreground]      Start the daemon (foreground by default)
   clankie stop                      Stop the daemon
+  clankie restart                   Restart the daemon
   clankie status                    Check if daemon is running
   clankie daemon install            Install as a system service (systemd/launchd)
   clankie daemon uninstall          Remove the system service
@@ -310,6 +312,10 @@ function cmdStop(): void {
 	stopDaemon();
 }
 
+async function cmdRestart(): Promise<void> {
+	await restartDaemon();
+}
+
 function cmdStatus(): void {
 	const status = isRunning();
 	if (status.running) {
@@ -473,6 +479,10 @@ async function main(): Promise<void> {
 
 		case "stop":
 			cmdStop();
+			break;
+
+		case "restart":
+			await cmdRestart();
 			break;
 
 		case "status":

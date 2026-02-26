@@ -378,3 +378,26 @@ export function stopDaemon(): boolean {
 		return false;
 	}
 }
+
+export async function restartDaemon(): Promise<void> {
+	const status = isRunning();
+	if (!status.running) {
+		console.log("Daemon is not running. Starting...");
+		await startDaemon();
+		return;
+	}
+
+	console.log(`Restarting daemon (pid ${status.pid})...`);
+	
+	// Stop the daemon
+	if (!stopDaemon()) {
+		console.error("Failed to stop daemon. Aborting restart.");
+		process.exit(1);
+	}
+
+	// Wait a moment for cleanup
+	await new Promise((resolve) => setTimeout(resolve, 1000));
+
+	// Start fresh
+	await startDaemon();
+}
