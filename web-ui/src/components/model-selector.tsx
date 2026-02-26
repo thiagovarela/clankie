@@ -32,7 +32,11 @@ export function ModelSelector() {
       return
     }
 
-    console.log('[ModelSelector] Changing model:', { provider, modelId, sessionId })
+    console.log('[ModelSelector] Changing model:', {
+      provider,
+      modelId,
+      sessionId,
+    })
 
     const client = clientManager.getClient()
     if (client) {
@@ -109,8 +113,7 @@ export function ModelSelector() {
 
         <div className="max-h-96 overflow-y-auto">
           {availableModels.map((m) => {
-            const isActive =
-              model.provider === m.provider && model.id === m.id
+            const isActive = model.provider === m.provider && model.id === m.id
             return (
               <DropdownMenuItem
                 key={`${m.provider}/${m.id}`}
