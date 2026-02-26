@@ -23,6 +23,8 @@ import {
   startLoginFlow,
 } from '@/stores/auth'
 import { connectionStore, updateConnectionSettings } from '@/stores/connection'
+import { setAvailableModels } from '@/stores/session'
+import { sessionsListStore } from '@/stores/sessions-list'
 
 export const Route = createFileRoute('/settings')({
   component: SettingsPage,
@@ -202,10 +204,32 @@ function ProviderAuthSection() {
     loadProviders()
   }, [loadProviders])
 
-  // Refresh provider list after successful OAuth login
+  // Refresh provider list and available models after successful OAuth login
   useEffect(() => {
     if (loginFlow?.status === 'complete' && loginFlow.success === true) {
       loadProviders()
+
+      // Also refresh available models for the active session
+      const { activeSessionId } = sessionsListStore.state
+      if (activeSessionId) {
+        const client = clientManager.getClient()
+        if (client) {
+          client
+            .getAvailableModels(activeSessionId)
+            .then(({ models }) => {
+              setAvailableModels(models)
+              console.log(
+                '[settings] Refreshed available models after OAuth login',
+              )
+            })
+            .catch((err) => {
+              console.error(
+                '[settings] Failed to refresh available models:',
+                err,
+              )
+            })
+        }
+      }
     }
   }, [loginFlow?.status, loginFlow?.success, loadProviders])
 
