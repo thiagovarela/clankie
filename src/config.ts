@@ -22,6 +22,10 @@ export interface AppConfig {
 		workspace?: string;
 		/** Override for pi's agent dir (default: ~/.clankie) */
 		agentDir?: string;
+		/** Restrict agent to workspace directory (default: true) */
+		restrictToWorkspace?: boolean;
+		/** Additional paths outside workspace that are allowed (e.g. ["/tmp"]) */
+		allowedPaths?: string[];
 		/** Model configuration */
 		model?: {
 			/** Primary model in provider/model format (e.g. "anthropic/claude-sonnet-4-5") */
