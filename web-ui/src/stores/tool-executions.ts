@@ -15,7 +15,7 @@ export interface ToolExecution {
   toolCallId: string
   toolName: string
   args: Record<string, unknown>
-  status: 'running' | 'completed' | 'error'
+  status: 'called' | 'running' | 'completed' | 'error'
   partialResult?: ToolExecutionResult
   result?: ToolExecutionResult
   isError?: boolean
@@ -46,6 +46,43 @@ function resolveCurrentAssistantMessageId(): string | null {
   return lastAssistant?.id ?? null
 }
 
+export function registerToolCall(params: {
+  toolCallId: string
+  toolName: string
+  args: Record<string, unknown>
+}): void {
+  const messageId = resolveCurrentAssistantMessageId()
+
+  toolExecutionsStore.setState((state) => {
+    const existing = state.executions[params.toolCallId]
+
+    return {
+      ...state,
+      executions: {
+        ...state.executions,
+        [params.toolCallId]: existing
+          ? {
+              ...existing,
+              toolName: params.toolName,
+              args: params.args,
+              messageId: existing.messageId ?? messageId,
+            }
+          : {
+              toolCallId: params.toolCallId,
+              toolName: params.toolName,
+              args: params.args,
+              status: 'called',
+              startTime: Date.now(),
+              messageId,
+            },
+      },
+      executionOrder: state.executionOrder.includes(params.toolCallId)
+        ? state.executionOrder
+        : [...state.executionOrder, params.toolCallId],
+    }
+  })
+}
+
 export function startToolExecution(params: {
   toolCallId: string
   toolName: string
@@ -53,23 +90,31 @@ export function startToolExecution(params: {
 }): void {
   const messageId = resolveCurrentAssistantMessageId()
 
-  toolExecutionsStore.setState((state) => ({
-    ...state,
-    executions: {
-      ...state.executions,
-      [params.toolCallId]: {
-        toolCallId: params.toolCallId,
-        toolName: params.toolName,
-        args: params.args,
-        status: 'running',
-        startTime: Date.now(),
-        messageId,
+  toolExecutionsStore.setState((state) => {
+    const existing = state.executions[params.toolCallId]
+
+    return {
+      ...state,
+      executions: {
+        ...state.executions,
+        [params.toolCallId]: {
+          toolCallId: params.toolCallId,
+          toolName: params.toolName,
+          args: params.args,
+          status: 'running',
+          startTime: existing?.startTime ?? Date.now(),
+          messageId: existing?.messageId ?? messageId,
+          partialResult: existing?.partialResult,
+          result: existing?.result,
+          isError: existing?.isError,
+          endTime: existing?.endTime,
+        },
       },
-    },
-    executionOrder: state.executionOrder.includes(params.toolCallId)
-      ? state.executionOrder
-      : [...state.executionOrder, params.toolCallId],
-  }))
+      executionOrder: state.executionOrder.includes(params.toolCallId)
+        ? state.executionOrder
+        : [...state.executionOrder, params.toolCallId],
+    }
+  })
 }
 
 export function updateToolExecution(
@@ -126,6 +171,13 @@ export function getToolExecutionsForMessage(
     .map((id) => state.executions[id])
     .filter((execution): execution is ToolExecution => Boolean(execution))
     .filter((execution) => execution.messageId === messageId)
+}
+
+export function hasToolExecutionsForMessage(
+  messageId: string,
+  state: ToolExecutionsStore,
+): boolean {
+  return getToolExecutionsForMessage(messageId, state).length > 0
 }
 
 export function clearToolExecutions(): void {

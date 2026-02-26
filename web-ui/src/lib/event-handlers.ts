@@ -7,6 +7,7 @@ import type { AgentSessionEvent, AuthEvent, RpcResponse } from '@/lib/types'
 import { updateLoginFlow } from '@/stores/auth'
 import {
   finishToolExecution,
+  registerToolCall,
   startToolExecution,
   updateToolExecution,
 } from '@/stores/tool-executions'
@@ -174,6 +175,35 @@ export function handleSessionEvent(
         case 'thinking_end':
           endThinking()
           break
+
+        case 'toolcall_end': {
+          const toolCall = ame.toolCall as
+            | {
+                id?: string
+                toolCallId?: string
+                name?: string
+                toolName?: string
+                arguments?: unknown
+                input?: unknown
+              }
+            | undefined
+
+          const toolCallId = toolCall?.id ?? toolCall?.toolCallId
+          const toolName = toolCall?.name ?? toolCall?.toolName
+          const args =
+            (toolCall?.arguments as Record<string, unknown> | undefined) ??
+            (toolCall?.input as Record<string, unknown> | undefined) ??
+            {}
+
+          if (toolCallId && toolName) {
+            registerToolCall({
+              toolCallId,
+              toolName,
+              args,
+            })
+          }
+          break
+        }
       }
       break
     }

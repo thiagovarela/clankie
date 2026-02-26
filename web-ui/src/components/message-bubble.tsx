@@ -1,9 +1,14 @@
+import { useStore } from '@tanstack/react-store'
 import { Bot, Loader2, User } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { ToolExecutionList } from './tool-execution-list'
 import type { DisplayMessage } from '@/stores/messages'
 import { cn } from '@/lib/utils'
+import {
+  hasToolExecutionsForMessage,
+  toolExecutionsStore,
+} from '@/stores/tool-executions'
 
 interface MessageBubbleProps {
   message: DisplayMessage
@@ -11,6 +16,13 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user'
+
+  const hasToolExecutions = useStore(toolExecutionsStore, (state) =>
+    hasToolExecutionsForMessage(message.id, state),
+  )
+
+  const assistantMarkdown =
+    message.content || (hasToolExecutions ? '' : message.isStreaming ? '...' : '')
 
   return (
     <div className={cn('flex gap-3', isUser && 'justify-end')}>
@@ -43,11 +55,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         ) : (
           <>
             <ToolExecutionList messageId={message.id} />
-            <div className="prose prose-sm dark:prose-invert max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {message.content || '...'}
-              </ReactMarkdown>
-            </div>
+            {assistantMarkdown && (
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {assistantMarkdown}
+                </ReactMarkdown>
+              </div>
+            )}
           </>
         )}
 
