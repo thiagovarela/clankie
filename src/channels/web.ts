@@ -80,6 +80,7 @@ type RpcCommand =
 	| { id?: string; type: "get_extensions" }
 	| { id?: string; type: "get_skills" }
 	| { id?: string; type: "install_package"; source: string; local?: boolean }
+	| { id?: string; type: "reload" }
 	| { id?: string; type: "get_auth_providers" }
 	| { id?: string; type: "auth_login"; providerId: string }
 	| { id?: string; type: "auth_set_api_key"; providerId: string; apiKey: string }
@@ -803,6 +804,11 @@ export class WebChannel implements Channel {
 						error: err instanceof Error ? err.message : String(err),
 					};
 				}
+			}
+
+			case "reload": {
+				await session.reload();
+				return { id, type: "response", command: "reload", success: true };
 			}
 
 			default: {

@@ -69,6 +69,7 @@ export type RpcCommand =
 	| { id?: string; type: "get_extensions" }
 	| { id?: string; type: "get_skills" }
 	| { id?: string; type: "install_package"; source: string; local?: boolean }
+	| { id?: string; type: "reload" }
 	| { id?: string; type: "get_auth_providers" }
 	| { id?: string; type: "auth_login"; providerId: string }
 	| {

@@ -252,6 +252,10 @@ export class ClankieClient {
 		return response as { output: string; exitCode: number };
 	}
 
+	async reload(sessionId: string): Promise<void> {
+		await this.sendCommand({ type: "reload" }, sessionId);
+	}
+
 	// ─── Internal ──────────────────────────────────────────────────────────────
 
 	private handleMessage(message: OutboundWebMessage | RpcResponse): void {

@@ -48,6 +48,9 @@ function ExtensionsPage() {
 
 		setLoading(true);
 		try {
+			// Reload session resources first to pick up extensions installed via chat
+			await client.reload(activeSessionId);
+
 			const [extensionsResult, skillsResult] = await Promise.all([
 				client.getExtensions(activeSessionId),
 				client.getSkills(activeSessionId),
