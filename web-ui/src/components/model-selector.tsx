@@ -354,9 +354,11 @@ export function ModelSelector() {
                   )
                   .map(([provider, models]) => (
                     <div key={provider}>
-                      <DropdownMenuLabel className="sticky top-0 bg-popover z-10">
-                        {formatProviderName(provider)}
-                      </DropdownMenuLabel>
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel className="sticky top-0 bg-popover z-10">
+                          {formatProviderName(provider)}
+                        </DropdownMenuLabel>
+                      </DropdownMenuGroup>
                       {models.map(renderModelItem)}
                       <DropdownMenuSeparator className="my-1" />
                     </div>
