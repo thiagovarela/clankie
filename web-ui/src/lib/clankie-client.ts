@@ -205,9 +205,6 @@ export class ClankieClient {
 		errors: Array<{ path: string; error: string }>;
 	}> {
 		const response = await this.sendCommand({ type: "get_extensions" }, sessionId);
-		console.log("[clankie-client] getExtensions raw response:", response);
-		console.log("[clankie-client] getExtensions response type:", typeof response);
-		console.log("[clankie-client] getExtensions response stringified:", JSON.stringify(response, null, 2));
 		return response as {
 			extensions: Array<{
 				path: string;

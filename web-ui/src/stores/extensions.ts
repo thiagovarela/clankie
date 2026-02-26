@@ -46,19 +46,10 @@ export function setLoading(loading: boolean): void {
 }
 
 export function setExtensions(extensions: Array<ExtensionInfo>, errors: Array<ExtensionError>): void {
-	console.log("[extensions-store] setExtensions called with:", extensions, errors);
-	console.log("[extensions-store] extensions type:", typeof extensions, "isArray:", Array.isArray(extensions));
-	
-	// Defensive: ensure extensions is an array
-	const safeExtensions = Array.isArray(extensions) ? extensions : [];
-	const safeErrors = Array.isArray(errors) ? errors : [];
-	
-	console.log("[extensions-store] safe extensions:", safeExtensions);
-	
 	extensionsStore.setState((state) => ({
 		...state,
-		extensions: safeExtensions,
-		extensionErrors: safeErrors,
+		extensions,
+		extensionErrors: errors,
 		isLoading: false,
 	}));
 }

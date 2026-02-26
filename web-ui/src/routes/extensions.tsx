@@ -34,12 +34,7 @@ function ExtensionsPage() {
 
 	const { extensions, extensionErrors, skills, skillDiagnostics, isLoading, installStatus } = useStore(
 		extensionsStore,
-		(state) => {
-			console.log("[extensions] Store state:", state);
-			console.log("[extensions] extensions type:", typeof state.extensions, "isArray:", Array.isArray(state.extensions));
-			console.log("[extensions] extensions value:", state.extensions);
-			return state;
-		},
+		(state) => state,
 	);
 
 	const [packageSource, setPackageSource] = useState("");
@@ -60,9 +55,6 @@ function ExtensionsPage() {
 				client.getExtensions(activeSessionId),
 				client.getSkills(activeSessionId),
 			]);
-
-			console.log("[extensions] extensionsResult:", extensionsResult);
-			console.log("[extensions] skillsResult:", skillsResult);
 
 			setExtensions(extensionsResult.extensions, extensionsResult.errors);
 			setSkills(skillsResult.skills, skillsResult.diagnostics);
