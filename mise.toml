@@ -64,10 +64,10 @@ fi
 
 # Install & build
 echo "==> Installing web-ui dependencies…"
-(cd web-ui && npm ci)
+(cd web-ui && bun install)
 
 echo "==> Building web-ui…"
-(cd web-ui && npm run build)
+(cd web-ui && bun run build)
 
 # Package
 echo "==> Packaging .output → ${TARBALL}…"

@@ -15,11 +15,16 @@ A minimal AI assistant that lives in Slack. Built on [pi](https://github.com/bad
 
 ### 1. Install Dependencies
 
-Requires [Node.js](https://nodejs.org) v24 or higher:
+**Runtime:** [Node.js](https://nodejs.org) v22.6.0+ (for native TypeScript support)  
+**Build:** [Bun](https://bun.sh) (for faster package installation and web-ui builds)
 
 ```bash
 # Check Node version
-node --version  # Should be >= v24.0.0
+node --version  # Should be >= v22.6.0
+
+# Install Bun (if not already installed)
+curl -fsSL https://bun.sh/install | bash
+bun --version
 ```
 
 **Don't have Node.js?** Install via [mise](https://mise.jdx.dev) (recommended) or [nvm](https://github.com/nvm-sh/nvm).
@@ -43,7 +48,7 @@ npm link
 
 Now `clankie` is available from anywhere. If you skip `npm link`, use `node --experimental-strip-types src/cli.ts` instead of `clankie`.
 
-**Note:** You can also use `bun install` for faster package installation, but the runtime requires Node.js v24+.
+**Note:** Bun is used for faster package installation and building the web-ui. The runtime requires Node.js v22.6.0+.
 
 ## Slack Setup
 
@@ -305,7 +310,7 @@ npm run check:fix    # Auto-fix issues
 npm run format       # Format code
 ```
 
-**Note:** You can use `bun install` for faster package installation, but the runtime requires Node.js v24+ with native TypeScript support.
+**Note:** Bun is used for package installation and building the web-ui. The runtime requires Node.js v22.6.0+ with native TypeScript support.
 
 ## Troubleshooting
 

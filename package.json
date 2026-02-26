@@ -14,13 +14,13 @@
 	],
 	"scripts": {
 		"dev": "node --experimental-strip-types src/cli.ts",
-		"build:web-ui": "cd web-ui && npm ci && npm run build && cd .. && rm -rf web-ui-dist && cp -r web-ui/.output/public web-ui-dist",
+		"build:web-ui": "cd web-ui && bun install && bun run build && cd .. && rm -rf web-ui-dist && cp -r web-ui/.output/public web-ui-dist",
 		"check": "biome check .",
 		"check:fix": "biome check --fix .",
 		"format": "biome format --write ."
 	},
 	"engines": {
-		"node": ">=24.0.0"
+		"node": ">=22.6.0"
 	},
 	"dependencies": {
 		"@hono/node-server": "^1.19.9",
