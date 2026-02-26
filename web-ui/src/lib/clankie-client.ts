@@ -258,6 +258,7 @@ export class ClankieClient {
 		// Handle raw RpcResponse (for commands without sessionId like list_sessions)
 		if ("type" in message && message.type === "response" && "id" in message) {
 			const response = message;
+			if (!response.id) return; // Skip responses without id
 			const pending = this.pendingRequests.get(response.id);
 			if (pending) {
 				this.pendingRequests.delete(response.id);
@@ -297,7 +298,10 @@ export class ClankieClient {
 			}
 
 			// Otherwise, it's a session event - forward to the event handler
-			this.options.onEvent(sessionId, event);
+			// Filter out auth events (type narrowing)
+			if (event.type !== "auth_event") {
+				this.options.onEvent(sessionId, event);
+			}
 			return;
 		}
 

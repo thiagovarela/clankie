@@ -157,5 +157,5 @@ export function setMessages(messages: Array<Message>): void {
 }
 
 export function clearMessages(): void {
-	messagesStore.setState(INITIAL_STATE);
+	messagesStore.setState(() => INITIAL_STATE);
 }

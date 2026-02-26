@@ -86,5 +86,5 @@ export function resetInstallStatus(): void {
 }
 
 export function resetExtensions(): void {
-	extensionsStore.setState(INITIAL_STATE);
+	extensionsStore.setState(() => INITIAL_STATE);
 }
