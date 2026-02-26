@@ -25,6 +25,8 @@ export class WebSocketClient {
   private reconnectAttempt = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private shouldReconnect = true
+  private visibilityHandler: (() => void) | null = null
+  private onlineHandler: (() => void) | null = null
 
   constructor(options: WebSocketClientOptions) {
     this.options = {
@@ -33,6 +35,7 @@ export class WebSocketClient {
       maxReconnectDelay: 30000,
       ...options,
     }
+    this.setupVisibilityHandlers()
   }
 
   connect(): void {
@@ -93,6 +96,7 @@ export class WebSocketClient {
       this.ws.close()
       this.ws = null
     }
+    this.cleanupVisibilityHandlers()
     this.setState('disconnected')
   }
 
@@ -130,5 +134,76 @@ export class WebSocketClient {
       this.reconnectTimer = null
       this.connect()
     }, delay)
+  }
+
+  /**
+   * Set up smart reconnection based on page visibility and network status.
+   * Reconnects immediately when:
+   * - Tab becomes visible (user switches back)
+   * - Network comes back online
+   */
+  private setupVisibilityHandlers(): void {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return
+    }
+
+    // Page Visibility API: reconnect when tab becomes visible
+    this.visibilityHandler = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('[ws] Tab became visible, checking connection...')
+        if (
+          this.shouldReconnect &&
+          this.state !== 'connected' &&
+          this.state !== 'connecting'
+        ) {
+          console.log('[ws] Reconnecting immediately (tab visible)')
+          // Cancel scheduled reconnect and connect immediately
+          if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer)
+            this.reconnectTimer = null
+          }
+          this.reconnectAttempt = 0 // Reset backoff
+          this.connect()
+        }
+      }
+    }
+
+    // Network status: reconnect when coming back online
+    this.onlineHandler = () => {
+      console.log('[ws] Network came online, checking connection...')
+      if (
+        this.shouldReconnect &&
+        this.state !== 'connected' &&
+        this.state !== 'connecting'
+      ) {
+        console.log('[ws] Reconnecting immediately (network online)')
+        // Cancel scheduled reconnect and connect immediately
+        if (this.reconnectTimer) {
+          clearTimeout(this.reconnectTimer)
+          this.reconnectTimer = null
+        }
+        this.reconnectAttempt = 0 // Reset backoff
+        this.connect()
+      }
+    }
+
+    document.addEventListener('visibilitychange', this.visibilityHandler)
+    window.addEventListener('online', this.onlineHandler)
+  }
+
+  private cleanupVisibilityHandlers(): void {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      return
+    }
+
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler)
+      this.visibilityHandler = null
+    }
+
+    if (this.onlineHandler) {
+      window.removeEventListener('online', this.onlineHandler)
+      this.onlineHandler = null
+    }
   }
 }
