@@ -8,114 +8,115 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from "./routes/__root";
-import { Route as ExtensionsRouteImport } from "./routes/extensions";
-import { Route as IndexRouteImport } from "./routes/index";
-import { Route as SessionsSessionIdRouteImport } from "./routes/sessions.$sessionId";
-import { Route as SettingsRouteImport } from "./routes/settings";
+import { Route as rootRouteImport } from './routes/__root'
+import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as ExtensionsRouteImport } from './routes/extensions'
+import { Route as IndexRouteImport } from './routes/index'
+import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
 
 const SettingsRoute = SettingsRouteImport.update({
-	id: "/settings",
-	path: "/settings",
-	getParentRoute: () => rootRouteImport,
-} as any);
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ExtensionsRoute = ExtensionsRouteImport.update({
-	id: "/extensions",
-	path: "/extensions",
-	getParentRoute: () => rootRouteImport,
-} as any);
+  id: '/extensions',
+  path: '/extensions',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
-	id: "/",
-	path: "/",
-	getParentRoute: () => rootRouteImport,
-} as any);
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
-	id: "/sessions/$sessionId",
-	path: "/sessions/$sessionId",
-	getParentRoute: () => rootRouteImport,
-} as any);
+  id: '/sessions/$sessionId',
+  path: '/sessions/$sessionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
-	"/": typeof IndexRoute;
-	"/extensions": typeof ExtensionsRoute;
-	"/settings": typeof SettingsRoute;
-	"/sessions/$sessionId": typeof SessionsSessionIdRoute;
+  '/': typeof IndexRoute
+  '/extensions': typeof ExtensionsRoute
+  '/settings': typeof SettingsRoute
+  '/sessions/$sessionId': typeof SessionsSessionIdRoute
 }
 export interface FileRoutesByTo {
-	"/": typeof IndexRoute;
-	"/extensions": typeof ExtensionsRoute;
-	"/settings": typeof SettingsRoute;
-	"/sessions/$sessionId": typeof SessionsSessionIdRoute;
+  '/': typeof IndexRoute
+  '/extensions': typeof ExtensionsRoute
+  '/settings': typeof SettingsRoute
+  '/sessions/$sessionId': typeof SessionsSessionIdRoute
 }
 export interface FileRoutesById {
-	__root__: typeof rootRouteImport;
-	"/": typeof IndexRoute;
-	"/extensions": typeof ExtensionsRoute;
-	"/settings": typeof SettingsRoute;
-	"/sessions/$sessionId": typeof SessionsSessionIdRoute;
+  __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
+  '/extensions': typeof ExtensionsRoute
+  '/settings': typeof SettingsRoute
+  '/sessions/$sessionId': typeof SessionsSessionIdRoute
 }
 export interface FileRouteTypes {
-	fileRoutesByFullPath: FileRoutesByFullPath;
-	fullPaths: "/" | "/extensions" | "/settings" | "/sessions/$sessionId";
-	fileRoutesByTo: FileRoutesByTo;
-	to: "/" | "/extensions" | "/settings" | "/sessions/$sessionId";
-	id: "__root__" | "/" | "/extensions" | "/settings" | "/sessions/$sessionId";
-	fileRoutesById: FileRoutesById;
+  fileRoutesByFullPath: FileRoutesByFullPath
+  fullPaths: '/' | '/extensions' | '/settings' | '/sessions/$sessionId'
+  fileRoutesByTo: FileRoutesByTo
+  to: '/' | '/extensions' | '/settings' | '/sessions/$sessionId'
+  id: '__root__' | '/' | '/extensions' | '/settings' | '/sessions/$sessionId'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-	IndexRoute: typeof IndexRoute;
-	ExtensionsRoute: typeof ExtensionsRoute;
-	SettingsRoute: typeof SettingsRoute;
-	SessionsSessionIdRoute: typeof SessionsSessionIdRoute;
+  IndexRoute: typeof IndexRoute
+  ExtensionsRoute: typeof ExtensionsRoute
+  SettingsRoute: typeof SettingsRoute
+  SessionsSessionIdRoute: typeof SessionsSessionIdRoute
 }
 
-declare module "@tanstack/react-router" {
-	interface FileRoutesByPath {
-		"/settings": {
-			id: "/settings";
-			path: "/settings";
-			fullPath: "/settings";
-			preLoaderRoute: typeof SettingsRouteImport;
-			parentRoute: typeof rootRouteImport;
-		};
-		"/extensions": {
-			id: "/extensions";
-			path: "/extensions";
-			fullPath: "/extensions";
-			preLoaderRoute: typeof ExtensionsRouteImport;
-			parentRoute: typeof rootRouteImport;
-		};
-		"/": {
-			id: "/";
-			path: "/";
-			fullPath: "/";
-			preLoaderRoute: typeof IndexRouteImport;
-			parentRoute: typeof rootRouteImport;
-		};
-		"/sessions/$sessionId": {
-			id: "/sessions/$sessionId";
-			path: "/sessions/$sessionId";
-			fullPath: "/sessions/$sessionId";
-			preLoaderRoute: typeof SessionsSessionIdRouteImport;
-			parentRoute: typeof rootRouteImport;
-		};
-	}
+declare module '@tanstack/react-router' {
+  interface FileRoutesByPath {
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/extensions': {
+      id: '/extensions'
+      path: '/extensions'
+      fullPath: '/extensions'
+      preLoaderRoute: typeof ExtensionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sessions/$sessionId': {
+      id: '/sessions/$sessionId'
+      path: '/sessions/$sessionId'
+      fullPath: '/sessions/$sessionId'
+      preLoaderRoute: typeof SessionsSessionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+  }
 }
 
 const rootRouteChildren: RootRouteChildren = {
-	IndexRoute: IndexRoute,
-	ExtensionsRoute: ExtensionsRoute,
-	SettingsRoute: SettingsRoute,
-	SessionsSessionIdRoute: SessionsSessionIdRoute,
-};
-export const routeTree = rootRouteImport._addFileChildren(rootRouteChildren)._addFileTypes<FileRouteTypes>();
+  IndexRoute: IndexRoute,
+  ExtensionsRoute: ExtensionsRoute,
+  SettingsRoute: SettingsRoute,
+  SessionsSessionIdRoute: SessionsSessionIdRoute,
+}
+export const routeTree = rootRouteImport
+  ._addFileChildren(rootRouteChildren)
+  ._addFileTypes<FileRouteTypes>()
 
-import type { createStart } from "@tanstack/react-start";
-import type { getRouter } from "./router.tsx";
-
-declare module "@tanstack/react-start" {
-	interface Register {
-		ssr: true;
-		router: Awaited<ReturnType<typeof getRouter>>;
-	}
+import type { getRouter } from './router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
 }
