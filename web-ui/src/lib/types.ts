@@ -137,11 +137,18 @@ export interface MessageContentThinking {
   thinking: string
 }
 
+export interface MessageContentImage {
+  type: 'image'
+  data: string
+  mimeType: string
+}
+
 export type MessageContent =
   | MessageContentText
   | MessageContentToolUse
   | MessageContentToolResult
   | MessageContentThinking
+  | MessageContentImage
 
 export interface Message {
   role: string // Can be "user", "assistant", "toolResult", "bashExecution", "custom", "branchSummary", "compactionSummary"

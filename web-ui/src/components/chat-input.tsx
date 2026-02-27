@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { ClipboardEvent, DragEvent, KeyboardEvent } from 'react'
 import type { AttachmentItem } from '@/components/attachment-preview'
 import type { ImageContent } from '@/lib/types'
+import type { DisplayAttachment } from '@/stores/messages'
 import { AttachmentPreview } from '@/components/attachment-preview'
 import { ModelSelector } from '@/components/model-selector'
 import { ToolActivitySheet } from '@/components/tool-activity-sheet'
@@ -197,7 +198,16 @@ export function ChatInput() {
     setMessage('')
     setAttachments([])
 
-    // Separate images from non-image files
+    // Prepare display metadata and split attachments for transport
+    const displayAttachments: Array<DisplayAttachment> = currentAttachments.map(
+      (att) => ({
+        type: att.mimeType.startsWith('image/') ? 'image' : 'file',
+        name: att.file.name,
+        mimeType: att.mimeType,
+        previewUrl: att.preview,
+      }),
+    )
+
     const images: Array<ImageContent> = currentAttachments
       .filter((att) => att.mimeType.startsWith('image/'))
       .map((att) => ({
@@ -234,8 +244,12 @@ export function ChatInput() {
         }
       }
 
-      // Add user message to UI
-      addUserMessage(finalMessage || '[Image attachments]')
+      // Add user message (with attachment metadata) to UI
+      const displayMessageContent = finalMessage
+        .replace(/(?:^|\n)\[Attached: [^\]]+\]/g, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+      addUserMessage(displayMessageContent, displayAttachments)
 
       // Send prompt with images
       await client.prompt(

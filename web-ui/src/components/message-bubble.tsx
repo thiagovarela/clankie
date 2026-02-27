@@ -1,5 +1,6 @@
 import { Bot, User } from 'lucide-react'
 import { AssistantMessageContent } from './assistant-message-content'
+import { MessageAttachments } from './message-attachments'
 import type { DisplayMessage } from '@/stores/messages'
 import { cn } from '@/lib/utils'
 
@@ -25,7 +26,12 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         )}
       >
         {isUser ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
+          <>
+            <MessageAttachments attachments={message.attachments} />
+            {message.content ? (
+              <p className="whitespace-pre-wrap">{message.content}</p>
+            ) : null}
+          </>
         ) : (
           <AssistantMessageContent message={message} />
         )}

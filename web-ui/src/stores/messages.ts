@@ -4,7 +4,16 @@
  */
 
 import { Store } from '@tanstack/store'
-import type { Message } from '@/lib/types'
+import type { Message, MessageContent } from '@/lib/types'
+
+const ATTACHED_FILE_LINE_REGEX = /(?:^|\n)\[Attached: ([^\]]+)\]/g
+
+export interface DisplayAttachment {
+  type: 'image' | 'file'
+  name?: string
+  mimeType?: string
+  previewUrl?: string
+}
 
 export interface DisplayMessage {
   id: string
@@ -15,6 +24,7 @@ export interface DisplayMessage {
   thinkingContent?: string
   persistedThinkingContent?: string
   isThinking?: boolean
+  attachments?: Array<DisplayAttachment>
 }
 
 export interface MessagesStore {
@@ -35,7 +45,10 @@ export const messagesStore = new Store<MessagesStore>(INITIAL_STATE)
 
 // ─── Actions ───────────────────────────────────────────────────────────────────
 
-export function addUserMessage(content: string): void {
+export function addUserMessage(
+  content: string,
+  attachments?: Array<DisplayAttachment>,
+): void {
   const id = `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
 
   messagesStore.setState((state) => ({
@@ -47,6 +60,7 @@ export function addUserMessage(content: string): void {
         role: 'user',
         content,
         timestamp: Date.now(),
+        attachments: attachments?.length ? attachments : undefined,
       },
     ],
   }))
@@ -163,6 +177,7 @@ export function setMessages(messages: Array<Message>): void {
     .map((msg, idx) => {
       let textContent = ''
       let persistedThinkingContent: string | undefined
+      let attachments: Array<DisplayAttachment> = []
 
       // Handle different content shapes: string, array, or undefined
       if (typeof msg.content === 'string') {
@@ -173,15 +188,28 @@ export function setMessages(messages: Array<Message>): void {
           .map((c) => c.text)
           .join('\n\n')
 
-        const thinkingBlocks = msg.content
-          .filter(
-            (c): c is { type: 'thinking'; thinking: string } =>
-              c.type === 'thinking',
-          )
-          .map((c) => c.thinking)
-          .join('\n\n')
+        if (msg.role === 'assistant') {
+          const thinkingBlocks = msg.content
+            .filter(
+              (c): c is { type: 'thinking'; thinking: string } =>
+                c.type === 'thinking',
+            )
+            .map((c) => c.thinking)
+            .join('\n\n')
 
-        persistedThinkingContent = thinkingBlocks || undefined
+          persistedThinkingContent = thinkingBlocks || undefined
+        }
+
+        if (msg.role === 'user') {
+          attachments = extractImageAttachments(msg.content)
+        }
+      }
+
+      if (msg.role === 'user') {
+        const { content: cleanedText, attachments: fileAttachments } =
+          extractFileAttachmentsFromText(textContent)
+        textContent = cleanedText
+        attachments = [...attachments, ...fileAttachments]
       }
 
       return {
@@ -189,6 +217,7 @@ export function setMessages(messages: Array<Message>): void {
         role: msg.role as 'user' | 'assistant',
         content: textContent,
         persistedThinkingContent,
+        attachments: attachments.length > 0 ? attachments : undefined,
         timestamp: Date.now() - (messages.length - idx) * 1000, // Approximate timestamps
       }
     })
@@ -208,6 +237,44 @@ export function setMessages(messages: Array<Message>): void {
     ...state,
     messages: displayMessages,
   }))
+}
+
+function extractImageAttachments(
+  contentBlocks: Array<MessageContent>,
+): Array<DisplayAttachment> {
+  return contentBlocks
+    .filter(
+      (
+        block,
+      ): block is Extract<MessageContent, { type: 'image'; data: string }> =>
+        block.type === 'image',
+    )
+    .map((block) => ({
+      type: 'image' as const,
+      mimeType: block.mimeType,
+      previewUrl: `data:${block.mimeType};base64,${block.data}`,
+    }))
+}
+
+function extractFileAttachmentsFromText(content: string): {
+  content: string
+  attachments: Array<DisplayAttachment>
+} {
+  const matches = Array.from(content.matchAll(ATTACHED_FILE_LINE_REGEX))
+  const attachments = matches.map((match) => ({
+    type: 'file' as const,
+    name: match[1],
+  }))
+
+  const cleanedContent = content
+    .replace(ATTACHED_FILE_LINE_REGEX, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+
+  return {
+    content: cleanedContent,
+    attachments,
+  }
 }
 
 export function clearMessages(): void {

@@ -36,6 +36,27 @@ describe('messages store', () => {
       expect(messages[0].content).toBe('First')
       expect(messages[1].content).toBe('Second')
     })
+
+    it('stores user attachments when provided', () => {
+      addUserMessage('With files', [
+        {
+          type: 'image',
+          name: 'photo.png',
+          previewUrl: 'data:image/png;base64,abc',
+        },
+        { type: 'file', name: 'notes.txt' },
+      ])
+
+      const { messages } = messagesStore.state
+      expect(messages[0].attachments).toEqual([
+        {
+          type: 'image',
+          name: 'photo.png',
+          previewUrl: 'data:image/png;base64,abc',
+        },
+        { type: 'file', name: 'notes.txt' },
+      ])
+    })
   })
 
   describe('assistant message streaming lifecycle', () => {
@@ -282,6 +303,53 @@ describe('messages store', () => {
       expect(messages[0].persistedThinkingContent).toBe(
         'First thought\n\nSecond thought',
       )
+    })
+
+    it('extracts image attachments from user message content blocks', () => {
+      const piMessages = [
+        {
+          role: 'user' as const,
+          content: [
+            { type: 'text' as const, text: 'Check this' },
+            {
+              type: 'image' as const,
+              data: 'abc123',
+              mimeType: 'image/png',
+            },
+          ],
+        },
+      ]
+
+      setMessages(piMessages)
+
+      const { messages } = messagesStore.state
+      expect(messages[0].content).toBe('Check this')
+      expect(messages[0].attachments).toEqual([
+        {
+          type: 'image',
+          mimeType: 'image/png',
+          previewUrl: 'data:image/png;base64,abc123',
+        },
+      ])
+    })
+
+    it('extracts file attachments from [Attached: ...] lines and cleans text', () => {
+      const piMessages = [
+        {
+          role: 'user' as const,
+          content:
+            'Please review\n[Attached: report.pdf]\n[Attached: notes.txt]\nThanks',
+        },
+      ]
+
+      setMessages(piMessages)
+
+      const { messages } = messagesStore.state
+      expect(messages[0].content).toBe('Please review\nThanks')
+      expect(messages[0].attachments).toEqual([
+        { type: 'file', name: 'report.pdf' },
+        { type: 'file', name: 'notes.txt' },
+      ])
     })
 
     it('assigns approximate timestamps in reverse order', () => {

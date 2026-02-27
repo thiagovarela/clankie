@@ -20,6 +20,51 @@ describe('MessageBubble', () => {
         container.querySelector('svg[class*="lucide-user"]'),
       ).toBeInTheDocument()
     })
+
+    it('renders image attachments in user messages', () => {
+      const message = makeDisplayMessage({
+        role: 'user',
+        content: 'See image',
+        attachments: [
+          {
+            type: 'image',
+            name: 'photo.png',
+            mimeType: 'image/png',
+            previewUrl: 'data:image/png;base64,abc',
+          },
+        ],
+      })
+
+      render(<MessageBubble message={message} />)
+
+      const image = screen.getByRole('img', { name: 'photo.png' })
+      expect(image).toBeInTheDocument()
+      expect(image).toHaveAttribute('src', 'data:image/png;base64,abc')
+    })
+
+    it('renders file attachments in user messages', () => {
+      const message = makeDisplayMessage({
+        role: 'user',
+        content: 'Attached file',
+        attachments: [{ type: 'file', name: 'spec.pdf' }],
+      })
+
+      render(<MessageBubble message={message} />)
+
+      expect(screen.getByText('spec.pdf')).toBeInTheDocument()
+    })
+
+    it('renders attachments without requiring text content', () => {
+      const message = makeDisplayMessage({
+        role: 'user',
+        content: '',
+        attachments: [{ type: 'file', name: 'empty.txt' }],
+      })
+
+      render(<MessageBubble message={message} />)
+
+      expect(screen.getByText('empty.txt')).toBeInTheDocument()
+    })
   })
 
   describe('assistant messages', () => {
