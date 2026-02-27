@@ -94,11 +94,21 @@ export function endAssistantMessage(): void {
     streamingContent: '',
     thinkingContent: '',
     currentMessageId: null,
-    messages: state.messages.map((msg) =>
-      msg.id === state.currentMessageId
-        ? { ...msg, isStreaming: false, isThinking: false }
-        : msg,
-    ),
+    messages: state.messages
+      .map((msg) =>
+        msg.id === state.currentMessageId
+          ? { ...msg, isStreaming: false, isThinking: false }
+          : msg,
+      )
+      .filter((msg) => {
+        if (msg.id !== state.currentMessageId || msg.role !== 'assistant') {
+          return true
+        }
+
+        const hasText = msg.content.trim().length > 0
+        const hasThinking = (msg.thinkingContent ?? '').trim().length > 0
+        return hasText || hasThinking
+      }),
   }))
 }
 
@@ -181,6 +191,17 @@ export function setMessages(messages: Array<Message>): void {
         persistedThinkingContent,
         timestamp: Date.now() - (messages.length - idx) * 1000, // Approximate timestamps
       }
+    })
+    .filter((message) => {
+      if (message.role === 'user') {
+        return true
+      }
+
+      const hasText = message.content.trim().length > 0
+      const hasThinking =
+        (message.persistedThinkingContent ?? '').trim().length > 0
+
+      return hasText || hasThinking
     })
 
   messagesStore.setState((state) => ({
