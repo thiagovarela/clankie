@@ -65,6 +65,14 @@ describe('ChatInput', () => {
       expect(screen.getByText(/to send/i)).toBeInTheDocument()
     })
 
+    it('renders tool activity button', () => {
+      render(<ChatInput />)
+
+      expect(
+        screen.getByRole('button', { name: /Tool activity/i }),
+      ).toBeInTheDocument()
+    })
+
     it('renders ModelSelector when model is set', () => {
       sessionStore.setState((state) => ({
         ...state,
@@ -200,10 +208,14 @@ describe('ChatInput', () => {
       const textarea = screen.getByPlaceholderText(/Send a message/i)
       const sendButton = screen.getByRole('button', { name: /Send message/i })
       const attachButton = screen.getByTitle('Attach files')
+      const toolActivityButton = screen.getByRole('button', {
+        name: /Tool activity/i,
+      })
 
       expect(textarea).toBeDisabled()
       expect(sendButton).toBeDisabled()
       expect(attachButton).toBeDisabled()
+      expect(toolActivityButton).toBeDisabled()
     })
 
     it('disables inputs when streaming', () => {
