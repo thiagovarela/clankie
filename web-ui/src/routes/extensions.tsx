@@ -126,8 +126,11 @@ function ExtensionsPage() {
 
   if (!isConnected) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center space-y-4">
+      <div className="flex h-full items-center justify-center chat-background">
+        <div className="text-center space-y-4 max-w-md p-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 mb-2">
+            <Settings className="h-8 w-8 text-destructive" />
+          </div>
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold">Not Connected</h2>
             <p className="text-muted-foreground">
@@ -135,7 +138,7 @@ function ExtensionsPage() {
             </p>
           </div>
           <Link to="/settings">
-            <Button>
+            <Button className="transition-transform hover:scale-105 active:scale-95">
               <Settings className="mr-2 h-4 w-4" />
               Go to Settings
             </Button>
@@ -147,9 +150,13 @@ function ExtensionsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center space-y-2">
-          <Loader2 className="inline-block h-8 w-8 animate-spin text-primary" />
+      <div className="flex h-full items-center justify-center chat-background">
+        <div className="text-center space-y-3">
+          <div className="inline-flex gap-1 mb-2">
+            <span className="typing-dot inline-block h-3 w-3 rounded-full bg-primary" />
+            <span className="typing-dot inline-block h-3 w-3 rounded-full bg-primary" />
+            <span className="typing-dot inline-block h-3 w-3 rounded-full bg-primary" />
+          </div>
           <p className="text-sm text-muted-foreground">
             Loading extensions and skills...
           </p>
@@ -159,10 +166,10 @@ function ExtensionsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto chat-background">
       <div className="container max-w-4xl py-8 px-4 space-y-6">
         {/* Extensions Section */}
-        <Card>
+        <Card className="card-depth">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Puzzle className="h-5 w-5" />
@@ -294,7 +301,7 @@ function ExtensionsPage() {
         </Card>
 
         {/* Skills Section */}
-        <Card>
+        <Card className="card-depth">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5" />
@@ -370,7 +377,7 @@ function ExtensionsPage() {
         </Card>
 
         {/* Install Package Section */}
-        <Card>
+        <Card className="card-depth">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Package className="h-5 w-5" />

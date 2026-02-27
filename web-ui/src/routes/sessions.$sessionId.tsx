@@ -58,8 +58,11 @@ function SessionPage() {
 
   if (!isConnected) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center space-y-4">
+      <div className="flex h-full items-center justify-center chat-background">
+        <div className="text-center space-y-4 max-w-md p-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 mb-2">
+            <Settings className="h-8 w-8 text-destructive" />
+          </div>
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold">Not Connected</h2>
             <p className="text-muted-foreground">
@@ -67,7 +70,7 @@ function SessionPage() {
             </p>
           </div>
           <Link to="/settings">
-            <Button>
+            <Button className="transition-transform hover:scale-105 active:scale-95">
               <Settings className="mr-2 h-4 w-4" />
               Go to Settings
             </Button>
@@ -80,11 +83,18 @@ function SessionPage() {
   // Show loading state while session is being loaded
   if (activeSessionId !== urlSessionId) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="text-center space-y-2">
-          <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-primary border-r-transparent" />
+      <div className="flex h-full items-center justify-center chat-background">
+        <div className="text-center space-y-3">
+          <div className="inline-flex gap-1 mb-2">
+            <span className="typing-dot inline-block h-3 w-3 rounded-full bg-primary" />
+            <span className="typing-dot inline-block h-3 w-3 rounded-full bg-primary" />
+            <span className="typing-dot inline-block h-3 w-3 rounded-full bg-primary" />
+          </div>
           <p className="text-sm text-muted-foreground">
-            Loading session {urlSessionId}...
+            Loading session{' '}
+            <span className="font-mono text-primary">
+              {urlSessionId.slice(0, 8)}
+            </span>
           </p>
         </div>
       </div>

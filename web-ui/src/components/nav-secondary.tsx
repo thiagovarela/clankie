@@ -71,7 +71,7 @@ export function NavSecondary({
                 className={`${connectionConfig.className} w-full justify-start`}
               >
                 <div
-                  className={`size-2 rounded-full mr-2 ${connectionConfig.dotColor}`}
+                  className={`size-2 rounded-full mr-2 ${connectionConfig.dotColor} ${status === 'connected' ? 'animate-breathe' : ''}`}
                 />
                 {connectionConfig.label}
               </Badge>

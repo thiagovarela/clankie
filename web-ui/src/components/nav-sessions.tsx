@@ -65,6 +65,11 @@ export function NavRecentSessions() {
               <SidebarMenuButton
                 isActive={session.sessionId === activeSessionId}
                 onClick={() => handleSwitchSession(session.sessionId)}
+                className={
+                  session.sessionId === activeSessionId
+                    ? 'border-l-2 border-primary'
+                    : 'hover:border-l-2 hover:border-primary/40 transition-all'
+                }
               >
                 <MessageSquareIcon />
                 <span className="truncate">

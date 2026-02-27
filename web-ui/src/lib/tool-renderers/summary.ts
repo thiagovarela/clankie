@@ -4,12 +4,11 @@ import {
   FileText,
   FolderOpen,
   FolderTree,
-  
   Search,
   Terminal,
-  Wrench
+  Wrench,
 } from 'lucide-react'
-import type {LucideIcon} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react'
 import type { ToolExecution } from '@/stores/tool-executions'
 
 export interface ToolSummary {

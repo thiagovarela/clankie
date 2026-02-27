@@ -56,9 +56,9 @@ function SettingsPage() {
   }
 
   return (
-    <div className="h-full overflow-y-auto">
+    <div className="h-full overflow-y-auto chat-background">
       <div className="container max-w-2xl py-8 px-4">
-        <Card>
+        <Card className="card-depth">
           <CardHeader>
             <CardTitle>Connection Settings</CardTitle>
             <CardDescription>
@@ -131,7 +131,7 @@ function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Card className="mt-4">
+        <Card className="mt-4 card-depth">
           <CardHeader>
             <CardTitle>Setup Instructions</CardTitle>
           </CardHeader>
@@ -279,7 +279,7 @@ function ProviderAuthSection() {
 
   return (
     <>
-      <Card className="mt-4">
+      <Card className="mt-4 card-depth">
         <CardHeader>
           <CardTitle>AI Provider Authentication</CardTitle>
           <CardDescription>

@@ -73,7 +73,7 @@ export function ThinkingStepsIndicator({
       </button>
 
       {isExpanded && (
-        <div className="mt-2 rounded-lg border border-border/60 bg-card/95 p-3 shadow-sm backdrop-blur-sm">
+        <div className="mt-2 rounded-lg border border-border/60 bg-card/95 p-3 shadow-sm backdrop-blur-sm animate-in fade-in slide-in-from-top-2 duration-200">
           <ol className="space-y-2 text-xs">
             {messages.map((msg, index) => {
               const thinkingText = getThinkingText(msg)

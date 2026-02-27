@@ -12,7 +12,10 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
   return (
     <div
-      className={cn('flex w-full', isUser ? 'justify-end' : 'justify-start')}
+      className={cn(
+        'flex w-full animate-message-enter',
+        isUser ? 'justify-end' : 'justify-start',
+      )}
     >
       <div
         className={cn(
@@ -33,7 +36,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         )}
 
         {message.isStreaming && !isUser && (
-          <span className="ml-1 inline-block h-3 w-1 animate-pulse bg-current" />
+          <span className="ml-2 inline-flex gap-1">
+            <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-current" />
+            <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-current" />
+            <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-current" />
+          </span>
         )}
       </div>
     </div>

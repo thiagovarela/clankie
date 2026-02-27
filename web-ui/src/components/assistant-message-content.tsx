@@ -1,10 +1,24 @@
 import { ChevronDown, Clock3, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
+import rehypePrettyCode from 'rehype-pretty-code'
 import remarkGfm from 'remark-gfm'
 import { ToolExecutionList } from './tool-execution-list'
 import type { DisplayMessage } from '@/stores/messages'
 import { cn } from '@/lib/utils'
+
+const rehypePlugins = [
+  [
+    rehypePrettyCode,
+    {
+      theme: {
+        dark: 'github-dark-dimmed',
+        light: 'github-light',
+      },
+      keepBackground: false,
+    },
+  ],
+]
 
 interface AssistantMessageContentProps {
   message: DisplayMessage
@@ -79,7 +93,10 @@ export function AssistantMessageContent({
 
       {message.content.trim().length > 0 ? (
         <div className="prose prose-sm dark:prose-invert max-w-none">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            rehypePlugins={rehypePlugins as any}
+          >
             {message.content}
           </ReactMarkdown>
         </div>

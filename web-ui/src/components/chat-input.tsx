@@ -297,7 +297,7 @@ export function ChatInput() {
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder="Send a message... (Ctrl+Enter to send)"
-              className="min-h-[80px] resize-none"
+              className="min-h-[80px] resize-none focus-glow"
               disabled={!sessionId || isStreaming}
             />
             {isDragging && (
@@ -347,6 +347,7 @@ export function ChatInput() {
                   isStreaming
                 }
                 size="icon"
+                className="transition-transform hover:scale-105 active:scale-95"
               >
                 <Send className="h-4 w-4" />
                 <span className="sr-only">Send message</span>

@@ -85,7 +85,7 @@ export function ToolExecutionCard({ execution }: { execution: ToolExecution }) {
 
       {/* Expanded output */}
       {expanded && (
-        <div className="mt-1 ml-5 rounded-md border border-border bg-muted/30 p-2">
+        <div className="mt-1 ml-5 rounded-md border border-border bg-muted/30 p-2 animate-in fade-in slide-in-from-top-2 duration-200">
           {hasSpecialRendering ? (
             <>
               {renderHint && (
