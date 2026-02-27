@@ -91,6 +91,14 @@ describe('messages store', () => {
         isStreaming: false,
       })
     })
+
+    it('removes assistant message when it ends without text or thinking', () => {
+      startAssistantMessage()
+      endAssistantMessage()
+
+      const { messages } = messagesStore.state
+      expect(messages).toHaveLength(0)
+    })
   })
 
   describe('thinking lifecycle', () => {
@@ -232,6 +240,27 @@ describe('messages store', () => {
 
       const { messages } = messagesStore.state
       expect(messages[0].content).toBe('First text\n\nSecond text')
+    })
+
+    it('filters assistant messages that have only tool calls', () => {
+      const piMessages = [
+        {
+          role: 'assistant' as const,
+          content: [
+            {
+              type: 'toolCall' as const,
+              id: 'call-1',
+              name: 'read',
+              arguments: { path: 'README.md' },
+            },
+          ],
+        },
+      ]
+
+      setMessages(piMessages)
+
+      const { messages } = messagesStore.state
+      expect(messages).toHaveLength(0)
     })
 
     it('hydrates persisted thinking content from assistant messages', () => {
