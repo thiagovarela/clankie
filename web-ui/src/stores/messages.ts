@@ -13,6 +13,7 @@ export interface DisplayMessage {
   timestamp: number
   isStreaming?: boolean
   thinkingContent?: string
+  persistedThinkingContent?: string
   isThinking?: boolean
 }
 
@@ -150,7 +151,8 @@ export function setMessages(messages: Array<Message>): void {
   const displayMessages: Array<DisplayMessage> = messages
     .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
     .map((msg, idx) => {
-      let textContent: string
+      let textContent = ''
+      let persistedThinkingContent: string | undefined
 
       // Handle different content shapes: string, array, or undefined
       if (typeof msg.content === 'string') {
@@ -160,14 +162,23 @@ export function setMessages(messages: Array<Message>): void {
           .filter((c): c is { type: 'text'; text: string } => c.type === 'text')
           .map((c) => c.text)
           .join('\n\n')
-      } else {
-        textContent = ''
+
+        const thinkingBlocks = msg.content
+          .filter(
+            (c): c is { type: 'thinking'; thinking: string } =>
+              c.type === 'thinking',
+          )
+          .map((c) => c.thinking)
+          .join('\n\n')
+
+        persistedThinkingContent = thinkingBlocks || undefined
       }
 
       return {
         id: `msg-${idx}`,
         role: msg.role as 'user' | 'assistant',
         content: textContent,
+        persistedThinkingContent,
         timestamp: Date.now() - (messages.length - idx) * 1000, // Approximate timestamps
       }
     })

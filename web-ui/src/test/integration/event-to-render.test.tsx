@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { ChatMessages } from '@/components/chat-messages'
 import { ConnectionStatus } from '@/components/connection-status'
@@ -167,8 +167,12 @@ describe('Event-to-Render Integration Tests', () => {
         'Let me think about this',
       )
 
-      // Render and verify DOM
+      // Render and verify DOM (metadata collapsed by default)
       render(<ChatMessages />)
+      expect(screen.queryByText('Thinking...')).not.toBeInTheDocument()
+      fireEvent.click(
+        screen.getByRole('button', { name: /assistant response/i }),
+      )
       expect(screen.getByText('Thinking...')).toBeInTheDocument()
       expect(screen.getByText('Let me think about this')).toBeInTheDocument()
 

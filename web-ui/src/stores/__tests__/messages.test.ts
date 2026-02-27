@@ -234,6 +234,27 @@ describe('messages store', () => {
       expect(messages[0].content).toBe('First text\n\nSecond text')
     })
 
+    it('hydrates persisted thinking content from assistant messages', () => {
+      const piMessages = [
+        {
+          role: 'assistant' as const,
+          content: [
+            { type: 'thinking' as const, thinking: 'First thought' },
+            { type: 'text' as const, text: 'Final answer' },
+            { type: 'thinking' as const, thinking: 'Second thought' },
+          ],
+        },
+      ]
+
+      setMessages(piMessages)
+
+      const { messages } = messagesStore.state
+      expect(messages[0].content).toBe('Final answer')
+      expect(messages[0].persistedThinkingContent).toBe(
+        'First thought\n\nSecond thought',
+      )
+    })
+
     it('assigns approximate timestamps in reverse order', () => {
       const piMessages = [
         {
