@@ -288,10 +288,10 @@ async function initializeChannels(): Promise<void> {
 }
 
 /**
- * Restart the daemon by stopping all channels, clearing cache, and reinitializing.
+ * Restart channels when config changes (internal helper for config watcher).
  */
-async function restartDaemon(): Promise<void> {
-	console.log("[daemon] Config changed — restarting...");
+async function restartChannels(): Promise<void> {
+	console.log("[daemon] Config changed — restarting channels...");
 
 	// Stop existing channels
 	for (const ch of activeChannels) {
@@ -305,7 +305,7 @@ async function restartDaemon(): Promise<void> {
 	// Reinitialize with fresh config
 	await initializeChannels();
 
-	console.log("[daemon] Restart complete.");
+	console.log("[daemon] Channels restarted.");
 }
 
 export async function startDaemon(): Promise<void> {
@@ -327,8 +327,8 @@ export async function startDaemon(): Promise<void> {
 			// Debounce: config writes often trigger multiple events (write + chmod)
 			if (debounceTimer) clearTimeout(debounceTimer);
 			debounceTimer = setTimeout(() => {
-				restartDaemon().catch((err) => {
-					console.error("[daemon] Restart failed:", err instanceof Error ? err.message : String(err));
+				restartChannels().catch((err) => {
+					console.error("[daemon] Channel restart failed:", err instanceof Error ? err.message : String(err));
 				});
 			}, 1000);
 		});
@@ -388,7 +388,7 @@ export async function restartDaemon(): Promise<void> {
 	}
 
 	console.log(`Restarting daemon (pid ${status.pid})...`);
-	
+
 	// Stop the daemon
 	if (!stopDaemon()) {
 		console.error("Failed to stop daemon. Aborting restart.");
