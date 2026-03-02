@@ -21,31 +21,21 @@ import { getAppDir } from "./config.ts";
 const SERVICE_NAME = "clankie";
 const LAUNCHD_LABEL = "ai.clankie.daemon";
 
-// ─── Resolve the app binary path ──────────────────────────────────────────────
-
-function _resolveAppBinary(): string {
-	// If running from a compiled binary, use its path
-	if (!process.argv[1]?.endsWith(".ts")) {
-		return process.argv[0];
-	}
-
-	// Running from source — use bun + script path
-	// Return the full command that systemd/launchd will use
-	return process.argv[0]; // bun binary path
-}
+// ─── Resolve the program arguments ────────────────────────────────────────────
 
 function resolveProgramArguments(): string[] {
 	const runtime = process.execPath || process.argv[0];
-	const entry = process.argv[1];
-	const isScriptEntry = Boolean(entry && /\.(?:[cm]?js|ts)$/.test(entry));
 
-	if (isScriptEntry && entry) {
-		// Running via runtime + script entry (e.g., node dist/cli.js, bun src/cli.ts)
-		return [runtime, entry, "start", "--foreground"];
-	}
+	// import.meta.filename always resolves to the actual file on disk,
+	// regardless of symlinks or how the process was invoked (bun, node, npm, etc.)
+	// In the bundle, this resolves to dist/cli.js. In dev, src/service.ts.
+	// We need the cli entry point, which is in the same directory.
+	const thisFile = import.meta.filename;
+	const cliEntry = thisFile.endsWith("service.ts")
+		? join(dirname(thisFile), "cli.ts") // dev: src/cli.ts
+		: join(dirname(thisFile), "cli.js"); // built: dist/cli.js
 
-	// Standalone executable invocation
-	return [runtime, "start", "--foreground"];
+	return [runtime, cliEntry, "start", "--foreground"];
 }
 
 // ─── Systemd (Linux) ──────────────────────────────────────────────────────────
