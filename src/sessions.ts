@@ -53,7 +53,9 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 	const extensionFactories: ExtensionFactory[] = [];
 	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
 	if (restrictToWorkspace) {
-		const allowedPaths = config.agent?.allowedPaths ?? [];
+		const configuredAllowedPaths = config.agent?.allowedPaths ?? [];
+		const attachmentRoot = join(getAppDir(), "attachments");
+		const allowedPaths = Array.from(new Set([...configuredAllowedPaths, attachmentRoot]));
 		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
 	}
 

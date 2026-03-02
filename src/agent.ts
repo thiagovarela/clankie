@@ -9,6 +9,7 @@
  * If not set, falls back to pi's default resolution (settings → first available).
  */
 
+import { join } from "node:path";
 import {
 	AuthStorage,
 	type CreateAgentSessionResult,
@@ -18,7 +19,7 @@ import {
 	ModelRegistry,
 	SessionManager,
 } from "@mariozechner/pi-coding-agent";
-import { getAgentDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
+import { getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
 import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
 
 export interface SessionOptions {
@@ -65,7 +66,9 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 	const extensionFactories: ExtensionFactory[] = [];
 	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
 	if (restrictToWorkspace) {
-		const allowedPaths = config.agent?.allowedPaths ?? [];
+		const configuredAllowedPaths = config.agent?.allowedPaths ?? [];
+		const attachmentRoot = join(getAppDir(), "attachments");
+		const allowedPaths = Array.from(new Set([...configuredAllowedPaths, attachmentRoot]));
 		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
 	}
 

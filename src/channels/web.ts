@@ -546,6 +546,28 @@ export class WebChannel implements Channel {
 		}
 	}
 
+	private injectAttachmentPaths(sessionId: string, message: string): string {
+		const attachmentNames = Array.from(message.matchAll(/\[Attached:\s*([^\]]+)\]/g))
+			.map((match) => match[1]?.trim())
+			.filter((name): name is string => Boolean(name));
+
+		if (attachmentNames.length === 0) return message;
+
+		const attachmentDir = join(getAppDir(), "attachments", sessionId);
+		const resolved: string[] = [];
+		for (const name of attachmentNames) {
+			const path = join(attachmentDir, name);
+			if (existsSync(path)) {
+				resolved.push(`  - ${name}: ${path}`);
+			}
+		}
+
+		if (resolved.length === 0) return message;
+
+		const suffix = `\n\n[Attached files saved to disk]\n${resolved.join("\n")}`;
+		return `${message}${suffix}`;
+	}
+
 	private async executeCommand(sessionId: string, session: AgentSession, command: RpcCommand): Promise<RpcResponse> {
 		const id = command.id;
 
@@ -554,9 +576,10 @@ export class WebChannel implements Channel {
 				console.log(
 					`[web] Executing prompt - session.sessionId: ${session.sessionId}, sessionFile: ${session.sessionFile}`,
 				);
+				const promptWithAttachmentPaths = this.injectAttachmentPaths(sessionId, command.message);
 				// Don't await - events will stream
 				session
-					.prompt(command.message, {
+					.prompt(promptWithAttachmentPaths, {
 						images: command.images,
 						streamingBehavior: command.streamingBehavior,
 						source: "rpc",
