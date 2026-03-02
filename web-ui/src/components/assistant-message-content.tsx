@@ -79,8 +79,8 @@ export function AssistantMessageContent({
       <ToolExecutionList messageId={message.id} />
 
       {message.content.trim().length > 0 ? (
-        <div className="prose prose-sm dark:prose-invert max-w-none">
-          <ReactMarkdown 
+        <div className="prose prose-base dark:prose-invert max-w-none">
+          <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}
           >
@@ -88,7 +88,7 @@ export function AssistantMessageContent({
           </ReactMarkdown>
         </div>
       ) : message.isStreaming ? (
-        <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground">
+        <div className="prose prose-base dark:prose-invert max-w-none text-muted-foreground">
           ...
         </div>
       ) : null}
