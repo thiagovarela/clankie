@@ -5,7 +5,6 @@
  *
  * Commands:
  *   clankie send "<message>"            Send a message, print response, exit
- *   clankie chat                        Interactive chat session (full pi TUI)
  *   clankie login                       Authenticate with your AI provider
  *   clankie start                       Start the daemon (channels + agent)
  *   clankie stop                        Stop the daemon
@@ -26,7 +25,7 @@ import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as readline from "node:readline/promises";
-import { AuthStorage, InteractiveMode, runPrintMode } from "@mariozechner/pi-coding-agent";
+import { AuthStorage, runPrintMode } from "@mariozechner/pi-coding-agent";
 import JSON5 from "json5";
 import { createSession } from "./agent.ts";
 import { buildApiKeyProviders } from "./auth/providers.ts";
@@ -41,7 +40,6 @@ function printHelp(): void {
 
 Usage:
   clankie send "<message>"          Send a message, print response, exit
-  clankie chat                      Start interactive chat session
   clankie init                      Set up clankie (generates auth token, configures web channel)
   clankie login                     Authenticate with your AI provider
   clankie start [--foreground]      Start the daemon (foreground by default)
@@ -136,21 +134,6 @@ async function cmdSend(args: string[]): Promise<void> {
 		mode: "text",
 		initialMessage: message,
 	});
-}
-
-async function cmdChat(args: string[]): Promise<void> {
-	const initialMessage = args.join(" ").trim() || undefined;
-
-	const { session, modelFallbackMessage } = await createSession({
-		continueRecent: true,
-	});
-
-	const mode = new InteractiveMode(session, {
-		modelFallbackMessage,
-		initialMessage,
-	});
-
-	await mode.run();
 }
 
 async function getApiKeyProvidersForLogin(oauthIds: Set<string>): Promise<Array<{ id: string; name: string }>> {
@@ -471,7 +454,8 @@ async function main(): Promise<void> {
 			break;
 
 		case "chat":
-			await cmdChat(rest);
+			console.error("The 'chat' command has been removed. Use the Web UI or 'clankie send'.");
+			process.exit(1);
 			break;
 
 		case "init":

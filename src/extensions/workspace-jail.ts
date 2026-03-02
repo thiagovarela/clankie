@@ -88,34 +88,30 @@ export function createWorkspaceJailExtension(workspaceDir: string, allowedPaths:
 		 * This is defense-in-depth, not a complete sandbox.
 		 */
 		function scanBashCommand(command: string): { allowed: boolean; reason?: string } {
-			// Block absolute paths outside workspace
+			// Validate explicit absolute/tilde paths mentioned in command text.
 			const absolutePathPattern = /(?:^|\s)([~/][\w\-./]+)/g;
 			let match: RegExpExecArray | null;
 
 			// biome-ignore lint/suspicious/noAssignInExpressions: regex exec pattern
 			while ((match = absolutePathPattern.exec(command)) !== null) {
 				const pathLike = match[1];
-
-				// Check if it looks like a path to a sensitive location
-				if (
-					pathLike.startsWith("/etc") ||
-					pathLike.startsWith("/var") ||
-					pathLike.startsWith("/usr") ||
-					pathLike.startsWith("/sys") ||
-					pathLike.startsWith("/proc") ||
-					pathLike.startsWith("/root") ||
-					pathLike.startsWith("~/")
-				) {
+				const check = isPathAllowed(pathLike);
+				if (!check.allowed) {
 					return {
 						allowed: false,
-						reason: `Blocked: command references path outside workspace: ${pathLike}`,
+						reason: check.reason ?? `Blocked: command references path outside allowed scope: ${pathLike}`,
 					};
 				}
 			}
 
-			// Block cd to absolute paths outside workspace
-			if (/\bcd\s+\//.test(command)) {
-				return { allowed: false, reason: "Blocked: 'cd /' or 'cd /path' outside workspace" };
+			// Validate `cd <target>` when target is absolute or explicit home-relative.
+			const cdMatch = command.match(/(?:^|\s)cd\s+([^\s;|&]+)/);
+			const cdTarget = cdMatch?.[1];
+			if (cdTarget && (cdTarget.startsWith("/") || cdTarget.startsWith("~"))) {
+				const check = isPathAllowed(cdTarget);
+				if (!check.allowed) {
+					return { allowed: false, reason: check.reason ?? `Blocked: cd to disallowed path: ${cdTarget}` };
+				}
 			}
 
 			// Block obvious .. traversal attempts that escape workspace
@@ -162,9 +158,12 @@ export function createWorkspaceJailExtension(workspaceDir: string, allowedPaths:
 
 		// Inject system prompt reminder
 		pi.on("before_agent_start", async () => {
+			const allowedPathsNote = normalizedAllowedPaths.length
+				? `\nAlso allowed: ${normalizedAllowedPaths.join(", ")}`
+				: "";
 			return {
-				systemPrompt: `\n\nIMPORTANT: You are restricted to working within the directory: ${workspaceDir}
-Do not access files, run commands, or reference paths outside this directory.`,
+				systemPrompt: `\n\nIMPORTANT: You are restricted to working within the directory: ${workspaceDir}${allowedPathsNote}
+Do not access files, run commands, or reference paths outside the allowed directories.`,
 			};
 		});
 	};

@@ -199,9 +199,6 @@ Each session maintains its own conversation history. Sessions persist across dae
 Even though clankie lives in Slack, you also have CLI access:
 
 ```bash
-# Interactive chat session (local terminal, uses pi's TUI)
-clankie chat
-
 # Send a one-off message (prints response and exits)
 clankie send "What files are in the current directory?"
 
@@ -297,11 +294,9 @@ Logs are stored in `~/.clankie/logs/daemon.log`.
 
 ```bash
 # Run directly with Bun (no build step)
-bun src/cli.ts chat
 bun src/cli.ts send "hello"
 
 # Or use bun scripts
-bun run dev chat
 bun run dev send "hello"
 
 # Build for production
