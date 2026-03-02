@@ -20,6 +20,7 @@ import type { ImageContent, OAuthLoginCallbacks } from "@mariozechner/pi-ai";
 import { type AgentSession, type AgentSessionEvent, AuthStorage } from "@mariozechner/pi-coding-agent";
 import { Hono } from "hono";
 import type { WSContext } from "hono/ws";
+import { buildApiKeyProviders } from "../auth/providers.ts";
 import { getAppDir, getAuthPath, loadConfig } from "../config.ts";
 import { getOrCreateSession } from "../sessions.ts";
 import type { Channel, MessageHandler } from "./channel.ts";
@@ -951,16 +952,9 @@ export class WebChannel implements Channel {
 					const oauthProviders = authStorage.getOAuthProviders();
 					const oauthIds = new Set(oauthProviders.map((p) => p.id));
 
-					// List of API key providers (filter out those that have OAuth)
-					const apiKeyProviders = [
-						{ id: "anthropic", name: "Anthropic" },
-						{ id: "openai", name: "OpenAI" },
-						{ id: "google", name: "Google (Gemini)" },
-						{ id: "xai", name: "xAI (Grok)" },
-						{ id: "groq", name: "Groq" },
-						{ id: "openrouter", name: "OpenRouter" },
-						{ id: "mistral", name: "Mistral" },
-					].filter((p) => !oauthIds.has(p.id));
+					// API key providers = curated built-ins + dynamically discovered providers
+					// from the loaded model registry (includes extension-registered providers).
+					const apiKeyProviders = await this.getApiKeyProviders(oauthIds);
 
 					// Combine both lists
 					const providers = [
@@ -1169,6 +1163,27 @@ export class WebChannel implements Channel {
 				error: err instanceof Error ? err.message : String(err),
 			});
 		}
+	}
+
+	private async getApiKeyProviders(oauthIds: Set<string>): Promise<Array<{ id: string; name: string }>> {
+		const dynamicProviderIds = new Set<string>();
+
+		// Discover additional providers from a loaded session model registry.
+		// This captures extension-registered providers (e.g. custom proxies).
+		try {
+			const config = loadConfig();
+			const discoverySession = await getOrCreateSession("web_auth_providers", config);
+			const allModels = discoverySession.modelRegistry.getAll();
+			for (const model of allModels) {
+				if (model.provider) dynamicProviderIds.add(model.provider);
+			}
+		} catch (err) {
+			console.warn(
+				`[web] Failed to discover dynamic API key providers: ${err instanceof Error ? err.message : String(err)}`,
+			);
+		}
+
+		return buildApiKeyProviders(oauthIds, dynamicProviderIds);
 	}
 
 	private sendAuthEvent(ws: WSContext, _loginFlowId: string, event: AuthEvent): void {

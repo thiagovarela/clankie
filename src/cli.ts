@@ -29,6 +29,7 @@ import * as readline from "node:readline/promises";
 import { AuthStorage, InteractiveMode, runPrintMode } from "@mariozechner/pi-coding-agent";
 import JSON5 from "json5";
 import { createSession } from "./agent.ts";
+import { buildApiKeyProviders } from "./auth/providers.ts";
 import { getAuthPath, getByPath, getConfigPath, loadConfig, saveConfig, setByPath, unsetByPath } from "./config.ts";
 import { isRunning, restartDaemon, startDaemon, stopDaemon } from "./daemon.ts";
 import { installService, showServiceLogs, showServiceStatus, uninstallService } from "./service.ts";
@@ -152,6 +153,22 @@ async function cmdChat(args: string[]): Promise<void> {
 	await mode.run();
 }
 
+async function getApiKeyProvidersForLogin(oauthIds: Set<string>): Promise<Array<{ id: string; name: string }>> {
+	const dynamicProviderIds = new Set<string>();
+
+	try {
+		const { session } = await createSession({ ephemeral: true });
+		const allModels = session.modelRegistry.getAll();
+		for (const model of allModels) {
+			if (model.provider) dynamicProviderIds.add(model.provider);
+		}
+	} catch (err) {
+		console.warn(`Warning: failed to discover dynamic providers: ${err instanceof Error ? err.message : String(err)}`);
+	}
+
+	return buildApiKeyProviders(oauthIds, dynamicProviderIds);
+}
+
 async function cmdLogin(_args: string[]): Promise<void> {
 	const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
@@ -160,15 +177,7 @@ async function cmdLogin(_args: string[]): Promise<void> {
 	const oauthProviders = authStorage.getOAuthProviders();
 	const oauthIds = new Set(oauthProviders.map((p) => p.id));
 
-	const apiKeyProviders = [
-		{ id: "anthropic", name: "Anthropic" },
-		{ id: "openai", name: "OpenAI" },
-		{ id: "google", name: "Google (Gemini)" },
-		{ id: "xai", name: "xAI (Grok)" },
-		{ id: "groq", name: "Groq" },
-		{ id: "openrouter", name: "OpenRouter" },
-		{ id: "mistral", name: "Mistral" },
-	].filter((p) => !oauthIds.has(p.id));
+	const apiKeyProviders = await getApiKeyProvidersForLogin(oauthIds);
 
 	const entries: { id: string; name: string; type: "oauth" | "apikey"; hasAuth: boolean }[] = [];
 
