@@ -1,6 +1,6 @@
 {
 	"name": "clankie",
-	"version": "0.2.11",
+	"version": "0.2.12",
 	"description": "A minimal personal AI assistant built on pi's SDK",
 	"type": "module",
 	"bin": {
