@@ -23,29 +23,29 @@ const IndexRoute = IndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => SettingsRoute,
+  id: '/settings/',
+  path: '/settings/',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsSkillsRoute = SettingsSkillsRouteImport.update({
-  id: '/skills',
-  path: '/skills',
-  getParentRoute: () => SettingsRoute,
+  id: '/settings/skills',
+  path: '/settings/skills',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsExtensionsRoute = SettingsExtensionsRouteImport.update({
-  id: '/extensions',
-  path: '/extensions',
-  getParentRoute: () => SettingsRoute,
+  id: '/settings/extensions',
+  path: '/settings/extensions',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsConnectionRoute = SettingsConnectionRouteImport.update({
-  id: '/connection',
-  path: '/connection',
-  getParentRoute: () => SettingsRoute,
+  id: '/settings/connection',
+  path: '/settings/connection',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsAuthRoute = SettingsAuthRouteImport.update({
-  id: '/auth',
-  path: '/auth',
-  getParentRoute: () => SettingsRoute,
+  id: '/settings/auth',
+  path: '/settings/auth',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   id: '/sessions/$sessionId',
@@ -114,6 +114,11 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
+  SettingsAuthRoute: typeof SettingsAuthRoute
+  SettingsConnectionRoute: typeof SettingsConnectionRoute
+  SettingsExtensionsRoute: typeof SettingsExtensionsRoute
+  SettingsSkillsRoute: typeof SettingsSkillsRoute
+  SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -127,38 +132,38 @@ declare module '@tanstack/react-router' {
     }
     '/settings/': {
       id: '/settings/'
-      path: '/'
+      path: '/settings'
       fullPath: '/settings/'
       preLoaderRoute: typeof SettingsIndexRouteImport
-      parentRoute: typeof SettingsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/settings/skills': {
       id: '/settings/skills'
-      path: '/skills'
+      path: '/settings/skills'
       fullPath: '/settings/skills'
       preLoaderRoute: typeof SettingsSkillsRouteImport
-      parentRoute: typeof SettingsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/settings/extensions': {
       id: '/settings/extensions'
-      path: '/extensions'
+      path: '/settings/extensions'
       fullPath: '/settings/extensions'
       preLoaderRoute: typeof SettingsExtensionsRouteImport
-      parentRoute: typeof SettingsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/settings/connection': {
       id: '/settings/connection'
-      path: '/connection'
+      path: '/settings/connection'
       fullPath: '/settings/connection'
       preLoaderRoute: typeof SettingsConnectionRouteImport
-      parentRoute: typeof SettingsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/settings/auth': {
       id: '/settings/auth'
-      path: '/auth'
+      path: '/settings/auth'
       fullPath: '/settings/auth'
       preLoaderRoute: typeof SettingsAuthRouteImport
-      parentRoute: typeof SettingsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/sessions/$sessionId': {
       id: '/sessions/$sessionId'
@@ -173,6 +178,11 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
+  SettingsAuthRoute: SettingsAuthRoute,
+  SettingsConnectionRoute: SettingsConnectionRoute,
+  SettingsExtensionsRoute: SettingsExtensionsRoute,
+  SettingsSkillsRoute: SettingsSkillsRoute,
+  SettingsIndexRoute: SettingsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

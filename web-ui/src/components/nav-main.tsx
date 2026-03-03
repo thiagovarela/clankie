@@ -1,5 +1,3 @@
-'use client'
-
 import { useNavigate } from '@tanstack/react-router'
 import { CirclePlusIcon } from 'lucide-react'
 import {
@@ -26,7 +24,7 @@ export function NavMain() {
   }
 
   return (
-    <SidebarGroup>
+    <SidebarGroup className="px-2">
       <SidebarGroupContent>
         <SidebarMenu>
           <SidebarMenuItem>

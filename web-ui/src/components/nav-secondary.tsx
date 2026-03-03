@@ -1,7 +1,4 @@
-'use client'
-
 import { Link, useRouterState } from '@tanstack/react-router'
-import { useStore } from '@tanstack/react-store'
 import {
   ChevronDown,
   Globe,
@@ -12,7 +9,6 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import type * as React from 'react'
-import { Badge } from '@/components/ui/badge'
 import {
   Collapsible,
   CollapsibleContent,
@@ -28,7 +24,6 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
 } from '@/components/ui/sidebar'
-import { connectionStore } from '@/stores/connection'
 
 const settingsLinks = [
   { to: '/settings/connection', label: 'Connection', icon: Globe },
@@ -40,44 +35,15 @@ const settingsLinks = [
 export function NavSecondary({
   ...props
 }: React.ComponentPropsWithoutRef<typeof SidebarGroup>) {
-  const { status } = useStore(connectionStore, (state) => ({
-    status: state.status,
-  }))
+  // Connection status is now shown in the topbar, not in the sidebar
 
   const { location } = useRouterState()
   const currentPath = location.pathname
   const isInSettings = currentPath.startsWith('/settings')
   const [settingsOpen, setSettingsOpen] = useState(isInSettings)
 
-  const connectionConfig = {
-    connected: {
-      label: 'Connected',
-      variant: 'default' as const,
-      className: 'bg-green-500/10 text-green-500 border-green-500/20',
-      dotColor: 'bg-green-500',
-    },
-    connecting: {
-      label: 'Connecting',
-      variant: 'secondary' as const,
-      className: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
-      dotColor: 'bg-yellow-500',
-    },
-    disconnected: {
-      label: 'Disconnected',
-      variant: 'secondary' as const,
-      className: 'bg-red-500/10 text-red-500 border-red-500/20',
-      dotColor: 'bg-red-500',
-    },
-    error: {
-      label: 'Error',
-      variant: 'destructive' as const,
-      className: 'bg-red-500/10 text-red-500 border-red-500/20',
-      dotColor: 'bg-red-500',
-    },
-  }[status]
-
   return (
-    <SidebarGroup {...props}>
+    <SidebarGroup {...props} className="px-2">
       <SidebarGroupContent>
         <SidebarMenu>
           <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
@@ -112,19 +78,6 @@ export function NavSecondary({
               </CollapsibleContent>
             </SidebarMenuItem>
           </Collapsible>
-          <SidebarMenuItem>
-            <div className="px-2 py-1.5">
-              <Badge
-                variant={connectionConfig.variant}
-                className={`${connectionConfig.className} w-full justify-start`}
-              >
-                <div
-                  className={`size-2 rounded-full mr-2 ${connectionConfig.dotColor} ${status === 'connected' ? 'animate-breathe' : ''}`}
-                />
-                {connectionConfig.label}
-              </Badge>
-            </div>
-          </SidebarMenuItem>
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>

@@ -171,10 +171,10 @@
     @apply rounded bg-muted/50 px-1.5 py-0.5 text-primary;
   }
 
-  /* Fix sidebar to start below header */
+  /* Remove the old sidebar offset fix since we now have a proper topbar */
   [data-slot='sidebar-container'] {
-    top: 3.5rem !important;
-    height: calc(100vh - 3.5rem) !important;
+    top: 0 !important;
+    height: 100vh !important;
   }
 }
 
@@ -309,5 +309,85 @@
   .focus-glow:focus-visible {
     outline: none;
     box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 35%, transparent);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     Tau-inspired visual tokens (Shell layer)
+     ═══════════════════════════════════════════════════════════════════════════ */
+
+  /* Frosted glass surfaces */
+  .glass {
+    background: color-mix(in oklch, var(--card) 85%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .dark .glass {
+    background: color-mix(in oklch, var(--card) 75%, transparent);
+  }
+
+  /* Subtle glass border */
+  .glass-border {
+    border-color: color-mix(in oklch, var(--border) 50%, transparent);
+  }
+
+  /* Elevated frosted dock (for composer) */
+  .dock {
+    background: color-mix(in oklch, var(--card) 95%, transparent);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    box-shadow:
+      0 4px 24px -2px oklch(0 0 0 / 0.08),
+      0 0 0 1px color-mix(in oklch, var(--border) 40%, transparent);
+  }
+
+  .dark .dock {
+    background: color-mix(in oklch, var(--card) 85%, transparent);
+    box-shadow:
+      0 4px 24px -2px oklch(0 0 0 / 0.3),
+      0 0 0 1px color-mix(in oklch, var(--border) 30%, transparent);
+  }
+
+  /* Translucent topbar */
+  .topbar-glass {
+    background: color-mix(in oklch, var(--background) 80%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom-color: color-mix(in oklch, var(--border) 50%, transparent);
+  }
+
+  /* Spacious message canvas padding (compensates for floating composer) */
+  .message-canvas {
+    padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Mobile safe area utilities */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  /* Shell layout utilities */
+  .shell-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "sidebar topbar"
+      "sidebar main";
+    height: 100vh;
+    height: 100dvh;
+  }
+
+  .shell-sidebar {
+    grid-area: sidebar;
+  }
+
+  .shell-topbar {
+    grid-area: topbar;
+  }
+
+  .shell-main {
+    grid-area: main;
+    min-height: 0;
   }
 }

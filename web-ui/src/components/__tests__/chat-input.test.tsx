@@ -58,22 +58,23 @@ describe('ChatInput', () => {
       expect(screen.getByTitle('Attach files')).toBeInTheDocument()
     })
 
-    it('renders keyboard shortcut hint', () => {
+    it('renders hidden file input with correct attributes', () => {
       render(<ChatInput />)
 
-      expect(screen.getByText(/Ctrl\+Enter/i)).toBeInTheDocument()
-      expect(screen.getByText(/to send/i)).toBeInTheDocument()
+      const fileInput = document.querySelector(
+        'input[type="file"]',
+      ) as HTMLInputElement
+      expect(fileInput).toBeInTheDocument()
+      expect(fileInput).toHaveAttribute('multiple')
+      expect(fileInput).toHaveAttribute(
+        'accept',
+        'image/*,application/pdf,text/*',
+      )
+      expect(fileInput).toHaveClass('hidden')
     })
 
-    it('renders tool activity button', () => {
-      render(<ChatInput />)
-
-      expect(
-        screen.getByRole('button', { name: /Tool activity/i }),
-      ).toBeInTheDocument()
-    })
-
-    it('renders ModelSelector when model is set', () => {
+    // NOTE: ModelSelector has been moved to ChatTopbar, so it no longer appears in ChatInput
+    it('does not render ModelSelector inside ChatInput', () => {
       sessionStore.setState((state) => ({
         ...state,
         sessionId: 'test-session-123',
@@ -91,22 +92,8 @@ describe('ChatInput', () => {
 
       render(<ChatInput />)
 
-      expect(screen.getByText('Claude 3.5 Sonnet')).toBeInTheDocument()
-    })
-
-    it('renders hidden file input with correct attributes', () => {
-      render(<ChatInput />)
-
-      const fileInput = document.querySelector(
-        'input[type="file"]',
-      ) as HTMLInputElement
-      expect(fileInput).toBeInTheDocument()
-      expect(fileInput).toHaveAttribute('multiple')
-      expect(fileInput).toHaveAttribute(
-        'accept',
-        'image/*,application/pdf,text/*',
-      )
-      expect(fileInput).toHaveClass('hidden')
+      // ModelSelector should NOT be in ChatInput anymore
+      expect(screen.queryByText('Claude 3.5 Sonnet')).not.toBeInTheDocument()
     })
   })
 
@@ -208,14 +195,10 @@ describe('ChatInput', () => {
       const textarea = screen.getByPlaceholderText(/Send a message/i)
       const sendButton = screen.getByRole('button', { name: /Send message/i })
       const attachButton = screen.getByTitle('Attach files')
-      const toolActivityButton = screen.getByRole('button', {
-        name: /Tool activity/i,
-      })
 
       expect(textarea).toBeDisabled()
       expect(sendButton).toBeDisabled()
       expect(attachButton).toBeDisabled()
-      expect(toolActivityButton).toBeDisabled()
     })
 
     it('disables inputs when streaming', () => {
@@ -365,12 +348,12 @@ describe('ChatInput', () => {
     it('shows drag indicator on drag over', async () => {
       render(<ChatInput />)
 
-      const container = screen
-        .getByPlaceholderText(/Send a message/i)
-        .closest('div')!.parentElement!
+      // Find the container by looking for the drag-drop wrapper
+      const container = document.querySelector('[class*="absolute bottom-0"]')
+      expect(container).toBeInTheDocument()
 
       await act(async () => {
-        fireEvent.dragOver(container, {
+        fireEvent.dragOver(container!, {
           dataTransfer: {
             files: [],
           },
@@ -385,12 +368,11 @@ describe('ChatInput', () => {
     it('hides drag indicator on drag leave', async () => {
       render(<ChatInput />)
 
-      const container = screen
-        .getByPlaceholderText(/Send a message/i)
-        .closest('div')!.parentElement!
+      const container = document.querySelector('[class*="absolute bottom-0"]')
+      expect(container).toBeInTheDocument()
 
       await act(async () => {
-        fireEvent.dragOver(container, {
+        fireEvent.dragOver(container!, {
           dataTransfer: {
             files: [],
           },
@@ -402,7 +384,7 @@ describe('ChatInput', () => {
       })
 
       await act(async () => {
-        fireEvent.dragLeave(container, {
+        fireEvent.dragLeave(container!, {
           dataTransfer: {
             files: [],
           },

@@ -81,13 +81,12 @@ function RootComponent() {
       <TooltipProvider>
         <SidebarProvider>
           <AppSidebar variant="inset" />
-          <SidebarInset>
-            <div className="flex flex-1 flex-col overflow-hidden">
-              <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
-                <SidebarTrigger />
-              </header>
-              <Outlet />
+          <SidebarInset className="relative">
+            {/* Mobile sidebar trigger - positioned absolute */}
+            <div className="absolute left-4 top-3.5 z-50 md:hidden">
+              <SidebarTrigger />
             </div>
+            <Outlet />
           </SidebarInset>
           <ExtensionUIProvider />
         </SidebarProvider>

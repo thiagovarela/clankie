@@ -66,7 +66,7 @@ export function ChatMessages() {
 
   if (messages.length === 0) {
     return (
-      <div className="flex flex-1 overflow-y-auto items-center justify-center p-8 chat-background">
+      <div className="flex-1 overflow-y-auto flex items-center justify-center p-8 chat-background pb-40">
         <div className="text-center space-y-4 max-w-md">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 mb-2">
             <span className="text-3xl font-mono font-bold text-primary">
@@ -98,7 +98,7 @@ export function ChatMessages() {
   const groups = groupMessages(messages)
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-6 chat-background">
+    <div className="flex-1 overflow-y-auto px-4 py-6 chat-background pb-40">
       <div className="mx-auto w-full max-w-3xl space-y-4">
         {groups.map((group) =>
           group.type === 'message' ? (

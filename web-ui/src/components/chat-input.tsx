@@ -6,7 +6,6 @@ import type { AttachmentItem } from '@/components/attachment-preview'
 import type { ImageContent } from '@/lib/types'
 import type { DisplayAttachment } from '@/stores/messages'
 import { AttachmentPreview } from '@/components/attachment-preview'
-import { ModelSelector } from '@/components/model-selector'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { clientManager } from '@/lib/client-manager'
@@ -273,21 +272,26 @@ export function ChatInput() {
 
   return (
     <div
-      className="border-t border-border bg-card p-4"
+      className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-4 pt-2 bg-gradient-to-t from-background via-background to-transparent"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       <div className="mx-auto w-full max-w-3xl">
-        <div className="flex flex-col gap-2">
+        {/* Floating dock container */}
+        <div className="relative rounded-2xl border border-border/50 bg-card/95 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20">
           {/* Attachment previews */}
-          <AttachmentPreview
-            attachments={attachments}
-            onRemove={handleRemoveAttachment}
-          />
+          {attachments.length > 0 && (
+            <div className="px-4 pt-3">
+              <AttachmentPreview
+                attachments={attachments}
+                onRemove={handleRemoveAttachment}
+              />
+            </div>
+          )}
 
           {/* Textarea with drag-drop indicator */}
-          <div className="relative">
+          <div className="relative px-4 py-3">
             <Textarea
               ref={textareaRef}
               id="chat-input"
@@ -296,12 +300,14 @@ export function ChatInput() {
               onChange={(e) => setMessage(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder="Send a message... (Ctrl+Enter to send)"
-              className="min-h-[80px] resize-none focus-glow"
+              placeholder="Send a message..."
+              className="min-h-[60px] resize-none border-0 bg-transparent p-0 text-base placeholder:text-muted-foreground/70 focus-visible:ring-0 focus-visible:ring-offset-0"
               disabled={!sessionId || isStreaming}
+              rows={1}
+              style={{ minHeight: '60px', maxHeight: '200px' }}
             />
             {isDragging && (
-              <div className="absolute inset-0 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-background/80 backdrop-blur-sm">
+              <div className="absolute inset-0 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-background/90 backdrop-blur-sm m-2">
                 <p className="text-sm font-medium text-primary">
                   Drop files here
                 </p>
@@ -310,8 +316,8 @@ export function ChatInput() {
           </div>
 
           {/* Toolbar row */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2 px-3 pb-3">
+            <div className="flex items-center gap-1">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -327,18 +333,18 @@ export function ChatInput() {
                 disabled={!sessionId || isStreaming}
                 onClick={() => fileInputRef.current?.click()}
                 title="Attach files"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
               >
                 <Paperclip className="h-4 w-4" />
                 <span className="sr-only">Attach files</span>
               </Button>
-              <p className="text-xs text-muted-foreground">
-                <kbd className="rounded bg-muted px-1.5 py-0.5">Ctrl+Enter</kbd>{' '}
-                to send
-              </p>
             </div>
 
             <div className="flex items-center gap-2">
-              <ModelSelector />
+              <kbd className="hidden sm:inline-flex h-6 items-center gap-1 rounded border border-border/50 bg-muted/50 px-2 text-[10px] font-medium text-muted-foreground">
+                <span>⌘</span>
+                <span>↵</span>
+              </kbd>
               <Button
                 onClick={handleSend}
                 disabled={
@@ -346,8 +352,8 @@ export function ChatInput() {
                   !sessionId ||
                   isStreaming
                 }
-                size="icon"
-                className="transition-transform hover:scale-105 active:scale-95"
+                size="icon-sm"
+                className="h-8 w-8 transition-transform hover:scale-105 active:scale-95"
               >
                 <Send className="h-4 w-4" />
                 <span className="sr-only">Send message</span>
@@ -355,6 +361,9 @@ export function ChatInput() {
             </div>
           </div>
         </div>
+
+        {/* Bottom safe area padding */}
+        <div className="h-2" />
       </div>
     </div>
   )

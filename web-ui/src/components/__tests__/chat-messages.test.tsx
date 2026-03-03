@@ -17,7 +17,7 @@ describe('ChatMessages', () => {
 
     expect(screen.getByText('Start a conversation')).toBeInTheDocument()
     expect(
-      screen.getByText('Send a message to begin chatting with clankie'),
+      screen.getByText(/Send a message to begin chatting with/),
     ).toBeInTheDocument()
   })
 
@@ -67,8 +67,8 @@ describe('ChatMessages', () => {
 
     expect(screen.getByText('Typing...')).toBeInTheDocument()
 
-    // Check for streaming cursor
-    const cursor = container.querySelector('.animate-pulse')
+    // Check for streaming cursor (typing-dot animation)
+    const cursor = container.querySelector('.typing-dot')
     expect(cursor).toBeInTheDocument()
   })
 
