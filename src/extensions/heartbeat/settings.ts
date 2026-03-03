@@ -1,5 +1,6 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { SettingsManager } from "@mariozechner/pi-coding-agent";
 import { getAgentDir, loadConfig } from "../../config.ts";
 import type { HeartbeatSettings } from "./types.ts";
@@ -14,6 +15,14 @@ const DEFAULTS: HeartbeatSettings = {
 	showOk: false,
 	model: null,
 };
+
+const PROJECT_SETTINGS_PATH = [".pi", "settings.json"] as const;
+
+export interface HeartbeatUiConfig {
+	enabled: boolean;
+	every: string;
+	model: string | null;
+}
 
 function toRecord(value: unknown): Record<string, unknown> {
 	if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -78,4 +87,80 @@ export function resolveHeartbeatSettings(cwd: string): HeartbeatSettings {
 	} catch {
 		return { ...DEFAULTS };
 	}
+}
+
+function getProjectSettingsPath(cwd: string): string {
+	return join(cwd, ...PROJECT_SETTINGS_PATH);
+}
+
+function readProjectSettings(cwd: string): Record<string, unknown> {
+	const settingsPath = getProjectSettingsPath(cwd);
+	if (!existsSync(settingsPath)) {
+		return {};
+	}
+
+	try {
+		const content = readFileSync(settingsPath, "utf8");
+		const parsed = JSON.parse(content);
+		return toRecord(parsed);
+	} catch {
+		return {};
+	}
+}
+
+function writeProjectSettings(cwd: string, settings: Record<string, unknown>): void {
+	const settingsPath = getProjectSettingsPath(cwd);
+	mkdirSync(dirname(settingsPath), { recursive: true });
+	writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+}
+
+function normalizeEvery(value: string): string {
+	const normalized = value.trim().toLowerCase();
+	if (!/^\d+\s*[mh]$/.test(normalized)) {
+		throw new Error("Invalid heartbeat schedule. Use values like '15m' or '1h'.");
+	}
+	return normalized.replace(/\s+/g, "");
+}
+
+function normalizeModel(value: string | null | undefined): string | null {
+	if (value == null) {
+		return null;
+	}
+	const normalized = value.trim();
+	if (!normalized) {
+		return null;
+	}
+	if (!/^[^/]+\/[^/]+$/.test(normalized)) {
+		throw new Error("Invalid model format. Use 'provider/model'.");
+	}
+	return normalized;
+}
+
+export function getHeartbeatUiConfig(cwd: string): HeartbeatUiConfig {
+	const settings = resolveHeartbeatSettings(cwd);
+	return {
+		enabled: settings.enabled,
+		every: settings.every,
+		model: settings.model,
+	};
+}
+
+export function setHeartbeatUiConfig(cwd: string, config: HeartbeatUiConfig): HeartbeatUiConfig {
+	const projectSettings = readProjectSettings(cwd);
+	const currentNamespace = toRecord(projectSettings["clankie-heartbeat"]);
+
+	const nextNamespace = {
+		...currentNamespace,
+		enabled: config.enabled,
+		every: normalizeEvery(config.every),
+		model: normalizeModel(config.model),
+	};
+
+	const nextProjectSettings = {
+		...projectSettings,
+		"clankie-heartbeat": nextNamespace,
+	};
+
+	writeProjectSettings(cwd, nextProjectSettings);
+	return getHeartbeatUiConfig(cwd);
 }

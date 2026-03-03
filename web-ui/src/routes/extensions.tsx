@@ -299,7 +299,13 @@ function ExtensionsPage() {
                           <p className="mb-2 text-xs font-medium text-muted-foreground">
                             Extension UI
                           </p>
-                          <JsonRenderRenderer spec={ext.uiSpec} />
+                          <JsonRenderRenderer
+                            spec={ext.uiSpec}
+                            sessionId={activeSessionId ?? undefined}
+                            extensionPath={ext.path}
+                            initialState={ext.uiState}
+                            onConfigSaved={loadExtensionsAndSkills}
+                          />
                         </div>
                       )}
                     </div>

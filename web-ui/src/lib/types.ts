@@ -73,6 +73,13 @@ export type RpcCommand =
   | { id?: string; type: 'get_messages' }
   | { id?: string; type: 'get_commands' }
   | { id?: string; type: 'get_extensions' }
+  | { id?: string; type: 'get_extension_config'; extensionPath: string }
+  | {
+      id?: string
+      type: 'set_extension_config'
+      extensionPath: string
+      config: Record<string, unknown>
+    }
   | { id?: string; type: 'get_skills' }
   | { id?: string; type: 'install_package'; source: string; local?: boolean }
   | { id?: string; type: 'reload' }
@@ -399,6 +406,7 @@ export interface ExtensionInfo {
   flags: Array<string>
   shortcuts: Array<string>
   uiSpec?: ExtensionUISpec
+  uiState?: Record<string, unknown>
 }
 
 export interface ExtensionError {

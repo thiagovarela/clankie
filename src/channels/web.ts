@@ -22,6 +22,12 @@ import { Hono } from "hono";
 import type { WSContext } from "hono/ws";
 import { buildApiKeyProviders } from "../auth/providers.ts";
 import { getAppDir, getAuthPath, loadConfig } from "../config.ts";
+import {
+	getHeartbeatUiConfig,
+	setHeartbeatUiConfig,
+	type HeartbeatUiConfig,
+} from "../extensions/heartbeat/settings.ts";
+import { reloadSharedHeartbeatRunnerSettings } from "../extensions/heartbeat/index.ts";
 import { HEARTBEAT_EXTENSION_UI_SPEC } from "../extensions/heartbeat/ui-spec.ts";
 import { getOrCreateSession } from "../sessions.ts";
 import type { Channel, MessageHandler } from "./channel.ts";
@@ -84,6 +90,13 @@ type RpcCommand =
 	| { id?: string; type: "get_messages" }
 	| { id?: string; type: "get_commands" }
 	| { id?: string; type: "get_extensions" }
+	| { id?: string; type: "get_extension_config"; extensionPath: string }
+	| {
+			id?: string;
+			type: "set_extension_config";
+			extensionPath: string;
+			config: Record<string, unknown>;
+	  }
 	| { id?: string; type: "get_skills" }
 	| { id?: string; type: "install_package"; source: string; local?: boolean }
 	| { id?: string; type: "reload" }
@@ -249,6 +262,36 @@ function resolveExtensionUiSpec(ext: ExtensionDescriptor): ExtensionUISpec | und
 	}
 
 	return undefined;
+}
+
+function isHeartbeatExtension(ext: ExtensionDescriptor): boolean {
+	const commandNames = Array.from(ext.commands.keys());
+	const flagNames = Array.from(ext.flags.keys());
+	return commandNames.includes("heartbeat") || flagNames.includes("heartbeat");
+}
+
+function normalizeHeartbeatConfigInput(config: Record<string, unknown>): HeartbeatUiConfig {
+	const enabled = config.enabled;
+	const every = config.every;
+	const model = config.model;
+
+	if (typeof enabled !== "boolean") {
+		throw new Error("Invalid heartbeat config: 'enabled' must be a boolean.");
+	}
+
+	if (typeof every !== "string") {
+		throw new Error("Invalid heartbeat config: 'every' must be a string.");
+	}
+
+	if (model !== null && model !== undefined && typeof model !== "string") {
+		throw new Error("Invalid heartbeat config: 'model' must be a string or null.");
+	}
+
+	return {
+		enabled,
+		every,
+		model: model == null ? null : model,
+	};
 }
 
 // ─── WebChannel ────────────────────────────────────────────────────────────────
@@ -682,6 +725,21 @@ export class WebChannel implements Channel {
 		return `${message}${suffix}`;
 	}
 
+	private getSessionCwd(session: AgentSession): string {
+		const maybeSessionWithCwd = session as AgentSession & { cwd?: string };
+		return maybeSessionWithCwd.cwd ?? process.cwd();
+	}
+
+	private getHeartbeatExtensionPath(session: AgentSession, requestedPath: string): string | undefined {
+		const extensions = session.resourceLoader.getExtensions().extensions as ExtensionDescriptor[];
+		const byPath = extensions.find((ext) => ext.path === requestedPath);
+		if (byPath && isHeartbeatExtension(byPath)) {
+			return byPath.path;
+		}
+		const heartbeatExtension = extensions.find((ext) => isHeartbeatExtension(ext));
+		return heartbeatExtension?.path;
+	}
+
 	private async executeCommand(sessionId: string, session: AgentSession, command: RpcCommand): Promise<RpcResponse> {
 		const id = command.id;
 
@@ -964,9 +1022,14 @@ export class WebChannel implements Channel {
 
 			case "get_extensions": {
 				const extensionsResult = session.resourceLoader.getExtensions();
+				const cwd = this.getSessionCwd(session);
 				const extensions = extensionsResult.extensions
 					.map((ext) => {
-						const uiSpec = resolveExtensionUiSpec(ext as ExtensionDescriptor);
+						const descriptor = ext as ExtensionDescriptor;
+						const uiSpec = resolveExtensionUiSpec(descriptor);
+						const uiState = isHeartbeatExtension(descriptor)
+							? { heartbeat: getHeartbeatUiConfig(cwd), extensionPath: ext.path }
+							: undefined;
 						return {
 							path: ext.path,
 							resolvedPath: ext.resolvedPath,
@@ -975,6 +1038,7 @@ export class WebChannel implements Channel {
 							flags: Array.from(ext.flags.keys()),
 							shortcuts: Array.from(ext.shortcuts.keys()),
 							uiSpec,
+							uiState,
 						};
 					})
 					.filter((ext) => !ext.path.startsWith("<inline:") || Boolean(ext.uiSpec));
@@ -987,6 +1051,60 @@ export class WebChannel implements Channel {
 					data: {
 						extensions,
 						errors: extensionsResult.errors,
+					},
+				};
+			}
+
+			case "get_extension_config": {
+				const heartbeatPath = this.getHeartbeatExtensionPath(session, command.extensionPath);
+				if (!heartbeatPath) {
+					return {
+						id,
+						type: "response",
+						command: "get_extension_config",
+						success: false,
+						error: `Unsupported extension config: ${command.extensionPath}`,
+					};
+				}
+
+				const cwd = this.getSessionCwd(session);
+				const config = getHeartbeatUiConfig(cwd);
+				return {
+					id,
+					type: "response",
+					command: "get_extension_config",
+					success: true,
+					data: {
+						extensionPath: heartbeatPath,
+						config,
+					},
+				};
+			}
+
+			case "set_extension_config": {
+				const heartbeatPath = this.getHeartbeatExtensionPath(session, command.extensionPath);
+				if (!heartbeatPath) {
+					return {
+						id,
+						type: "response",
+						command: "set_extension_config",
+						success: false,
+						error: `Unsupported extension config: ${command.extensionPath}`,
+					};
+				}
+
+				const nextConfig = normalizeHeartbeatConfigInput(command.config);
+				const cwd = this.getSessionCwd(session);
+				const savedConfig = setHeartbeatUiConfig(cwd, nextConfig);
+				reloadSharedHeartbeatRunnerSettings(cwd);
+				return {
+					id,
+					type: "response",
+					command: "set_extension_config",
+					success: true,
+					data: {
+						extensionPath: heartbeatPath,
+						config: savedConfig,
 					},
 				};
 			}
