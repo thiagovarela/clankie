@@ -21,4 +21,5 @@ export interface ExtensionRenderHint {
 export interface ExtensionUISpec {
   root: string
   elements: Record<string, unknown>
+  actions?: Record<string, { description?: string }>
 }

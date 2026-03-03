@@ -80,6 +80,13 @@ export type RpcCommand =
       extensionPath: string
       config: Record<string, unknown>
     }
+  | {
+      id?: string
+      type: 'extension_ui_action'
+      extensionPath: string
+      action: string
+      params: Record<string, unknown>
+    }
   | { id?: string; type: 'get_skills' }
   | { id?: string; type: 'install_package'; source: string; local?: boolean }
   | { id?: string; type: 'reload' }
@@ -396,6 +403,7 @@ export type ExtensionUIResponse =
 export interface ExtensionUISpec {
   root: string
   elements: Record<string, unknown>
+  actions?: Record<string, { description?: string }>
 }
 
 export interface ExtensionInfo {
