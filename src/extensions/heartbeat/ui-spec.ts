@@ -15,20 +15,14 @@ export const HEARTBEAT_EXTENSION_UI_SPEC = {
 				direction: "vertical",
 				gap: "md",
 			},
-			children: [
-				"heartbeat-enabled",
-				"heartbeat-every",
-				"heartbeat-model",
-				"heartbeat-save",
-				"heartbeat-help",
-			],
+			children: ["heartbeat-enabled", "heartbeat-every", "heartbeat-model", "heartbeat-save", "heartbeat-help"],
 		},
 		"heartbeat-enabled": {
 			type: "Switch",
 			props: {
 				label: "Enable heartbeat",
 				name: "heartbeat-enabled",
-				checked: { $bindState: "/heartbeat/enabled" },
+				checked: { $bindState: "/config/enabled" },
 			},
 		},
 		"heartbeat-every": {
@@ -37,7 +31,7 @@ export const HEARTBEAT_EXTENSION_UI_SPEC = {
 				label: "Schedule",
 				name: "heartbeat-every",
 				placeholder: "30m",
-				value: { $bindState: "/heartbeat/every" },
+				value: { $bindState: "/config/every" },
 			},
 		},
 		"heartbeat-model": {
@@ -46,7 +40,7 @@ export const HEARTBEAT_EXTENSION_UI_SPEC = {
 				label: "Model (optional)",
 				name: "heartbeat-model",
 				options: { $state: "/availableModels" },
-				value: { $bindState: "/heartbeat/model" },
+				value: { $bindState: "/config/model" },
 			},
 		},
 		"heartbeat-save": {
@@ -59,9 +53,9 @@ export const HEARTBEAT_EXTENSION_UI_SPEC = {
 				press: {
 					action: "saveExtensionConfig",
 					params: {
-						enabled: { $state: "/heartbeat/enabled" },
-						every: { $state: "/heartbeat/every" },
-						model: { $state: "/heartbeat/model" },
+						enabled: { $state: "/config/enabled" },
+						every: { $state: "/config/every" },
+						model: { $state: "/config/model" },
 					},
 				},
 			},

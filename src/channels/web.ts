@@ -10,9 +10,9 @@
  */
 
 import * as crypto from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
@@ -22,11 +22,6 @@ import { Hono } from "hono";
 import type { WSContext } from "hono/ws";
 import { buildApiKeyProviders } from "../auth/providers.ts";
 import { getAppDir, getAuthPath, loadConfig } from "../config.ts";
-import {
-	getHeartbeatUiConfig,
-	setHeartbeatUiConfig,
-	type HeartbeatUiConfig,
-} from "../extensions/heartbeat/settings.ts";
 import { reloadSharedHeartbeatRunnerSettings } from "../extensions/heartbeat/index.ts";
 import { HEARTBEAT_EXTENSION_UI_SPEC } from "../extensions/heartbeat/ui-spec.ts";
 import { getOrCreateSession } from "../sessions.ts";
@@ -97,6 +92,13 @@ type RpcCommand =
 			extensionPath: string;
 			config: Record<string, unknown>;
 	  }
+	| {
+			id?: string;
+			type: "extension_ui_action";
+			extensionPath: string;
+			action: string;
+			params: Record<string, unknown>;
+	  }
 	| { id?: string; type: "get_skills" }
 	| { id?: string; type: "install_package"; source: string; local?: boolean }
 	| { id?: string; type: "reload" }
@@ -154,6 +156,7 @@ type RpcExtensionUIResponse =
 interface ExtensionUISpec {
 	root: string;
 	elements: Record<string, unknown>;
+	actions?: Record<string, { description?: string }>;
 }
 
 interface ExtensionDescriptor {
@@ -174,7 +177,15 @@ function isValidExtensionUISpec(value: unknown): value is ExtensionUISpec {
 		return false;
 	}
 
-	return typeof value.root === "string" && isRecord(value.elements);
+	if (typeof value.root !== "string" || !isRecord(value.elements)) {
+		return false;
+	}
+
+	if (value.actions !== undefined && !isRecord(value.actions)) {
+		return false;
+	}
+
+	return true;
 }
 
 function tryReadJson(filePath: string): unknown | undefined {
@@ -270,28 +281,98 @@ function isHeartbeatExtension(ext: ExtensionDescriptor): boolean {
 	return commandNames.includes("heartbeat") || flagNames.includes("heartbeat");
 }
 
-function normalizeHeartbeatConfigInput(config: Record<string, unknown>): HeartbeatUiConfig {
-	const enabled = config.enabled;
-	const every = config.every;
-	const model = config.model;
+const PROJECT_SETTINGS_PATH = [".pi", "settings.json"] as const;
 
-	if (typeof enabled !== "boolean") {
-		throw new Error("Invalid heartbeat config: 'enabled' must be a boolean.");
+function getProjectSettingsPath(cwd: string): string {
+	return join(cwd, ...PROJECT_SETTINGS_PATH);
+}
+
+function readProjectSettings(cwd: string): Record<string, unknown> {
+	const settingsPath = getProjectSettingsPath(cwd);
+	if (!existsSync(settingsPath)) {
+		return {};
 	}
 
-	if (typeof every !== "string") {
-		throw new Error("Invalid heartbeat config: 'every' must be a string.");
+	try {
+		const content = readFileSync(settingsPath, "utf8");
+		const parsed = JSON.parse(content);
+		return isRecord(parsed) ? parsed : {};
+	} catch {
+		return {};
+	}
+}
+
+function writeProjectSettings(cwd: string, settings: Record<string, unknown>): void {
+	const settingsPath = getProjectSettingsPath(cwd);
+	mkdirSync(dirname(settingsPath), { recursive: true });
+	writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, "utf8");
+}
+
+function sanitizeNamespace(input: string): string {
+	return input
+		.toLowerCase()
+		.replace(/^@/, "")
+		.replace(/[^a-z0-9]+/g, "-")
+		.replace(/^-+|-+$/g, "")
+		.replace(/-{2,}/g, "-");
+}
+
+function getExtensionNamespace(ext: ExtensionDescriptor): string {
+	if (isHeartbeatExtension(ext)) {
+		return "clankie-heartbeat";
 	}
 
-	if (model !== null && model !== undefined && typeof model !== "string") {
-		throw new Error("Invalid heartbeat config: 'model' must be a string or null.");
+	const fromPath = sanitizeNamespace(ext.path);
+	if (fromPath) {
+		return fromPath;
 	}
 
+	return sanitizeNamespace(basename(ext.resolvedPath)) || "extension-config";
+}
+
+function normalizeExtensionUiConfig(namespace: string, config: Record<string, unknown>): Record<string, unknown> {
+	if (namespace !== "clankie-heartbeat") {
+		return config;
+	}
+
+	const model = typeof config.model === "string" ? config.model.trim() : config.model;
 	return {
-		enabled,
-		every,
-		model: model == null ? null : model,
+		enabled: Boolean(config.enabled),
+		every: String(config.every ?? ""),
+		model: model === "" || model === "(default session model)" || model == null ? null : model,
 	};
+}
+
+function getExtensionUiConfig(cwd: string, ext: ExtensionDescriptor): Record<string, unknown> {
+	const settings = readProjectSettings(cwd);
+	const namespace = getExtensionNamespace(ext);
+	const namespaceValue = settings[namespace];
+	return isRecord(namespaceValue) ? namespaceValue : {};
+}
+
+function setExtensionUiConfig(
+	cwd: string,
+	ext: ExtensionDescriptor,
+	config: Record<string, unknown>,
+): Record<string, unknown> {
+	const settings = readProjectSettings(cwd);
+	const namespace = getExtensionNamespace(ext);
+	const nextConfig = normalizeExtensionUiConfig(namespace, config);
+	const currentNamespaceValue = settings[namespace];
+	const currentNamespaceConfig = isRecord(currentNamespaceValue) ? currentNamespaceValue : {};
+	settings[namespace] = {
+		...currentNamespaceConfig,
+		...nextConfig,
+	};
+	writeProjectSettings(cwd, settings);
+	const saved = settings[namespace];
+	return isRecord(saved) ? saved : {};
+}
+
+function applyExtensionConfigSideEffects(cwd: string, ext: ExtensionDescriptor): void {
+	if (isHeartbeatExtension(ext)) {
+		reloadSharedHeartbeatRunnerSettings(cwd);
+	}
 }
 
 // ─── WebChannel ────────────────────────────────────────────────────────────────
@@ -730,14 +811,9 @@ export class WebChannel implements Channel {
 		return maybeSessionWithCwd.cwd ?? process.cwd();
 	}
 
-	private getHeartbeatExtensionPath(session: AgentSession, requestedPath: string): string | undefined {
+	private getExtensionDescriptor(session: AgentSession, requestedPath: string): ExtensionDescriptor | undefined {
 		const extensions = session.resourceLoader.getExtensions().extensions as ExtensionDescriptor[];
-		const byPath = extensions.find((ext) => ext.path === requestedPath);
-		if (byPath && isHeartbeatExtension(byPath)) {
-			return byPath.path;
-		}
-		const heartbeatExtension = extensions.find((ext) => isHeartbeatExtension(ext));
-		return heartbeatExtension?.path;
+		return extensions.find((ext) => ext.path === requestedPath || ext.resolvedPath === requestedPath);
 	}
 
 	private async executeCommand(sessionId: string, session: AgentSession, command: RpcCommand): Promise<RpcResponse> {
@@ -1032,16 +1108,19 @@ export class WebChannel implements Channel {
 					.map((ext) => {
 						const descriptor = ext as ExtensionDescriptor;
 						const uiSpec = resolveExtensionUiSpec(descriptor);
-						const heartbeatConfig = getHeartbeatUiConfig(cwd);
-						const uiState = isHeartbeatExtension(descriptor)
+						const config = getExtensionUiConfig(cwd, descriptor);
+						const uiState = uiSpec
 							? {
-									heartbeat: {
-										...heartbeatConfig,
-										model: heartbeatConfig.model ?? "(default session model)",
+									config: {
+										...config,
+										model:
+											typeof config.model === "string" && config.model.trim().length > 0
+												? config.model
+												: "(default session model)",
 									},
 									availableModels: availableModelIds,
 									extensionPath: ext.path,
-							  }
+								}
 							: undefined;
 						return {
 							path: ext.path,
@@ -1069,54 +1148,81 @@ export class WebChannel implements Channel {
 			}
 
 			case "get_extension_config": {
-				const heartbeatPath = this.getHeartbeatExtensionPath(session, command.extensionPath);
-				if (!heartbeatPath) {
+				const extension = this.getExtensionDescriptor(session, command.extensionPath);
+				if (!extension) {
 					return {
 						id,
 						type: "response",
 						command: "get_extension_config",
 						success: false,
-						error: `Unsupported extension config: ${command.extensionPath}`,
+						error: `Unknown extension: ${command.extensionPath}`,
 					};
 				}
 
 				const cwd = this.getSessionCwd(session);
-				const config = getHeartbeatUiConfig(cwd);
+				const config = getExtensionUiConfig(cwd, extension);
 				return {
 					id,
 					type: "response",
 					command: "get_extension_config",
 					success: true,
 					data: {
-						extensionPath: heartbeatPath,
+						extensionPath: extension.path,
 						config,
 					},
 				};
 			}
 
 			case "set_extension_config": {
-				const heartbeatPath = this.getHeartbeatExtensionPath(session, command.extensionPath);
-				if (!heartbeatPath) {
+				const extension = this.getExtensionDescriptor(session, command.extensionPath);
+				if (!extension) {
 					return {
 						id,
 						type: "response",
 						command: "set_extension_config",
 						success: false,
-						error: `Unsupported extension config: ${command.extensionPath}`,
+						error: `Unknown extension: ${command.extensionPath}`,
 					};
 				}
 
-				const nextConfig = normalizeHeartbeatConfigInput(command.config);
 				const cwd = this.getSessionCwd(session);
-				const savedConfig = setHeartbeatUiConfig(cwd, nextConfig);
-				reloadSharedHeartbeatRunnerSettings(cwd);
+				const savedConfig = setExtensionUiConfig(cwd, extension, command.config);
+				applyExtensionConfigSideEffects(cwd, extension);
 				return {
 					id,
 					type: "response",
 					command: "set_extension_config",
 					success: true,
 					data: {
-						extensionPath: heartbeatPath,
+						extensionPath: extension.path,
+						config: savedConfig,
+					},
+				};
+			}
+
+			case "extension_ui_action": {
+				const extension = this.getExtensionDescriptor(session, command.extensionPath);
+				if (!extension) {
+					return {
+						id,
+						type: "response",
+						command: "extension_ui_action",
+						success: false,
+						error: `Unknown extension: ${command.extensionPath}`,
+					};
+				}
+
+				const cwd = this.getSessionCwd(session);
+				const savedConfig = setExtensionUiConfig(cwd, extension, command.params);
+				applyExtensionConfigSideEffects(cwd, extension);
+				return {
+					id,
+					type: "response",
+					command: "extension_ui_action",
+					success: true,
+					data: {
+						extensionPath: extension.path,
+						action: command.action,
 						config: savedConfig,
 					},
 				};
