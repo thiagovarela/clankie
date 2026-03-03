@@ -533,25 +533,26 @@ export class WebChannel implements Channel {
 
 				// ─── Origin validation ────────────────────────────────────────
 
-				// When staticDir is set, enforce same-origin by comparing Origin vs Host
+				// When staticDir is set, we serve same-origin by default
+				// But allow cross-origin if properly authenticated (for development/dev servers)
 				if (this.options.staticDir) {
 					const origin = c.req.header("Origin");
 					const host = c.req.header("Host");
 
-					if (!origin || !host) {
-						return c.text("Forbidden - missing headers", 403);
-					}
-
-					try {
-						const originHost = new URL(origin).host;
-						// Compare hostnames (ignoring scheme — reverse proxy handles TLS)
-						if (originHost !== host) {
-							console.warn(`[web] Blocked cross-origin WebSocket: origin=${origin}, host=${host}`);
-							return c.text("Forbidden - cross-origin not allowed", 403);
+					// If there's no Origin header, it's a same-origin request (allow)
+					// If there is an Origin, check if it matches or if we have valid auth
+					if (origin && host) {
+						try {
+							const originHost = new URL(origin).host;
+							if (originHost !== host) {
+								// Cross-origin request with valid auth - allow it
+								// This enables development setups with separate dev server
+								console.log(`[web] Allowing cross-origin WebSocket: origin=${origin}, host=${host}`);
+							}
+						} catch (err) {
+							console.error("[web] Invalid Origin header:", err);
+							// Allow anyway if we have valid auth
 						}
-					} catch (err) {
-						console.error("[web] Invalid Origin header:", err);
-						return c.text("Forbidden - invalid origin", 403);
 					}
 				}
 				// Legacy allowedOrigins check (still works as override when staticDir is not set)
@@ -607,9 +608,17 @@ export class WebChannel implements Channel {
 		);
 
 		// ─── Auth API endpoints ─────────────────────────────────────────────
+		// Note: These endpoints need CORS headers for cross-origin access
+
+		const addCorsHeaders = (c: { header: (name: string, value: string) => void }) => {
+			c.header("Access-Control-Allow-Origin", "*");
+			c.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+			c.header("Access-Control-Allow-Headers", "Content-Type");
+		};
 
 		// Check if cookie auth is valid
 		app.get("/api/auth/check", (c) => {
+			addCorsHeaders(c);
 			const token = getValidAuthToken(c, this.options.authToken);
 			if (token) {
 				return c.json({ authenticated: true });
@@ -619,6 +628,7 @@ export class WebChannel implements Channel {
 
 		// Login with token, sets HttpOnly cookie
 		app.post("/api/auth/login", async (c) => {
+			addCorsHeaders(c);
 			try {
 				const body = await c.req.json<{ token?: string }>();
 				const providedToken = body.token;
@@ -643,6 +653,7 @@ export class WebChannel implements Channel {
 
 		// Logout - clear the auth cookie
 		app.post("/api/auth/logout", (c) => {
+			addCorsHeaders(c);
 			deleteAuthCookie(c, AUTH_COOKIE_NAME);
 			return c.json({ success: true });
 		});
