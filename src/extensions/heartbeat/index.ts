@@ -35,14 +35,16 @@ async function handleHeartbeatCommand(args: string, _pi: ExtensionAPI, cwd: stri
 
 	if (action === "reload") {
 		const settings = runner.reloadSettings();
-		return `✓ Heartbeat settings reloaded (every: ${settings.every}, resultsDir: ${settings.resultsDir})`;
+		return `✓ Heartbeat settings reloaded (every: ${settings.every}, resultsDir: ${settings.resultsDir}, model: ${settings.model ?? "default"})`;
 	}
 
 	const status = runner.getStatus();
+	const settings = runner.getSettings();
 	const last = status.lastResult;
 	const lines = [
 		`Heartbeat: ${status.active ? "active" : "inactive"}${status.running ? " (running)" : ""}`,
 		`Runs: ${status.runCount} · OK: ${status.okCount} · Alerts: ${status.alertCount}`,
+		`Model: ${settings.model ?? "(default session model)"}`,
 		last ? `Last: ${last.timestamp} (${last.ok ? "OK" : "alert"})` : "Last: never",
 		last ? `Results: ${last.resultsDir}` : "Results: ~/.clankie/workspace/heartbeat",
 	];

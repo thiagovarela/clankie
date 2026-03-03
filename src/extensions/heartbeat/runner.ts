@@ -175,6 +175,10 @@ export class HeartbeatRunner {
 		};
 	}
 
+	getSettings(): HeartbeatSettings {
+		return { ...this.settings };
+	}
+
 	async runNow(): Promise<HeartbeatRunResult> {
 		this.settings = resolveHeartbeatSettings(this.cwd);
 		return this.execute();
@@ -274,7 +278,9 @@ export class HeartbeatRunner {
 		});
 		await loader.reload();
 
-		const modelSpec = config.agent?.model?.primary;
+		const configuredModelSpec = this.settings.model?.trim();
+		const fallbackModelSpec = config.agent?.model?.primary;
+		const modelSpec = configuredModelSpec || fallbackModelSpec;
 		let model: ReturnType<ModelRegistry["find"]> | undefined;
 		if (modelSpec) {
 			const slash = modelSpec.indexOf("/");

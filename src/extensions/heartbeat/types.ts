@@ -12,6 +12,7 @@ export interface HeartbeatSettings {
 	ackMaxChars: number;
 	resultsDir: string;
 	showOk: boolean;
+	model: string | null;
 }
 
 export interface HeartbeatParsedResponse {
