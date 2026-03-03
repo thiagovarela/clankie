@@ -11,6 +11,8 @@ export type ConnectionState =
 export interface WebSocketClientOptions {
   url: string
   authToken: string
+  /** When true, use cookie-based auth (browser sends cookies automatically) */
+  useCookieAuth?: boolean
   onMessage: (data: unknown) => void
   onStateChange: (state: ConnectionState, error?: string) => void
   reconnect?: boolean
@@ -48,9 +50,12 @@ export class WebSocketClient {
 
     try {
       // Browser WebSocket API doesn't support custom headers (like Authorization)
-      // Pass the auth token via URL query parameter instead
+      // When useCookieAuth is true, the browser automatically sends cookies
+      // Otherwise, pass the auth token via URL query parameter
       const url = new URL(this.options.url)
-      url.searchParams.set('token', this.options.authToken)
+      if (!this.options.useCookieAuth && this.options.authToken) {
+        url.searchParams.set('token', this.options.authToken)
+      }
       this.ws = new WebSocket(url.toString())
 
       this.ws.onopen = () => {

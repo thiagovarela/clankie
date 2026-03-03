@@ -9,6 +9,8 @@ import type { ConnectionState } from '@/lib/ws-client'
 export interface ConnectionSettings {
   url: string
   authToken: string
+  /** When true, use cookie-based auth instead of localStorage token */
+  useCookieAuth: boolean
 }
 
 export interface ConnectionStore {
@@ -41,6 +43,7 @@ function getDefaultUrl(): string {
 const DEFAULT_SETTINGS: ConnectionSettings = {
   url: getDefaultUrl(),
   authToken: '',
+  useCookieAuth: false,
 }
 
 // Load settings from localStorage
@@ -107,4 +110,46 @@ export function resetConnectionError(): void {
     ...state,
     error: undefined,
   }))
+}
+
+/**
+ * Enable cookie-based authentication mode.
+ * This is called when /api/auth/check returns authenticated: true.
+ * When enabled, the client uses cookies for WebSocket auth instead of localStorage.
+ */
+export function enableCookieAuth(): void {
+  connectionStore.setState((state) => {
+    // Enable cookie auth, clear the stored token (it's now in the cookie)
+    const updated = { ...state.settings, useCookieAuth: true }
+    // Don't save to localStorage - cookie auth doesn't need it
+    return {
+      ...state,
+      settings: updated,
+    }
+  })
+}
+
+/**
+ * Disable cookie-based authentication mode and optionally clear the cookie.
+ * If clearCookie is true, calls /api/auth/logout to clear the server-side cookie.
+ */
+export async function disableCookieAuth(clearCookie: boolean): Promise<void> {
+  if (clearCookie) {
+    try {
+      const settings = connectionStore.state.settings
+      const apiUrl = settings.url.replace(/^ws/, 'http').replace(/\/$/, '')
+      await fetch(`${apiUrl}/api/auth/logout`, { method: 'POST' })
+    } catch (err) {
+      console.error('[connection] Failed to clear auth cookie:', err)
+    }
+  }
+
+  connectionStore.setState((state) => {
+    const updated = { ...state.settings, useCookieAuth: false }
+    saveSettings(updated)
+    return {
+      ...state,
+      settings: updated,
+    }
+  })
 }
