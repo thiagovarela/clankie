@@ -11,6 +11,16 @@ function ensureRunner(cwd: string): HeartbeatRunner {
 	return sharedRunner;
 }
 
+export function reloadSharedHeartbeatRunnerSettings(cwd?: string): void {
+	if (!sharedRunner) {
+		return;
+	}
+	if (cwd) {
+		ensureRunner(cwd);
+	}
+	sharedRunner.reloadSettings();
+}
+
 async function handleHeartbeatCommand(args: string, _pi: ExtensionAPI, cwd: string): Promise<string> {
 	const runner = ensureRunner(cwd);
 	const action = args.trim().toLowerCase();

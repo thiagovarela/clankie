@@ -258,6 +258,29 @@ export class ClankieClient {
     }
   }
 
+  async getExtensionConfig(
+    sessionId: string,
+    extensionPath: string,
+  ): Promise<{ extensionPath: string; config: Record<string, unknown> }> {
+    const response = await this.sendCommand(
+      { type: 'get_extension_config', extensionPath },
+      sessionId,
+    )
+    return response as { extensionPath: string; config: Record<string, unknown> }
+  }
+
+  async setExtensionConfig(
+    sessionId: string,
+    extensionPath: string,
+    config: Record<string, unknown>,
+  ): Promise<{ extensionPath: string; config: Record<string, unknown> }> {
+    const response = await this.sendCommand(
+      { type: 'set_extension_config', extensionPath, config },
+      sessionId,
+    )
+    return response as { extensionPath: string; config: Record<string, unknown> }
+  }
+
   async getSkills(sessionId: string): Promise<{
     skills: Array<{
       name: string

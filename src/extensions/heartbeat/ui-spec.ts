@@ -5,7 +5,7 @@ export const HEARTBEAT_EXTENSION_UI_SPEC = {
 			type: "Card",
 			props: {
 				title: "Heartbeat",
-				description: "Periodic health checks for your workspace",
+				description: "Configure periodic workspace health checks",
 			},
 			children: ["heartbeat-stack"],
 		},
@@ -13,28 +13,64 @@ export const HEARTBEAT_EXTENSION_UI_SPEC = {
 			type: "Stack",
 			props: {
 				direction: "vertical",
-				gap: "sm",
+				gap: "md",
 			},
-			children: ["heartbeat-description", "heartbeat-commands", "heartbeat-flags"],
+			children: [
+				"heartbeat-enabled",
+				"heartbeat-every",
+				"heartbeat-model",
+				"heartbeat-save",
+				"heartbeat-help",
+			],
 		},
-		"heartbeat-description": {
+		"heartbeat-enabled": {
+			type: "Switch",
+			props: {
+				label: "Enable heartbeat",
+				name: "heartbeat-enabled",
+				checked: { $bindState: "/heartbeat/enabled" },
+			},
+		},
+		"heartbeat-every": {
+			type: "Input",
+			props: {
+				label: "Schedule",
+				name: "heartbeat-every",
+				placeholder: "30m",
+				value: { $bindState: "/heartbeat/every" },
+			},
+		},
+		"heartbeat-model": {
+			type: "Input",
+			props: {
+				label: "Model (optional)",
+				name: "heartbeat-model",
+				placeholder: "anthropic/claude-sonnet-4-5",
+				value: { $bindState: "/heartbeat/model" },
+			},
+		},
+		"heartbeat-save": {
+			type: "Button",
+			props: {
+				label: "Save heartbeat settings",
+				variant: "primary",
+			},
+			on: {
+				press: {
+					action: "saveExtensionConfig",
+					params: {
+						enabled: { $state: "/heartbeat/enabled" },
+						every: { $state: "/heartbeat/every" },
+						model: { $state: "/heartbeat/model" },
+					},
+				},
+			},
+		},
+		"heartbeat-help": {
 			type: "Text",
 			props: {
-				text: "Use /heartbeat on|off|run|reload to control checks and --heartbeat to auto-start.",
+				text: "Use values like 15m or 1h. Keep model empty to use the default session model.",
 				variant: "muted",
-			},
-		},
-		"heartbeat-commands": {
-			type: "Text",
-			props: {
-				text: "Commands: /heartbeat on, /heartbeat off, /heartbeat run, /heartbeat reload",
-			},
-		},
-		"heartbeat-flags": {
-			type: "Badge",
-			props: {
-				text: "--heartbeat",
-				variant: "secondary",
 			},
 		},
 	},
