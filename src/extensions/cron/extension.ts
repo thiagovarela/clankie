@@ -20,7 +20,7 @@ const CronParamsSchema = Type.Object({
 	intervalMs: Type.Optional(Type.Number({ description: "Interval in milliseconds for every schedule" })),
 	cron: Type.Optional(Type.String({ description: "Cron expression for cron schedule" })),
 	tz: Type.Optional(Type.String({ description: "IANA timezone for cron schedule" })),
-	deliveryChannel: Type.Optional(Type.String({ description: "Target channel (e.g. slack)" })),
+	deliveryChannel: Type.Optional(Type.String({ description: "Target channel (e.g. web)" })),
 	deliveryChatId: Type.Optional(Type.String({ description: "Target chat/channel ID" })),
 	deliveryThreadId: Type.Optional(Type.String({ description: "Optional thread ID" })),
 	deleteAfterRun: Type.Optional(Type.Boolean({ description: "Delete one-shot jobs after success" })),

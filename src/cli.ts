@@ -63,17 +63,13 @@ Config paths (dot-separated):
   agent.agentDir                    Override pi's agent dir
   agent.model.primary               Primary model (provider/model format)
   agent.model.fallbacks             Fallback models (JSON array)
-  channels.slack.appToken           Slack app token (xapp-...) for Socket Mode
-  channels.slack.botToken           Slack bot token (xoxb-...) for API calls
-  channels.slack.allowFrom          Allowed Slack user IDs (JSON array of strings)
-  channels.slack.enabled            Enable/disable Slack (default: true)
   channels.web.authToken            Web channel auth token (required, shared secret)
   channels.web.port                 Web channel port (default: 3100)
   channels.web.allowedOrigins       Allowed origins (JSON array, empty = allow all)
   channels.web.staticDir            Path to built web-ui files (serves UI on same port)
   channels.web.enabled              Enable/disable web channel (default: true)
 
-Slack slash commands (when running as daemon):
+Session commands (when running as daemon):
   /switch <name>                    Switch to a different session
   /sessions                         List all sessions
   /new                              Start a fresh session
@@ -83,11 +79,6 @@ Examples:
   clankie init                          # generates token, configures web channel
   clankie login                         # authenticate with AI provider
   clankie start                         # starts daemon, prints connect URL
-  
-  # Slack setup
-  clankie config set channels.slack.appToken "xapp-..."
-  clankie config set channels.slack.botToken "xoxb-..."
-  clankie config set channels.slack.allowFrom ["U12345678"]
   
   # Manual web channel setup (optional if using init)
   clankie config set channels.web.authToken "your-secret-token"
@@ -364,7 +355,7 @@ async function cmdConfig(args: string[]): Promise<void> {
 	if (sub === "get") {
 		const [path] = rest;
 		if (!path) {
-			console.error("Usage: clankie config get <path>\n\nExample: clankie config get channels.slack.botToken");
+			console.error("Usage: clankie config get <path>\n\nExample: clankie config get channels.web.authToken");
 			process.exit(1);
 		}
 		const config = loadConfig();
@@ -382,7 +373,7 @@ async function cmdConfig(args: string[]): Promise<void> {
 		const [path, ...valueParts] = rest;
 		if (!path) {
 			console.error(
-				'Usage: clankie config set <path> <value>\n\nExample: clankie config set channels.slack.botToken "xoxb-..."',
+				'Usage: clankie config set <path> <value>\n\nExample: clankie config set channels.web.authToken "your-secret-token"',
 			);
 			process.exit(1);
 		}
