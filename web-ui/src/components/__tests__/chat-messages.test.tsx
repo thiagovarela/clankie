@@ -118,7 +118,7 @@ describe('ChatMessages', () => {
   })
 
   describe('layout', () => {
-    it('applies correct container classes', () => {
+    it('applies correct container classes with messages', () => {
       addUserMessage('Test') // Add a message so content renders
 
       const { container } = render(<ChatMessages />)
@@ -130,6 +130,14 @@ describe('ChatMessages', () => {
       // Check for message spacing
       const messagesContainer = container.querySelector('.space-y-4')
       expect(messagesContainer).toBeInTheDocument()
+    })
+
+    it('applies overflow scroll container in empty state', () => {
+      const { container } = render(<ChatMessages />)
+
+      // Check for overflow scroll container even when empty
+      const scrollContainer = container.querySelector('.overflow-y-auto')
+      expect(scrollContainer).toBeInTheDocument()
     })
   })
 
