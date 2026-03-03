@@ -19,7 +19,6 @@ import {
 	ModelRegistry,
 	SessionManager,
 } from "@mariozechner/pi-coding-agent";
-import createMemoryExtension from "../extensions/clankie-memory/src/index.ts";
 import { getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
 import { createCronExtension } from "./extensions/cron/index.ts";
 import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
@@ -69,7 +68,6 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 	const extensionFactories: ExtensionFactory[] = [];
 	extensionFactories.push(createCronExtension());
 	extensionFactories.push(createHeartbeatExtension());
-	extensionFactories.push(createMemoryExtension);
 	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
 	if (restrictToWorkspace) {
 		const configuredAllowedPaths = config.agent?.allowedPaths ?? [];
