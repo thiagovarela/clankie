@@ -41,11 +41,11 @@ export const HEARTBEAT_EXTENSION_UI_SPEC = {
 			},
 		},
 		"heartbeat-model": {
-			type: "Input",
+			type: "Select",
 			props: {
 				label: "Model (optional)",
 				name: "heartbeat-model",
-				placeholder: "anthropic/claude-sonnet-4-5",
+				options: { $state: "/availableModels" },
 				value: { $bindState: "/heartbeat/model" },
 			},
 		},
@@ -69,7 +69,7 @@ export const HEARTBEAT_EXTENSION_UI_SPEC = {
 		"heartbeat-help": {
 			type: "Text",
 			props: {
-				text: "Use values like 15m or 1h. Keep model empty to use the default session model.",
+				text: "Use values like 15m or 1h. Pick '(default session model)' to follow the session model.",
 				variant: "muted",
 			},
 		},
