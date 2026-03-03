@@ -5,6 +5,7 @@ import {
   shadcnComponentDefinitions,
   shadcnComponents,
 } from '@json-render/shadcn'
+import { toast } from 'sonner'
 import { clientManager } from '@/lib/client-manager'
 import type { ExtensionUISpec } from './types'
 
@@ -48,22 +49,30 @@ export function JsonRenderRenderer({
       handlers={{
         saveExtensionConfig: async (params) => {
           if (!client || !sessionId || !extensionPath) {
-            throw new Error('Not connected')
+            toast.error('Not connected')
+            return
           }
 
           const modelValue =
             typeof params.model === 'string' ? params.model.trim() : ''
 
-          await client.setExtensionConfig(sessionId, extensionPath, {
-            enabled: Boolean(params.enabled),
-            every: String(params.every ?? ''),
-            model:
-              modelValue === '' || modelValue === '(default session model)'
-                ? null
-                : modelValue,
-          })
+          try {
+            await client.setExtensionConfig(sessionId, extensionPath, {
+              enabled: Boolean(params.enabled),
+              every: String(params.every ?? ''),
+              model:
+                modelValue === '' || modelValue === '(default session model)'
+                  ? null
+                  : modelValue,
+            })
 
-          await onConfigSaved?.()
+            await onConfigSaved?.()
+            toast.success('Extension settings saved')
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error)
+            toast.error(message)
+          }
         },
       }}
     >
