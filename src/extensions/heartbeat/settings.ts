@@ -12,6 +12,7 @@ const DEFAULTS: HeartbeatSettings = {
 	ackMaxChars: 300,
 	resultsDir: join(homedir(), ".clankie", "workspace", "heartbeat"),
 	showOk: false,
+	model: null,
 };
 
 function toRecord(value: unknown): Record<string, unknown> {
@@ -41,6 +42,7 @@ function parseNamespace(raw: Record<string, unknown>): Partial<HeartbeatSettings
 		ackMaxChars: typeof raw.ackMaxChars === "number" ? raw.ackMaxChars : undefined,
 		resultsDir: typeof raw.resultsDir === "string" ? raw.resultsDir : undefined,
 		showOk: typeof raw.showOk === "boolean" ? raw.showOk : undefined,
+		model: typeof raw.model === "string" ? raw.model : raw.model === null ? null : undefined,
 	};
 }
 
