@@ -1,5 +1,5 @@
 import { defineCatalog } from '@json-render/core'
-import { Renderer, defineRegistry } from '@json-render/react'
+import { JSONUIProvider, Renderer, defineRegistry } from '@json-render/react'
 import { schema } from '@json-render/react/schema'
 import {
   shadcnComponentDefinitions,
@@ -17,5 +17,9 @@ const { registry } = defineRegistry(catalog, {
 })
 
 export function JsonRenderRenderer({ spec }: { spec: ExtensionUISpec }) {
-  return <Renderer spec={spec as any} registry={registry} />
+  return (
+    <JSONUIProvider registry={registry}>
+      <Renderer spec={spec as any} registry={registry} />
+    </JSONUIProvider>
+  )
 }
