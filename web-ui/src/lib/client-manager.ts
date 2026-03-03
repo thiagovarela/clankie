@@ -42,7 +42,10 @@ class ClientManager {
 
     const { settings } = connectionStore.state
 
-    if (!settings.authToken) {
+    // Allow connection if:
+    // 1. authToken is provided (token-based auth), OR
+    // 2. useCookieAuth is true (cookie-based auth)
+    if (!settings.authToken && !settings.useCookieAuth) {
       updateConnectionStatus('error', 'Auth token is required')
       return
     }
@@ -50,6 +53,7 @@ class ClientManager {
     this.client = new ClankieClient({
       url: settings.url,
       authToken: settings.authToken,
+      useCookieAuth: settings.useCookieAuth,
       onEvent: (sessionId, event) => {
         const { activeSessionId } = sessionsListStore.state
         handleSessionEvent(sessionId, event, activeSessionId)

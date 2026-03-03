@@ -15,7 +15,11 @@ import {
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { clientManager } from '@/lib/client-manager'
-import { connectionStore, updateConnectionSettings } from '@/stores/connection'
+import {
+  connectionStore,
+  enableCookieAuth,
+  updateConnectionSettings,
+} from '@/stores/connection'
 import { ExtensionUIProvider } from '@/components/extension-ui/provider'
 
 export const Route = createRootRoute({
@@ -49,10 +53,43 @@ export const Route = createRootRoute({
 })
 
 function RootComponent() {
-  // Auto-detect token from URL query parameter and auto-connect
+  // Auto-detect cookie auth and auto-connect
   useEffect(() => {
-    // Check for ?token= query parameter
-    if (typeof window !== 'undefined') {
+    async function checkCookieAuth() {
+      if (typeof window === 'undefined') return
+
+      // Get the WebSocket URL from settings to determine the API base URL
+      const { settings } = connectionStore.state
+      const wsUrl = settings.url
+      // Convert ws:// to http:// for API calls
+      const apiBase = wsUrl.replace(/^ws/, 'http').replace(/\/$/, '')
+
+      try {
+        // Check if cookie auth is valid
+        const response = await fetch(`${apiBase}/api/auth/check`, {
+          credentials: 'include', // Include cookies in the request
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.authenticated) {
+            // Cookie auth is valid - enable it
+            console.log('[root] Cookie auth is active')
+            enableCookieAuth()
+            // Connect using cookie auth
+            if (!clientManager.isConnected()) {
+              clientManager.connect()
+            }
+            return
+          }
+        }
+      } catch (err) {
+        // API call failed (probably cross-origin or server doesn't support it)
+        console.log('[root] Cookie auth check failed:', err)
+      }
+
+      // Fall back to token-based auth
+      // Check for ?token= query parameter
       const params = new URLSearchParams(window.location.search)
       const token = params.get('token')
 
@@ -67,13 +104,15 @@ function RootComponent() {
           '[root] Detected auth token from URL, saved to localStorage',
         )
       }
+
+      // Auto-connect if auth token is configured
+      const { settings: currentSettings } = connectionStore.state
+      if (currentSettings.authToken && !clientManager.isConnected()) {
+        clientManager.connect()
+      }
     }
 
-    // Auto-connect if auth token is configured
-    const { settings } = connectionStore.state
-    if (settings.authToken && !clientManager.isConnected()) {
-      clientManager.connect()
-    }
+    checkCookieAuth()
   }, [])
 
   return (

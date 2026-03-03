@@ -27,6 +27,8 @@ import type { ConnectionState } from './ws-client'
 export interface ClankieClientOptions {
   url: string
   authToken: string
+  /** When true, use cookie-based auth (browser sends cookies automatically) */
+  useCookieAuth?: boolean
   onEvent: (sessionId: string, event: AgentSessionEvent | RpcResponse) => void
   onAuthEvent: (event: AuthEvent) => void
   onExtensionUIRequest: (event: ExtensionUIRequest) => void
@@ -47,6 +49,7 @@ export class ClankieClient {
     this.ws = new WebSocketClient({
       url: options.url,
       authToken: options.authToken,
+      useCookieAuth: options.useCookieAuth,
       onMessage: (data) =>
         this.handleMessage(data as OutboundWebMessage | RpcResponse),
       onStateChange: options.onStateChange,

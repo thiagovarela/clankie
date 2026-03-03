@@ -19,6 +19,7 @@ import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 import type { ImageContent, OAuthLoginCallbacks } from "@mariozechner/pi-ai";
 import { type AgentSession, type AgentSessionEvent, AuthStorage } from "@mariozechner/pi-coding-agent";
 import { Hono } from "hono";
+import { parse as parseCookie, serialize as serializeCookie } from "hono/utils/cookie";
 import type { WSContext } from "hono/ws";
 import { buildApiKeyProviders } from "../auth/providers.ts";
 import { getAppDir, getAuthPath, loadConfig } from "../config.ts";
@@ -377,6 +378,105 @@ function applyExtensionConfigSideEffects(cwd: string, ext: ExtensionDescriptor):
 
 // ─── WebChannel ────────────────────────────────────────────────────────────────
 
+/** Cookie name for auth token (HttpOnly, same-origin) */
+const AUTH_COOKIE_NAME = "clankie_auth";
+
+/** Cookie max age: 30 days in seconds */
+const AUTH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60;
+
+/**
+ * Build cookie options based on request protocol.
+ * Secure flag is only set for HTTPS connections.
+ */
+function getCookieOptions(c: { req: { header: (name: string) => string | undefined } }): {
+	httpOnly: boolean;
+	sameSite: "Strict" | "Lax" | "None";
+	secure: boolean;
+	path: string;
+	maxAge: number;
+} {
+	const protocol = c.req.header("x-forwarded-proto") || c.req.header("protocol") || "http";
+	const isHttps = protocol === "https";
+
+	return {
+		httpOnly: true,
+		sameSite: "Lax" as const,
+		secure: isHttps,
+		path: "/",
+		maxAge: AUTH_COOKIE_MAX_AGE,
+	};
+}
+
+/**
+ * Set a cookie on the response using Hono's context.
+ */
+function setAuthCookie(
+	c: { header: (name: string, value: string, options?: { append?: boolean }) => void },
+	name: string,
+	value: string,
+	options: Parameters<typeof getCookieOptions>[0],
+): void {
+	const cookieValue = serializeCookie(name, value, {
+		...options,
+		httpOnly: true,
+		sameSite: options.sameSite,
+		secure: options.secure,
+		path: options.path,
+		maxAge: options.maxAge,
+	});
+	c.header("Set-Cookie", cookieValue);
+}
+
+/**
+ * Delete a cookie by setting it with an expired maxAge.
+ */
+function deleteAuthCookie(
+	c: { header: (name: string, value: string, options?: { append?: boolean }) => void },
+	name: string,
+): void {
+	const cookieValue = serializeCookie(name, "", {
+		path: "/",
+		maxAge: 0,
+	});
+	c.header("Set-Cookie", cookieValue);
+}
+
+/**
+ * Validate auth token from various sources (cookie, query param, header).
+ * Returns the token if valid, undefined otherwise.
+ */
+function getValidAuthToken(
+	c: { req: { header: (name: string) => string | undefined; query: (name: string) => string | undefined } },
+	validToken: string,
+): string | undefined {
+	// 1. Try Authorization header (Bearer token)
+	const authHeader = c.req.header("Authorization");
+	if (authHeader) {
+		const headerToken = authHeader.replace(/^Bearer\s+/i, "");
+		if (headerToken === validToken) {
+			return headerToken;
+		}
+	}
+
+	// 2. Try HttpOnly cookie (set by /api/auth/login)
+	const cookieHeader = c.req.header("Cookie");
+	if (cookieHeader) {
+		const cookies = parseCookie(cookieHeader);
+		const cookieToken = cookies[AUTH_COOKIE_NAME];
+		if (cookieToken === validToken) {
+			return cookieToken;
+		}
+	}
+
+	// 3. Try query parameter (legacy, for backward compatibility)
+	const queryToken = c.req.query("token");
+	if (queryToken === validToken) {
+		return queryToken;
+	}
+
+	return undefined;
+}
+
 export class WebChannel implements Channel {
 	readonly name = "web";
 	private options: WebChannelOptions;
@@ -424,14 +524,10 @@ export class WebChannel implements Channel {
 		app.get(
 			"/",
 			wsUpgrade((c) => {
-				// Validate auth token from Authorization header or URL query param
-				const authHeader = c.req.header("Authorization");
-				const headerToken = authHeader?.replace(/^Bearer\s+/i, "");
-				const queryToken = c.req.query("token");
+				// Validate auth token from Authorization header, cookie, or URL query param
+				const token = getValidAuthToken(c, this.options.authToken);
 
-				const token = headerToken || queryToken;
-
-				if (token !== this.options.authToken) {
+				if (!token) {
 					return c.text("Unauthorized", 401);
 				}
 
@@ -509,6 +605,47 @@ export class WebChannel implements Channel {
 				};
 			}),
 		);
+
+		// ─── Auth API endpoints ─────────────────────────────────────────────
+
+		// Check if cookie auth is valid
+		app.get("/api/auth/check", (c) => {
+			const token = getValidAuthToken(c, this.options.authToken);
+			if (token) {
+				return c.json({ authenticated: true });
+			}
+			return c.json({ authenticated: false });
+		});
+
+		// Login with token, sets HttpOnly cookie
+		app.post("/api/auth/login", async (c) => {
+			try {
+				const body = await c.req.json<{ token?: string }>();
+				const providedToken = body.token;
+
+				if (!providedToken) {
+					return c.json({ success: false, error: "Token is required" }, 400);
+				}
+
+				if (providedToken !== this.options.authToken) {
+					return c.json({ success: false, error: "Invalid token" }, 401);
+				}
+
+				// Set the HttpOnly cookie
+				setAuthCookie(c, AUTH_COOKIE_NAME, providedToken, getCookieOptions(c));
+
+				return c.json({ success: true });
+			} catch (err) {
+				console.error("[web] /api/auth/login error:", err);
+				return c.json({ success: false, error: "Internal server error" }, 500);
+			}
+		});
+
+		// Logout - clear the auth cookie
+		app.post("/api/auth/logout", (c) => {
+			deleteAuthCookie(c, AUTH_COOKIE_NAME);
+			return c.json({ success: true });
+		});
 
 		// ─── Static file serving ──────────────────────────────────────────────
 
