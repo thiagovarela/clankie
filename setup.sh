@@ -53,7 +53,14 @@ else
   info "clankie installed"
 fi
 
-# ─── 4. Initialize clankie ───────────────────────────────────────────
+# ─── 4. Install standalone extension dependencies (if in repo) ───────
+if [ -d "extensions/clankie-memory" ]; then
+  warn "Installing clankie-memory dependencies…"
+  (cd extensions/clankie-memory && npm install)
+  info "clankie-memory dependencies installed"
+fi
+
+# ─── 5. Initialize clankie ───────────────────────────────────────────
 warn "Running clankie init…"
 clankie init
 info "clankie init complete"
