@@ -21,6 +21,7 @@ import {
 import type { Attachment } from "./channels/channel.ts";
 import { type AppConfig, getAgentDir, getAppDir, getAuthPath, getWorkspace } from "./config.ts";
 import { createCronExtension } from "./extensions/cron/index.ts";
+import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
 import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
 
 // ─── Session cache (one session per chat) ──────────────────────────────────────
@@ -53,6 +54,7 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 	// Build extension factories (workspace jail if enabled)
 	const extensionFactories: ExtensionFactory[] = [];
 	extensionFactories.push(createCronExtension());
+	extensionFactories.push(createHeartbeatExtension());
 	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
 	if (restrictToWorkspace) {
 		const configuredAllowedPaths = config.agent?.allowedPaths ?? [];
