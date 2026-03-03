@@ -41,6 +41,15 @@ describe('extensions store', () => {
           commands: ['cmd1'],
           flags: [],
           shortcuts: [],
+          uiSpec: {
+            root: 'root',
+            elements: {
+              root: {
+                type: 'Text',
+                props: { text: 'Hello' },
+              },
+            },
+          },
         },
       ]
 
@@ -104,6 +113,33 @@ describe('extensions store', () => {
       expect(extensionsStore.state.extensions[0].path).toBe('new')
       expect(extensionsStore.state.extensionErrors).toHaveLength(1)
       expect(extensionsStore.state.extensionErrors[0].path).toBe('new-error')
+    })
+
+    it('supports extensions that include uiSpec', () => {
+      setExtensions(
+        [
+          {
+            path: 'ui-ext',
+            resolvedPath: 'ui-ext',
+            tools: [],
+            commands: ['heartbeat'],
+            flags: ['heartbeat'],
+            shortcuts: [],
+            uiSpec: {
+              root: 'card-1',
+              elements: {
+                'card-1': {
+                  type: 'Card',
+                  props: { title: 'Heartbeat' },
+                },
+              },
+            },
+          },
+        ],
+        [],
+      )
+
+      expect(extensionsStore.state.extensions[0].uiSpec?.root).toBe('card-1')
     })
   })
 

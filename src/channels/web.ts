@@ -12,7 +12,7 @@
 import * as crypto from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import type { Server } from "node:http";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { serve } from "@hono/node-server";
 import { createNodeWebSocket } from "@hono/node-ws";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
@@ -22,6 +22,7 @@ import { Hono } from "hono";
 import type { WSContext } from "hono/ws";
 import { buildApiKeyProviders } from "../auth/providers.ts";
 import { getAppDir, getAuthPath, loadConfig } from "../config.ts";
+import { HEARTBEAT_EXTENSION_UI_SPEC } from "../extensions/heartbeat/ui-spec.ts";
 import { getOrCreateSession } from "../sessions.ts";
 import type { Channel, MessageHandler } from "./channel.ts";
 
@@ -136,6 +137,119 @@ type RpcExtensionUIResponse =
 	| { type: "extension_ui_response"; id: string; value: string }
 	| { type: "extension_ui_response"; id: string; confirmed: boolean }
 	| { type: "extension_ui_response"; id: string; cancelled: true };
+
+interface ExtensionUISpec {
+	root: string;
+	elements: Record<string, unknown>;
+}
+
+interface ExtensionDescriptor {
+	path: string;
+	resolvedPath: string;
+	tools: Map<string, unknown>;
+	commands: Map<string, unknown>;
+	flags: Map<string, unknown>;
+	shortcuts: Map<string, unknown>;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isValidExtensionUISpec(value: unknown): value is ExtensionUISpec {
+	if (!isRecord(value)) {
+		return false;
+	}
+
+	return typeof value.root === "string" && isRecord(value.elements);
+}
+
+function tryReadJson(filePath: string): unknown | undefined {
+	try {
+		const raw = readFileSync(filePath, "utf8");
+		return JSON.parse(raw);
+	} catch {
+		return undefined;
+	}
+}
+
+function findPackageRoot(startDir: string): string | undefined {
+	let current = resolve(startDir);
+
+	while (true) {
+		const packageJsonPath = join(current, "package.json");
+		if (existsSync(packageJsonPath)) {
+			return current;
+		}
+
+		const parent = dirname(current);
+		if (parent === current) {
+			return undefined;
+		}
+		current = parent;
+	}
+}
+
+function getUiSpecCandidatePaths(extensionPath: string, resolvedPath: string): string[] {
+	const candidates = new Set<string>();
+
+	for (const pathValue of [resolvedPath, extensionPath]) {
+		if (!pathValue || pathValue.startsWith("<inline:")) {
+			continue;
+		}
+
+		const absolutePath = resolve(pathValue);
+		if (!existsSync(absolutePath)) {
+			continue;
+		}
+
+		if (statSync(absolutePath).isFile()) {
+			candidates.add(`${absolutePath}.ui.json`);
+			candidates.add(join(dirname(absolutePath), "ui-spec.json"));
+			const packageRoot = findPackageRoot(dirname(absolutePath));
+			if (packageRoot) {
+				candidates.add(join(packageRoot, "ui-spec.json"));
+			}
+			continue;
+		}
+
+		if (statSync(absolutePath).isDirectory()) {
+			candidates.add(join(absolutePath, "ui-spec.json"));
+			const packageRoot = findPackageRoot(absolutePath);
+			if (packageRoot) {
+				candidates.add(join(packageRoot, "ui-spec.json"));
+			}
+		}
+	}
+
+	return Array.from(candidates);
+}
+
+function resolveInlineExtensionUiSpec(ext: ExtensionDescriptor): ExtensionUISpec | undefined {
+	const commandNames = Array.from(ext.commands.keys());
+	const flagNames = Array.from(ext.flags.keys());
+	const isHeartbeatExtension = commandNames.includes("heartbeat") || flagNames.includes("heartbeat");
+	return isHeartbeatExtension ? HEARTBEAT_EXTENSION_UI_SPEC : undefined;
+}
+
+function resolveExtensionUiSpec(ext: ExtensionDescriptor): ExtensionUISpec | undefined {
+	if (ext.path.startsWith("<inline:")) {
+		return resolveInlineExtensionUiSpec(ext);
+	}
+
+	for (const candidatePath of getUiSpecCandidatePaths(ext.path, ext.resolvedPath)) {
+		if (!existsSync(candidatePath) || !statSync(candidatePath).isFile()) {
+			continue;
+		}
+
+		const parsed = tryReadJson(candidatePath);
+		if (isValidExtensionUISpec(parsed)) {
+			return parsed;
+		}
+	}
+
+	return undefined;
+}
 
 // ─── WebChannel ────────────────────────────────────────────────────────────────
 
@@ -850,18 +964,20 @@ export class WebChannel implements Channel {
 
 			case "get_extensions": {
 				const extensionsResult = session.resourceLoader.getExtensions();
-				// Filter out inline extensions (created programmatically, like workspace-jail)
-				// They have paths like '<inline:1>' and typically don't expose user-facing tools
 				const extensions = extensionsResult.extensions
-					.filter((ext) => !ext.path.startsWith("<inline:"))
-					.map((ext) => ({
-						path: ext.path,
-						resolvedPath: ext.resolvedPath,
-						tools: Array.from(ext.tools.keys()),
-						commands: Array.from(ext.commands.keys()),
-						flags: Array.from(ext.flags.keys()),
-						shortcuts: Array.from(ext.shortcuts.keys()),
-					}));
+					.map((ext) => {
+						const uiSpec = resolveExtensionUiSpec(ext as ExtensionDescriptor);
+						return {
+							path: ext.path,
+							resolvedPath: ext.resolvedPath,
+							tools: Array.from(ext.tools.keys()),
+							commands: Array.from(ext.commands.keys()),
+							flags: Array.from(ext.flags.keys()),
+							shortcuts: Array.from(ext.shortcuts.keys()),
+							uiSpec,
+						};
+					})
+					.filter((ext) => !ext.path.startsWith("<inline:") || Boolean(ext.uiSpec));
 
 				return {
 					id,
