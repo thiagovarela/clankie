@@ -386,6 +386,11 @@ export type ExtensionUIResponse =
 
 // ─── Extensions & Skills ───────────────────────────────────────────────────────
 
+export interface ExtensionUISpec {
+  root: string
+  elements: Record<string, unknown>
+}
+
 export interface ExtensionInfo {
   path: string
   resolvedPath: string
@@ -393,6 +398,7 @@ export interface ExtensionInfo {
   commands: Array<string>
   flags: Array<string>
   shortcuts: Array<string>
+  uiSpec?: ExtensionUISpec
 }
 
 export interface ExtensionError {

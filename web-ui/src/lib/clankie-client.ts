@@ -8,6 +8,8 @@ import type {
   AgentSessionEvent,
   AuthEvent,
   AuthProvider,
+  ExtensionError,
+  ExtensionInfo,
   ExtensionUIRequest,
   ExtensionUIResponse,
   ImageContent,
@@ -243,30 +245,16 @@ export class ClankieClient {
   // ─── Extensions & Skills ───────────────────────────────────────────────────
 
   async getExtensions(sessionId: string): Promise<{
-    extensions: Array<{
-      path: string
-      resolvedPath: string
-      tools: Array<string>
-      commands: Array<string>
-      flags: Array<string>
-      shortcuts: Array<string>
-    }>
-    errors: Array<{ path: string; error: string }>
+    extensions: Array<ExtensionInfo>
+    errors: Array<ExtensionError>
   }> {
     const response = await this.sendCommand(
       { type: 'get_extensions' },
       sessionId,
     )
     return response as {
-      extensions: Array<{
-        path: string
-        resolvedPath: string
-        tools: Array<string>
-        commands: Array<string>
-        flags: Array<string>
-        shortcuts: Array<string>
-      }>
-      errors: Array<{ path: string; error: string }>
+      extensions: Array<ExtensionInfo>
+      errors: Array<ExtensionError>
     }
   }
 

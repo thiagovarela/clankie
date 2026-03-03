@@ -22,6 +22,7 @@ import {
 import { Field, FieldLabel } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { clientManager } from '@/lib/client-manager'
+import { JsonRenderRenderer } from '@/lib/tool-renderers/json-render-renderer'
 import { connectionStore } from '@/stores/connection'
 import {
   extensionsStore,
@@ -292,6 +293,15 @@ function ExtensionsPage() {
                           </div>
                         )}
                       </div>
+
+                      {ext.uiSpec && (
+                        <div className="rounded-md border bg-muted/30 p-3">
+                          <p className="mb-2 text-xs font-medium text-muted-foreground">
+                            Extension UI
+                          </p>
+                          <JsonRenderRenderer spec={ext.uiSpec} />
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
