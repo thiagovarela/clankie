@@ -26,6 +26,8 @@ export interface AppConfig {
 		restrictToWorkspace?: boolean;
 		/** Additional paths outside workspace that are allowed (e.g. ["/tmp"]) */
 		allowedPaths?: string[];
+		/** User timezone (IANA, e.g. "America/Sao_Paulo") */
+		userTimezone?: string;
 		/** Model configuration */
 		model?: {
 			/** Primary model in provider/model format (e.g. "anthropic/claude-sonnet-4-5") */
@@ -33,6 +35,12 @@ export interface AppConfig {
 			/** Fallback models tried in order if primary fails */
 			fallbacks?: string[];
 		};
+	};
+
+	/** Cron scheduler configuration */
+	cron?: {
+		enabled?: boolean;
+		tickIntervalMs?: number;
 	};
 
 	/** Channel configuration — each channel starts when its section exists */

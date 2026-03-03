@@ -13,6 +13,7 @@ import type { Channel, InboundMessage } from "./channels/channel.ts";
 import { SlackChannel } from "./channels/slack.ts";
 import { WebChannel } from "./channels/web.ts";
 import { getAppDir, getBundledWebUiDir, getConfigPath, getWorkspace, loadConfig } from "./config.ts";
+import { CronScheduler, getCronJobsPath, setCronScheduler } from "./extensions/cron/index.ts";
 import {
 	getActiveSessionName,
 	getOrCreateSession,
@@ -58,6 +59,8 @@ function cleanupPidFile(): void {
 
 let activeChannels: Channel[] = [];
 let configWatcher: ReturnType<typeof watch> | null = null;
+let cronJobsWatcher: ReturnType<typeof watch> | null = null;
+let cronScheduler: CronScheduler | null = null;
 
 // ─── Message handling ──────────────────────────────────────────────────────────
 
@@ -284,6 +287,32 @@ async function initializeChannels(): Promise<void> {
 	// Store in module state
 	activeChannels = channels;
 
+	// Cron scheduler
+	if (cronScheduler) {
+		cronScheduler.stop();
+		cronScheduler = null;
+		setCronScheduler(null);
+	}
+	if (config.cron?.enabled !== false) {
+		cronScheduler = new CronScheduler({
+			tickIntervalMs: config.cron?.tickIntervalMs,
+			onDeliver: async (delivery, text) => {
+				const target = channels.find((channel) => channel.name === delivery.channel);
+				if (!target) {
+					throw new Error(`Delivery channel not available: ${delivery.channel}`);
+				}
+				await target.send(delivery.chatId, text, { threadId: delivery.threadId });
+			},
+		});
+		setCronScheduler(cronScheduler);
+		const started = cronScheduler.start();
+		if (started) {
+			console.log("[daemon] Cron scheduler started.");
+		} else {
+			console.warn("[daemon] Cron scheduler lock is held by another process; scheduler not started.");
+		}
+	}
+
 	console.log("[daemon] Ready. Waiting for messages...");
 }
 
@@ -292,6 +321,12 @@ async function initializeChannels(): Promise<void> {
  */
 async function restartChannels(): Promise<void> {
 	console.log("[daemon] Config changed — restarting channels...");
+
+	if (cronScheduler) {
+		cronScheduler.stop();
+		cronScheduler = null;
+		setCronScheduler(null);
+	}
 
 	// Stop existing channels
 	for (const ch of activeChannels) {
@@ -317,10 +352,12 @@ export async function startDaemon(): Promise<void> {
 	// Initial startup
 	await initializeChannels();
 
-	// ─── Config file watcher ──────────────────────────────────────────────
+	// ─── Config and cron jobs file watchers ──────────────────────────────
 
 	const configPath = getConfigPath();
+	const cronJobsPath = getCronJobsPath();
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+	let cronDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 	try {
 		configWatcher = watch(configPath, (_eventType) => {
@@ -337,15 +374,44 @@ export async function startDaemon(): Promise<void> {
 		console.warn(`[daemon] Could not watch config file: ${err instanceof Error ? err.message : String(err)}`);
 	}
 
+	try {
+		cronJobsWatcher = watch(cronJobsPath, (_eventType) => {
+			if (cronDebounceTimer) clearTimeout(cronDebounceTimer);
+			cronDebounceTimer = setTimeout(() => {
+				console.log("[daemon] Cron jobs changed — restarting scheduler...");
+				if (cronScheduler) {
+					cronScheduler.stop();
+					const started = cronScheduler.start();
+					if (!started) {
+						console.warn("[daemon] Could not restart cron scheduler (lock held).");
+					}
+				}
+			}, 1000);
+		});
+		console.log(`[daemon] Watching cron jobs file: ${cronJobsPath}`);
+	} catch (err) {
+		console.warn(`[daemon] Could not watch cron jobs file: ${err instanceof Error ? err.message : String(err)}`);
+	}
+
 	// ─── Graceful shutdown ────────────────────────────────────────────────
 
 	const shutdown = async (signal: string) => {
 		console.log(`\n[daemon] Received ${signal}, shutting down...`);
 
-		// Close config watcher
+		// Close file watchers
 		if (configWatcher) {
 			configWatcher.close();
 			configWatcher = null;
+		}
+		if (cronJobsWatcher) {
+			cronJobsWatcher.close();
+			cronJobsWatcher = null;
+		}
+
+		if (cronScheduler) {
+			cronScheduler.stop();
+			cronScheduler = null;
+			setCronScheduler(null);
 		}
 
 		// Stop channels
