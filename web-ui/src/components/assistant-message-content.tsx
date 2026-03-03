@@ -79,7 +79,7 @@ export function AssistantMessageContent({
       <ToolExecutionList messageId={message.id} />
 
       {message.content.trim().length > 0 ? (
-        <div className="prose prose-base dark:prose-invert max-w-none">
+        <div className="prose prose-base dark:prose-invert max-w-none text-muted-foreground">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}
