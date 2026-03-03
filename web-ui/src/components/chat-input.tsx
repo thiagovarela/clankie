@@ -272,14 +272,14 @@ export function ChatInput() {
 
   return (
     <div
-      className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-4 pt-2 bg-gradient-to-t from-background via-background to-transparent"
+      className="absolute bottom-0 left-0 right-0 z-20 px-4 pb-6 pt-8 bg-gradient-to-t from-background via-background/95 to-transparent"
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
       <div className="mx-auto w-full max-w-3xl">
         {/* Floating dock container */}
-        <div className="relative rounded-2xl border border-border/50 bg-card/95 backdrop-blur-xl shadow-lg shadow-black/5 dark:shadow-black/20">
+        <div className="relative rounded-2xl border border-border/40 bg-card/80 backdrop-blur-xl shadow-2xl shadow-black/10 dark:shadow-black/30">
           {/* Attachment previews */}
           {attachments.length > 0 && (
             <div className="px-4 pt-3">

@@ -30,10 +30,10 @@ export function NavMain() {
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip="New Chat"
-              className="h-9 text-sm bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground transition-all"
+              className="h-10 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground transition-all rounded-xl"
               onClick={handleCreateChat}
             >
-              <CirclePlusIcon className="h-4 w-4" />
+              <CirclePlusIcon className="h-4 w-4 mr-1" />
               <span>New Chat</span>
             </SidebarMenuButton>
           </SidebarMenuItem>

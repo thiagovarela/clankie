@@ -19,7 +19,7 @@ export function ChatTopbar() {
   }
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border/50 bg-background/80 backdrop-blur-md px-4 sticky top-0 z-30">
+    <header className="flex h-14 shrink-0 items-center justify-between gap-4 border-b border-border/30 bg-background/60 backdrop-blur-xl px-4 sticky top-0 z-30">
       {/* Left: New chat button */}
       <div className="flex items-center gap-2">
         <Button

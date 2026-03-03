@@ -41,22 +41,22 @@ export function NavSecondary({
   const [settingsOpen, setSettingsOpen] = useState(isInSettings)
 
   return (
-    <SidebarGroup {...props} className="px-2 py-1">
+    <SidebarGroup {...props} className="px-2 py-2">
       <SidebarGroupContent>
-        <SidebarMenu className="gap-0.5">
+        <SidebarMenu className="gap-1">
           <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
             <SidebarMenuItem>
               <CollapsibleTrigger asChild>
-                <SidebarMenuButton className="h-7 text-xs text-sidebar-foreground/70 hover:text-sidebar-foreground">
-                  <Settings className="h-3.5 w-3.5" />
+                <SidebarMenuButton className="h-10 text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground rounded-xl">
+                  <Settings className="h-4 w-4" />
                   <span>Settings</span>
                   <ChevronDown
-                    className={`ml-auto h-3 w-3 transition-transform text-muted-foreground/50 ${settingsOpen ? 'rotate-180' : ''}`}
+                    className={`ml-auto h-4 w-4 transition-transform text-muted-foreground/50 ${settingsOpen ? 'rotate-180' : ''}`}
                   />
                 </SidebarMenuButton>
               </CollapsibleTrigger>
               <CollapsibleContent>
-                <SidebarMenuSub className="gap-0.5 py-1">
+                <SidebarMenuSub className="gap-1 py-1">
                   {settingsLinks.map((link) => {
                     const Icon = link.icon
                     const isActive = currentPath === link.to
@@ -65,9 +65,9 @@ export function NavSecondary({
                         <SidebarMenuSubButton
                           render={<Link to={link.to} />}
                           isActive={isActive}
-                          className="h-6 text-[11px]"
+                          className="h-9 text-xs rounded-lg"
                         >
-                          <Icon className="h-3 w-3" />
+                          <Icon className="h-3.5 w-3.5" />
                           <span>{link.label}</span>
                         </SidebarMenuSubButton>
                       </SidebarMenuSubItem>

@@ -18,24 +18,25 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar 
       collapsible="offcanvas" 
+      className="border-r border-border/20"
       {...props}
     >
-      <SidebarHeader className="gap-3 px-3 py-3 border-b border-sidebar-border/30">
+      <SidebarHeader className="gap-3 px-4 py-4">
         {/* Brand row */}
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton 
               size="lg" 
               render={<Link to="/" />}
-              className="h-9"
+              className="h-10"
             >
-              <div className="flex items-center gap-2.5">
-                <div className="flex items-center justify-center w-7 h-7 rounded-lg bg-primary/15 border border-primary/20">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary/15 border border-primary/20">
                   <span className="text-sm font-mono font-bold text-primary">
                     c/
                   </span>
                 </div>
-                <span className="text-base font-mono font-semibold tracking-tight text-sidebar-foreground/90">
+                <span className="text-lg font-mono font-semibold tracking-tight text-sidebar-foreground">
                   clankie
                 </span>
               </div>
@@ -45,15 +46,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
         {/* Search input - Tau-style search-first */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
           <Input
             placeholder="Search sessions..."
-            className="h-9 pl-9 text-sm bg-sidebar-accent/50 border-0 focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/40"
+            className="h-10 pl-10 text-sm bg-sidebar-accent/50 border-0 rounded-xl focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/40"
           />
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="gap-1 py-3">
+      <SidebarContent className="gap-2 px-2 py-2">
         <NavMain />
         <NavRecentSessions />
         <NavSecondary className="mt-auto" />
