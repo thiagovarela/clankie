@@ -43,38 +43,63 @@
   --sidebar-ring: oklch(0.852 0.199 91.936);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   Terracotta Dark Theme (Tau-inspired)
+   Warm copper/terracotta accent on dark muted background
+   ═══════════════════════════════════════════════════════════════════════════ */
 .dark {
-  --background: oklch(0.141 0.005 285.823);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.21 0.006 285.885);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.21 0.006 285.885);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.795 0.184 86.047);
-  --primary-foreground: oklch(0.421 0.095 57.708);
-  --secondary: oklch(0.274 0.006 286.033);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.274 0.006 286.033);
-  --muted-foreground: oklch(0.705 0.015 286.067);
-  --accent: oklch(0.274 0.006 286.033);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.421 0.095 57.708);
-  --chart-1: oklch(0.905 0.182 98.111);
-  --chart-2: oklch(0.795 0.184 86.047);
-  --chart-3: oklch(0.681 0.162 75.834);
-  --chart-4: oklch(0.554 0.135 66.442);
-  --chart-5: oklch(0.476 0.114 61.907);
-  --sidebar: oklch(0.21 0.006 285.885);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.795 0.184 86.047);
-  --sidebar-primary-foreground: oklch(0.987 0.026 102.212);
-  --sidebar-accent: oklch(0.274 0.006 286.033);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.421 0.095 57.708);
+  /* Base - warm dark grays */
+  --background: oklch(0.18 0.01 285);
+  --foreground: oklch(0.92 0.005 285);
+  
+  /* Card - slightly lighter with warmth */
+  --card: oklch(0.22 0.01 285);
+  --card-foreground: oklch(0.92 0.005 285);
+  
+  /* Popover */
+  --popover: oklch(0.2 0.01 285);
+  --popover-foreground: oklch(0.92 0.005 285);
+  
+  /* Primary - Terracotta/Copper (the star of the show) */
+  --primary: oklch(0.65 0.14 45);
+  --primary-foreground: oklch(0.15 0.02 45);
+  
+  /* Secondary - warm gray */
+  --secondary: oklch(0.25 0.01 285);
+  --secondary-foreground: oklch(0.92 0.005 285);
+  
+  /* Muted - subtle warm gray */
+  --muted: oklch(0.28 0.01 285);
+  --muted-foreground: oklch(0.55 0.01 285);
+  
+  /* Accent - copper highlight */
+  --accent: oklch(0.35 0.05 45);
+  --accent-foreground: oklch(0.92 0.005 285);
+  
+  /* Destructive */
+  --destructive: oklch(0.6 0.18 25);
+  
+  /* Borders - subtle warm tint */
+  --border: oklch(0.35 0.02 45 / 0.25);
+  --input: oklch(0.3 0.02 45 / 0.3);
+  --ring: oklch(0.65 0.14 45);
+  
+  /* Chart colors - terracotta palette */
+  --chart-1: oklch(0.65 0.14 45);
+  --chart-2: oklch(0.6 0.12 55);
+  --chart-3: oklch(0.55 0.1 40);
+  --chart-4: oklch(0.5 0.08 50);
+  --chart-5: oklch(0.45 0.06 45);
+  
+  /* Sidebar - matches background */
+  --sidebar: oklch(0.16 0.01 285);
+  --sidebar-foreground: oklch(0.9 0.005 285);
+  --sidebar-primary: oklch(0.65 0.14 45);
+  --sidebar-primary-foreground: oklch(0.15 0.02 45);
+  --sidebar-accent: oklch(0.28 0.02 45);
+  --sidebar-accent-foreground: oklch(0.92 0.005 285);
+  --sidebar-border: oklch(0.35 0.02 45 / 0.2);
+  --sidebar-ring: oklch(0.65 0.14 45);
 }
 
 @theme inline {
@@ -292,7 +317,7 @@
       inset 0 0 0 1px oklch(1 0 0 / 0.04);
   }
 
-  /* Neutral gradient background for main chat area */
+  /* Chat background - subtle warm gradient */
   .chat-background {
     background: linear-gradient(to bottom, var(--background), var(--secondary));
   }
@@ -301,7 +326,7 @@
     background: linear-gradient(
       to bottom,
       var(--background),
-      oklch(0.12 0.004 286)
+      color-mix(in oklch, var(--accent) 5%, var(--background))
     );
   }
 
@@ -389,5 +414,99 @@
   .shell-main {
     grid-area: main;
     min-height: 0;
+  }
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     Terracotta Theme Specific Cards
+     ═══════════════════════════════════════════════════════════════════════════ */
+
+  /* Thinking card - warm copper/terracotta tint */
+  .thinking-card {
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--accent) 15%, var(--card)) 0%,
+      color-mix(in oklch, var(--accent) 8%, var(--card)) 100%
+    );
+    border: 1px solid color-mix(in oklch, var(--accent) 25%, transparent);
+    box-shadow: 
+      0 1px 2px oklch(0 0 0 / 0.1),
+      inset 0 1px 0 color-mix(in oklch, var(--accent) 10%, transparent);
+  }
+
+  .thinking-card-live {
+    background: linear-gradient(
+      135deg,
+      color-mix(in oklch, var(--accent) 20%, var(--card)) 0%,
+      color-mix(in oklch, var(--accent) 10%, var(--card)) 100%
+    );
+    border: 1px solid color-mix(in oklch, var(--accent) 35%, transparent);
+    box-shadow: 
+      0 0 12px color-mix(in oklch, var(--accent) 15%, transparent),
+      inset 0 1px 0 color-mix(in oklch, var(--accent) 15%, transparent);
+  }
+
+  /* Tool card - dark tech/code aesthetic */
+  .tool-card {
+    background: linear-gradient(
+      180deg,
+      color-mix(in oklch, var(--muted) 50%, var(--card)) 0%,
+      var(--card) 100%
+    );
+    border: 1px solid color-mix(in oklch, var(--muted-foreground) 15%, transparent);
+    box-shadow: 
+      0 1px 2px oklch(0 0 0 / 0.15),
+      inset 0 1px 0 color-mix(in oklch, var(--muted-foreground) 5%, transparent);
+  }
+
+  .tool-card-expanded {
+    background: linear-gradient(
+      180deg,
+      var(--card) 0%,
+      color-mix(in oklch, var(--background) 50%, var(--card)) 100%
+    );
+    border: 1px solid color-mix(in oklch, var(--muted-foreground) 20%, transparent);
+  }
+
+  /* Tool icon colors */
+  .tool-icon-bash { color: oklch(0.65 0.12 145); }
+  .tool-icon-read { color: oklch(0.65 0.12 220); }
+  .tool-icon-write { color: oklch(0.65 0.12 145); }
+  .tool-icon-edit { color: oklch(0.7 0.12 80); }
+  .tool-icon-grep { color: oklch(0.7 0.12 300); }
+  .tool-icon-find { color: oklch(0.65 0.12 190); }
+  .tool-icon-ls { color: oklch(0.65 0.12 260); }
+  .tool-icon-default { color: var(--muted-foreground); }
+
+  /* Compact sidebar spacing (Tau-style tight density) */
+  .sidebar-dense {
+    --sidebar-item-height: 28px;
+    --sidebar-item-padding: 6px 10px;
+    --sidebar-font-size: 12px;
+    --sidebar-letter-spacing: -0.01em;
+  }
+
+  .sidebar-dense [data-slot="sidebar-menu-button"] {
+    min-height: var(--sidebar-item-height);
+    padding: var(--sidebar-item-padding);
+    font-size: var(--sidebar-font-size);
+    letter-spacing: var(--sidebar-letter-spacing);
+  }
+
+  /* Chat message spacing - generous vertical rhythm */
+  .chat-messages-spacious {
+    --message-gap: 24px;
+    --message-padding-y: 32px;
+  }
+
+  /* User message bubble - terracotta tint */
+  .message-user {
+    background: linear-gradient(
+      135deg,
+      var(--primary) 0%,
+      color-mix(in oklch, var(--primary) 85%, oklch(0.5 0.05 45)) 100%
+    );
+    box-shadow: 
+      0 2px 8px color-mix(in oklch, var(--primary) 20%, transparent),
+      0 0 0 1px color-mix(in oklch, var(--primary) 30%, transparent);
   }
 }

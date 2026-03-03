@@ -28,10 +28,21 @@ export function ToolExecutionCard({ execution }: { execution: ToolExecution }) {
 
   const hasSpecialRendering = Boolean(renderHint || uiSpec)
 
+  // Tool icon color mapping
+  const toolColorClass = {
+    bash: 'tool-icon-bash',
+    read: 'tool-icon-read',
+    write: 'tool-icon-write',
+    edit: 'tool-icon-edit',
+    grep: 'tool-icon-grep',
+    find: 'tool-icon-find',
+    ls: 'tool-icon-ls',
+  }[execution.toolName] || 'tool-icon-default'
+
   return (
     <div
       className={cn(
-        'group text-xs',
+        'group text-xs my-1',
         execution.status === 'error' && 'text-destructive',
       )}
     >
@@ -40,54 +51,60 @@ export function ToolExecutionCard({ execution }: { execution: ToolExecution }) {
         type="button"
         onClick={() => setExpanded((v) => !v)}
         className={cn(
-          'flex w-full items-center gap-1.5 rounded px-2 py-1 text-left transition-colors',
-          'hover:bg-muted/50',
+          'flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left transition-all',
+          'hover:bg-muted/40',
           execution.status === 'error' && 'hover:bg-destructive/10',
+          expanded && 'bg-muted/30',
         )}
       >
         <ChevronRight
           className={cn(
-            'h-3 w-3 shrink-0 transition-transform text-muted-foreground',
+            'h-3.5 w-3.5 shrink-0 transition-transform duration-150',
             expanded && 'rotate-90',
+            execution.status === 'error' ? 'text-destructive/60' : 'text-muted-foreground/50',
           )}
         />
-        <Icon
-          className={cn(
-            'h-3.5 w-3.5 shrink-0',
-            execution.toolName === 'bash' && 'text-emerald-500',
-            execution.toolName === 'read' && 'text-blue-500',
-            execution.toolName === 'write' && 'text-emerald-500',
-            execution.toolName === 'edit' && 'text-amber-500',
-            execution.toolName === 'grep' && 'text-violet-500',
-            execution.toolName === 'find' && 'text-cyan-500',
-            execution.toolName === 'ls' && 'text-indigo-500',
-            !['bash', 'read', 'write', 'edit', 'grep', 'find', 'ls'].includes(
-              execution.toolName,
-            ) && 'text-muted-foreground',
-          )}
-        />
-        <span className="font-mono">{execution.toolName}</span>
+        
+        <div className={cn(
+          'flex items-center justify-center w-5 h-5 rounded bg-muted/50',
+          toolColorClass,
+        )}>
+          <Icon className="h-3 w-3" />
+        </div>
+        
+        <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
+          {execution.toolName}
+        </span>
+        
         {summary.command && (
           <>
-            <span className="text-muted-foreground">›</span>
-            <span className="truncate font-mono text-muted-foreground">
+            <span className="text-muted-foreground/30">›</span>
+            <span className="truncate font-mono text-muted-foreground/60">
               {summary.command}
             </span>
           </>
         )}
+        
         {execution.status === 'running' && (
-          <Loader2 className="ml-auto h-3 w-3 shrink-0 animate-spin text-muted-foreground" />
+          <Loader2 className="ml-auto h-3 w-3 shrink-0 animate-spin text-primary/60" />
         )}
         {execution.status === 'error' && (
-          <span className="ml-auto shrink-0 text-destructive">failed</span>
+          <span className="ml-auto shrink-0 text-[10px] uppercase tracking-wider text-destructive/80">
+            failed
+          </span>
+        )}
+        {execution.status === 'completed' && !expanded && (
+          <span className="ml-auto shrink-0 text-[10px] text-muted-foreground/40">
+            done
+          </span>
         )}
       </button>
 
       {/* Expanded output */}
       {expanded && (
-        <div className="mt-1 ml-5 rounded-md border border-border bg-muted/30 p-2 animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="mt-1 ml-6 rounded-lg tool-card-expanded p-3 animate-in fade-in slide-in-from-top-1 duration-150">
           {hasSpecialRendering ? (
-            <>
+            <div className="space-y-2">
               {renderHint && (
                 <RenderHintRenderer
                   hint={renderHint}
@@ -95,9 +112,9 @@ export function ToolExecutionCard({ execution }: { execution: ToolExecution }) {
                 />
               )}
               {uiSpec && <JsonRenderRenderer spec={uiSpec} />}
-            </>
+            </div>
           ) : (
-            <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-xs">
+            <pre className="max-h-64 overflow-auto whitespace-pre-wrap text-[11px] leading-relaxed font-mono text-muted-foreground/80">
               {output || '(no output)'}
             </pre>
           )}

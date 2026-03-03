@@ -24,17 +24,17 @@ export function NavMain() {
   }
 
   return (
-    <SidebarGroup className="px-2">
+    <SidebarGroup className="px-2 py-1">
       <SidebarGroupContent>
-        <SidebarMenu>
+        <SidebarMenu className="gap-1">
           <SidebarMenuItem>
             <SidebarMenuButton
-              tooltip="Create Chat"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground duration-200 ease-linear"
+              tooltip="New Chat"
+              className="h-9 text-sm bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground transition-all"
               onClick={handleCreateChat}
             >
-              <CirclePlusIcon />
-              <span>Create Chat</span>
+              <CirclePlusIcon className="h-4 w-4" />
+              <span>New Chat</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

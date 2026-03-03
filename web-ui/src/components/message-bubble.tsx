@@ -20,26 +20,28 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       <div
         className={cn(
           isUser
-            ? 'max-w-[75%] rounded-2xl bg-primary px-4 py-2.5 text-primary-foreground'
-            : 'w-full text-foreground',
+            ? 'max-w-[80%] rounded-2xl rounded-br-md px-4 py-3 text-primary-foreground message-user'
+            : 'w-full max-w-3xl text-foreground',
         )}
       >
         {isUser ? (
-          <>
+          <div className="space-y-1">
             <MessageAttachments attachments={message.attachments} />
             {message.content ? (
-              <p className="whitespace-pre-wrap">{message.content}</p>
+              <p className="whitespace-pre-wrap text-[15px] leading-relaxed">
+                {message.content}
+              </p>
             ) : null}
-          </>
+          </div>
         ) : (
           <AssistantMessageContent message={message} />
         )}
 
         {message.isStreaming && !isUser && (
           <span className="ml-2 inline-flex gap-1">
-            <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-current" />
-            <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-current" />
-            <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-current" />
+            <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-primary/60" />
+            <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-primary/60" />
+            <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-primary/60" />
           </span>
         )}
       </div>
