@@ -12,6 +12,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from '@/components/ui/sidebar'
+import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { clientManager } from '@/lib/client-manager'
 import { connectionStore, updateConnectionSettings } from '@/stores/connection'
@@ -90,6 +91,7 @@ function RootComponent() {
           </SidebarInset>
           <ExtensionUIProvider />
         </SidebarProvider>
+        <Toaster />
       </TooltipProvider>
     </RootDocument>
   )
