@@ -66,7 +66,10 @@ export function ChatMessages() {
 
   if (messages.length === 0) {
     return (
-      <div className="flex-1 overflow-y-auto flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8 chat-background" style={{ paddingBottom: '180px' }}>
+      <div
+        className="flex-1 overflow-y-auto flex items-center justify-center px-4 sm:px-6 lg:px-8 py-8 chat-background"
+        style={{ paddingBottom: '180px' }}
+      >
         <div className="text-center space-y-5 max-w-md">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 mb-2">
             <span className="text-3xl font-mono font-bold text-primary">
@@ -98,8 +101,11 @@ export function ChatMessages() {
   const groups = groupMessages(messages)
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 chat-background" style={{ paddingBottom: '180px' }}>
-      <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div
+      className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 chat-background"
+      style={{ paddingBottom: '180px' }}
+    >
+      <div className="mx-auto w-full max-w-7xl space-y-6">
         {groups.map((group) =>
           group.type === 'message' ? (
             <MessageBubble key={group.message.id} message={group.message} />
