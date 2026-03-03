@@ -51,13 +51,16 @@ export function JsonRenderRenderer({
             throw new Error('Not connected')
           }
 
+          const modelValue =
+            typeof params.model === 'string' ? params.model.trim() : ''
+
           await client.setExtensionConfig(sessionId, extensionPath, {
             enabled: Boolean(params.enabled),
             every: String(params.every ?? ''),
             model:
-              typeof params.model === 'string' && params.model.trim() === ''
+              modelValue === '' || modelValue === '(default session model)'
                 ? null
-                : (params.model ?? null),
+                : modelValue,
           })
 
           await onConfigSaved?.()

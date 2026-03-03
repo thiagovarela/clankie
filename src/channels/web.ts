@@ -1023,12 +1023,25 @@ export class WebChannel implements Channel {
 			case "get_extensions": {
 				const extensionsResult = session.resourceLoader.getExtensions();
 				const cwd = this.getSessionCwd(session);
+				const availableModels = await session.modelRegistry.getAvailable();
+				const availableModelIds = [
+					"(default session model)",
+					...Array.from(new Set(availableModels.map((model) => `${model.provider}/${model.id}`))).sort(),
+				];
 				const extensions = extensionsResult.extensions
 					.map((ext) => {
 						const descriptor = ext as ExtensionDescriptor;
 						const uiSpec = resolveExtensionUiSpec(descriptor);
+						const heartbeatConfig = getHeartbeatUiConfig(cwd);
 						const uiState = isHeartbeatExtension(descriptor)
-							? { heartbeat: getHeartbeatUiConfig(cwd), extensionPath: ext.path }
+							? {
+									heartbeat: {
+										...heartbeatConfig,
+										model: heartbeatConfig.model ?? "(default session model)",
+									},
+									availableModels: availableModelIds,
+									extensionPath: ext.path,
+							  }
 							: undefined;
 						return {
 							path: ext.path,
