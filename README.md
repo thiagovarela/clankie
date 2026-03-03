@@ -8,6 +8,8 @@ A minimal AI assistant built on [pi](https://github.com/badlogic/pi-mono)'s SDK.
 - 📎 **Handle attachments** — Upload images (vision models), documents, code files
 - 🔄 **Session management** — Switch between conversations with `/switch`, `/sessions`, `/new` commands
 - 🔌 **pi ecosystem** — Works with pi extensions, skills, and prompt templates
+- 🧩 **Extension UI Spec** — Declarative UI for extensions (forms, switches, selects) rendered in the browser
+- 🔐 **API Provider Auth** — Configure OAuth and API keys for AI providers through the Web UI
 - 🔒 **Privacy-first** — Runs on your machine, your credentials, your data
 
 ## Installation
@@ -82,6 +84,22 @@ Then open the connect URL printed by the daemon.
 1. Start the daemon: `clankie start`
 2. Open the connect URL from logs (or use `http://localhost:3100?token=<your-token>`)
 3. Start chatting
+
+### Settings Pages
+
+The Web UI includes built-in settings pages accessible from the sidebar:
+
+**Authentication** (`/settings/auth`)  
+Configure AI provider credentials:
+- OAuth login for supported providers (Anthropic, OpenAI, GitHub Copilot, etc.)
+- API key entry for providers that support direct authentication
+- View and manage existing authentications
+
+**Extensions** (`/settings/extensions`)  
+Browse and configure loaded extensions:
+- View registered tools, commands, flags, and shortcuts
+- Interactive configuration forms for extensions with UI Spec
+- Install new packages via chat commands
 
 ### Session Management Commands
 
@@ -189,6 +207,134 @@ If needed:
 clankie daemon uninstall
 clankie daemon install
 ```
+
+## Architecture
+
+### How the Web UI Talks to PI
+
+clankie uses a **WebSocket RPC protocol** that bridges the browser to pi's agent sessions:
+
+```
+┌─────────────┐      WebSocket       ┌──────────────┐      RPC      ┌─────────────┐
+│   Web UI    │ ◄──────────────────► │    Daemon    │ ◄───────────► │  pi Agent   │
+│  (Browser)  │   JSON messages      │   (Node.js)  │   (local)     │   (SDK)     │
+└─────────────┘                      └──────────────┘               └─────────────┘
+```
+
+**Protocol flow:**
+
+1. **Connection** — Web UI connects to `ws://localhost:3100` with auth token
+2. **Session binding** — Each tab gets its own session ID; multiple sessions per connection
+3. **Bidirectional messages**:
+   - **Client → Server:** `RpcCommand` (prompt, steer, abort, set_model, etc.)
+   - **Server → Client:** `AgentSessionEvent` (message_start, message_update, tool_execution_start, etc.)
+4. **Streaming** — Assistant responses stream token-by-token via `message_update` events
+5. **Authentication** — Auth tokens via query param (`?token=...`) or HTTP-only cookies
+
+See [`web-ui/src/lib/types.ts`](./web-ui/src/lib/types.ts) for the full protocol types.
+
+### API Provider Configuration via UI
+
+clankie provides a built-in settings page for managing AI provider authentication:
+
+**Supported auth methods:**
+- **OAuth** — Browser-based login flows (Anthropic, OpenAI, GitHub Copilot, etc.)
+- **API Key** — Direct entry of API keys for providers that support it
+
+**How it works:**
+
+1. Extensions register providers via `pi.registerProvider()` with optional `oauth` config
+2. Web UI fetches available providers via `get_auth_providers` RPC
+3. OAuth flows open in browser, callbacks handled by local HTTP server
+4. Credentials stored securely by clankie daemon (never in browser)
+5. Authenticated providers automatically available for model selection
+
+**Configuration:**
+```typescript
+// In an extension
+pi.registerProvider("my-provider", {
+  baseUrl: "https://api.example.com",
+  api: "anthropic-messages",
+  models: [...],
+  oauth: {
+    name: "My Provider",
+    async login(callbacks) {
+      callbacks.onAuth({ url: "https://auth.example.com/..." });
+      const code = await callbacks.onPrompt({ message: "Enter code:" });
+      return { refresh: code, access: code, expires: Date.now() + 3600000 };
+    }
+  }
+});
+```
+
+### Extension UI Spec
+
+Extensions can define **declarative UI components** that render as native forms in the Web UI:
+
+**How it works:**
+
+1. Create a `ui-spec.json` next to your extension (or export `UI_SPEC` inline)
+2. Define components (Card, Stack, Switch, Input, Select, Button, Text)
+3. Bind component values to extension config/state
+4. Web UI renders the spec as interactive React components
+5. Actions flow back to the extension via RPC
+
+**Example ui-spec.json:**
+```json
+{
+  "root": "my-extension-card",
+  "elements": {
+    "my-extension-card": {
+      "type": "Card",
+      "props": { "title": "My Extension", "description": "Configuration" },
+      "children": ["settings-stack"]
+    },
+    "settings-stack": {
+      "type": "Stack",
+      "props": { "direction": "vertical", "gap": "md" },
+      "children": ["enabled-switch", "save-button"]
+    },
+    "enabled-switch": {
+      "type": "Switch",
+      "props": {
+        "label": "Enable feature",
+        "checked": { "$bindState": "/config/enabled" }
+      }
+    },
+    "save-button": {
+      "type": "Button",
+      "props": { "label": "Save", "variant": "primary" },
+      "on": {
+        "press": {
+          "action": "saveExtensionConfig",
+          "params": { "enabled": { "$state": "/config/enabled" } }
+        }
+      }
+    }
+  }
+}
+```
+
+**UI Spec locations (checked in order):**
+- `{extension-path}.ui.json`
+- `{extension-dir}/ui-spec.json`
+- Package root `ui-spec.json`
+
+**Supported component types:**
+- `Card` — Container with title/description
+- `Stack` — Vertical/horizontal layout container
+- `Switch` — Toggle boolean values
+- `Input` — Text input with labels
+- `Select` — Dropdown with options
+- `Button` — Action triggers
+- `Text` — Static or dynamic text
+
+**State binding:**
+- `{ "$bindState": "/config/key" }` — Two-way binding to extension config
+- `{ "$state": "/path" }` — Read-only state reference
+- Static values for labels, placeholders, etc.
+
+See the [heartbeat extension](./src/extensions/heartbeat/ui-spec.ts) for a working example.
 
 ## How It Works
 
