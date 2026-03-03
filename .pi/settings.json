@@ -1,0 +1,7 @@
+{
+  "clankie-heartbeat": {
+    "enabled": false,
+    "every": "30m",
+    "model": "openai-codex/gpt-5.2"
+  }
+}

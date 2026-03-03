@@ -9,25 +9,43 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as ExtensionsRouteImport } from './routes/extensions'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as SettingsSkillsRouteImport } from './routes/settings/skills'
+import { Route as SettingsExtensionsRouteImport } from './routes/settings/extensions'
+import { Route as SettingsConnectionRouteImport } from './routes/settings/connection'
+import { Route as SettingsAuthRouteImport } from './routes/settings/auth'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
 
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ExtensionsRoute = ExtensionsRouteImport.update({
-  id: '/extensions',
-  path: '/extensions',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsIndexRoute = SettingsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsSkillsRoute = SettingsSkillsRouteImport.update({
+  id: '/skills',
+  path: '/skills',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsExtensionsRoute = SettingsExtensionsRouteImport.update({
+  id: '/extensions',
+  path: '/extensions',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsConnectionRoute = SettingsConnectionRouteImport.update({
+  id: '/connection',
+  path: '/connection',
+  getParentRoute: () => SettingsRoute,
+} as any)
+const SettingsAuthRoute = SettingsAuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => SettingsRoute,
 } as any)
 const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   id: '/sessions/$sessionId',
@@ -37,60 +55,110 @@ const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/extensions': typeof ExtensionsRoute
-  '/settings': typeof SettingsRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
+  '/settings/auth': typeof SettingsAuthRoute
+  '/settings/connection': typeof SettingsConnectionRoute
+  '/settings/extensions': typeof SettingsExtensionsRoute
+  '/settings/skills': typeof SettingsSkillsRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/extensions': typeof ExtensionsRoute
-  '/settings': typeof SettingsRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
+  '/settings/auth': typeof SettingsAuthRoute
+  '/settings/connection': typeof SettingsConnectionRoute
+  '/settings/extensions': typeof SettingsExtensionsRoute
+  '/settings/skills': typeof SettingsSkillsRoute
+  '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/extensions': typeof ExtensionsRoute
-  '/settings': typeof SettingsRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
+  '/settings/auth': typeof SettingsAuthRoute
+  '/settings/connection': typeof SettingsConnectionRoute
+  '/settings/extensions': typeof SettingsExtensionsRoute
+  '/settings/skills': typeof SettingsSkillsRoute
+  '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/extensions' | '/settings' | '/sessions/$sessionId'
+  fullPaths:
+    | '/'
+    | '/sessions/$sessionId'
+    | '/settings/auth'
+    | '/settings/connection'
+    | '/settings/extensions'
+    | '/settings/skills'
+    | '/settings/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/extensions' | '/settings' | '/sessions/$sessionId'
-  id: '__root__' | '/' | '/extensions' | '/settings' | '/sessions/$sessionId'
+  to:
+    | '/'
+    | '/sessions/$sessionId'
+    | '/settings/auth'
+    | '/settings/connection'
+    | '/settings/extensions'
+    | '/settings/skills'
+    | '/settings'
+  id:
+    | '__root__'
+    | '/'
+    | '/sessions/$sessionId'
+    | '/settings/auth'
+    | '/settings/connection'
+    | '/settings/extensions'
+    | '/settings/skills'
+    | '/settings/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  ExtensionsRoute: typeof ExtensionsRoute
-  SettingsRoute: typeof SettingsRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/extensions': {
-      id: '/extensions'
-      path: '/extensions'
-      fullPath: '/extensions'
-      preLoaderRoute: typeof ExtensionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/settings/': {
+      id: '/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/skills': {
+      id: '/settings/skills'
+      path: '/skills'
+      fullPath: '/settings/skills'
+      preLoaderRoute: typeof SettingsSkillsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/extensions': {
+      id: '/settings/extensions'
+      path: '/extensions'
+      fullPath: '/settings/extensions'
+      preLoaderRoute: typeof SettingsExtensionsRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/connection': {
+      id: '/settings/connection'
+      path: '/connection'
+      fullPath: '/settings/connection'
+      preLoaderRoute: typeof SettingsConnectionRouteImport
+      parentRoute: typeof SettingsRoute
+    }
+    '/settings/auth': {
+      id: '/settings/auth'
+      path: '/auth'
+      fullPath: '/settings/auth'
+      preLoaderRoute: typeof SettingsAuthRouteImport
+      parentRoute: typeof SettingsRoute
     }
     '/sessions/$sessionId': {
       id: '/sessions/$sessionId'
@@ -104,8 +172,6 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  ExtensionsRoute: ExtensionsRoute,
-  SettingsRoute: SettingsRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
 }
 export const routeTree = rootRouteImport

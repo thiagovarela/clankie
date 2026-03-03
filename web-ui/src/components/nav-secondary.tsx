@@ -1,18 +1,41 @@
 'use client'
 
-import { Link } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@tanstack/react-store'
-import { Puzzle, Settings } from 'lucide-react'
+import {
+  ChevronDown,
+  Globe,
+  KeyRound,
+  Puzzle,
+  Settings,
+  Sparkles,
+} from 'lucide-react'
+import { useState } from 'react'
 import type * as React from 'react'
 import { Badge } from '@/components/ui/badge'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
 } from '@/components/ui/sidebar'
 import { connectionStore } from '@/stores/connection'
+
+const settingsLinks = [
+  { to: '/settings/connection', label: 'Connection', icon: Globe },
+  { to: '/settings/auth', label: 'Auth', icon: KeyRound },
+  { to: '/settings/extensions', label: 'Extensions', icon: Puzzle },
+  { to: '/settings/skills', label: 'Skills', icon: Sparkles },
+]
 
 export function NavSecondary({
   ...props
@@ -20,6 +43,11 @@ export function NavSecondary({
   const { status } = useStore(connectionStore, (state) => ({
     status: state.status,
   }))
+
+  const { location } = useRouterState()
+  const currentPath = location.pathname
+  const isInSettings = currentPath.startsWith('/settings')
+  const [settingsOpen, setSettingsOpen] = useState(isInSettings)
 
   const connectionConfig = {
     connected: {
@@ -52,18 +80,38 @@ export function NavSecondary({
     <SidebarGroup {...props}>
       <SidebarGroupContent>
         <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton render={<Link to="/settings" />}>
-              <Settings />
-              <span>Settings</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton render={<Link to="/extensions" />}>
-              <Puzzle />
-              <span>Extensions</span>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
+          <Collapsible open={settingsOpen} onOpenChange={setSettingsOpen}>
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton>
+                  <Settings />
+                  <span>Settings</span>
+                  <ChevronDown
+                    className={`ml-auto h-4 w-4 transition-transform ${settingsOpen ? 'rotate-180' : ''}`}
+                  />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <SidebarMenuSub>
+                  {settingsLinks.map((link) => {
+                    const Icon = link.icon
+                    const isActive = currentPath === link.to
+                    return (
+                      <SidebarMenuSubItem key={link.to}>
+                        <SidebarMenuSubButton
+                          render={<Link to={link.to} />}
+                          isActive={isActive}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{link.label}</span>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    )
+                  })}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
           <SidebarMenuItem>
             <div className="px-2 py-1.5">
               <Badge

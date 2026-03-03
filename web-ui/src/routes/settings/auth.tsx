@@ -22,153 +22,40 @@ import {
   setProviders,
   startLoginFlow,
 } from '@/stores/auth'
-import { connectionStore, updateConnectionSettings } from '@/stores/connection'
+import { connectionStore } from '@/stores/connection'
 import { setAvailableModels } from '@/stores/session'
 import { sessionsListStore } from '@/stores/sessions-list'
 
-export const Route = createFileRoute('/settings')({
-  component: SettingsPage,
+export const Route = createFileRoute('/settings/auth')({
+  component: AuthSettingsPage,
 })
 
-function SettingsPage() {
-  const { settings, status } = useStore(connectionStore, (state) => ({
-    settings: state.settings,
+function AuthSettingsPage() {
+  const { status } = useStore(connectionStore, (state) => ({
     status: state.status,
   }))
 
-  const [url, setUrl] = useState(settings.url)
-  const [authToken, setAuthToken] = useState(settings.authToken)
-
   const isConnected = status === 'connected'
-  const isConnecting = status === 'connecting'
 
-  const handleSave = () => {
-    updateConnectionSettings({ url, authToken })
-  }
-
-  const handleConnect = () => {
-    updateConnectionSettings({ url, authToken })
-    clientManager.connect()
-  }
-
-  const handleDisconnect = () => {
-    clientManager.disconnect()
-  }
-
-  return (
-    <div className="h-full overflow-y-auto chat-background">
-      <div className="container max-w-2xl py-8 px-4">
-        <Card className="card-depth">
-          <CardHeader>
-            <CardTitle>Connection Settings</CardTitle>
-            <CardDescription>
-              Configure the WebSocket connection to your clankie instance
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Field>
-              <FieldLabel htmlFor="ws-url">WebSocket URL</FieldLabel>
-              <Input
-                id="ws-url"
-                type="text"
-                placeholder="ws://localhost:3100"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-                disabled={isConnected}
-              />
-            </Field>
-
-            <Field>
-              <FieldLabel htmlFor="auth-token">Auth Token</FieldLabel>
-              <Input
-                id="auth-token"
-                type="password"
-                placeholder="Enter your authentication token"
-                value={authToken}
-                onChange={(e) => setAuthToken(e.target.value)}
-                disabled={isConnected}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Set with:{' '}
-                <code className="rounded bg-muted px-1 py-0.5">
-                  clankie config set channels.web.authToken "your-token"
-                </code>
-              </p>
-            </Field>
-
-            <div className="flex gap-2 pt-2">
-              {!isConnected ? (
-                <>
-                  <Button
-                    onClick={handleConnect}
-                    disabled={isConnecting || !authToken}
-                  >
-                    {isConnecting ? 'Connecting...' : 'Connect'}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={handleSave}
-                    disabled={isConnecting}
-                  >
-                    Save
-                  </Button>
-                </>
-              ) : (
-                <Button variant="destructive" onClick={handleDisconnect}>
-                  Disconnect
-                </Button>
-              )}
-            </div>
-
-            {!authToken && (
-              <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
-                <p className="font-medium">Auth token required</p>
-                <p className="text-xs mt-1">
-                  Configure the token in clankie and enter it above to connect.
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="mt-4 card-depth">
-          <CardHeader>
-            <CardTitle>Setup Instructions</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div>
-              <p className="font-medium">
-                1. Enable the web channel in clankie
-              </p>
-              <code className="block mt-1 rounded bg-muted p-2 text-xs">
-                clankie config set channels.web.authToken "your-secret-token"
-                <br />
-                clankie config set channels.web.port 3100
-              </code>
-            </div>
-
-            <div>
-              <p className="font-medium">2. Start the clankie daemon</p>
-              <code className="block mt-1 rounded bg-muted p-2 text-xs">
-                clankie start
-              </code>
-            </div>
-
-            <div>
-              <p className="font-medium">
-                3. Enter the token above and connect
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                The web-ui will connect to ws://localhost:3100 by default
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {isConnected && <ProviderAuthSection />}
+  if (!isConnected) {
+    return (
+      <div className="h-full flex items-center justify-center chat-background">
+        <div className="text-center space-y-4 max-w-md p-8">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 mb-2">
+            <Shield className="h-8 w-8 text-destructive" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-2xl font-semibold">Not Connected</h2>
+            <p className="text-muted-foreground">
+              Connect to clankie to manage AI provider authentication
+            </p>
+          </div>
+        </div>
       </div>
-    </div>
-  )
+    )
+  }
+
+  return <ProviderAuthSection />
 }
 
 function ProviderAuthSection() {
@@ -219,12 +106,12 @@ function ProviderAuthSection() {
             .then(({ models }) => {
               setAvailableModels(models)
               console.log(
-                '[settings] Refreshed available models after OAuth login',
+                '[settings/auth] Refreshed available models after OAuth login',
               )
             })
             .catch((err) => {
               console.error(
-                '[settings] Failed to refresh available models:',
+                '[settings/auth] Failed to refresh available models:',
                 err,
               )
             })
@@ -278,52 +165,82 @@ function ProviderAuthSection() {
   }
 
   return (
-    <>
-      <Card className="mt-4 card-depth">
-        <CardHeader>
-          <CardTitle>AI Provider Authentication</CardTitle>
-          <CardDescription>
-            Configure authentication for AI providers (OpenAI, Anthropic, etc.)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {isLoadingProviders ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : providers.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">
-              No providers available.
+    <div className="h-full overflow-y-auto chat-background">
+      <div className="container max-w-2xl py-8 px-4">
+        <Card className="card-depth">
+          <CardHeader>
+            <CardTitle>AI Provider Authentication</CardTitle>
+            <CardDescription>
+              Configure authentication for AI providers (OpenAI, Anthropic,
+              etc.)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingProviders ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : providers.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4">
+                No providers available. Make sure clankie is configured with at
+                least one AI provider.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {providers.map((provider) => (
+                  <ProviderCard
+                    key={provider.id}
+                    provider={provider}
+                    isEditing={apiKeyProviderId === provider.id}
+                    apiKeyValue={apiKeyValue}
+                    onApiKeyChange={setApiKeyValue}
+                    onLogin={() =>
+                      provider.type === 'oauth'
+                        ? handleOAuthLogin(provider.id)
+                        : handleApiKeyLogin(provider.id)
+                    }
+                    onSaveApiKey={() => handleApiKeySave(provider.id)}
+                    onCancelApiKey={() => setApiKeyProviderId(null)}
+                    onLogout={() => handleLogout(provider.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="mt-4 card-depth">
+          <CardHeader>
+            <CardTitle>About Provider Authentication</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              AI providers require authentication to access their APIs. You can
+              authenticate using:
             </p>
-          ) : (
-            <div className="space-y-3">
-              {providers.map((provider) => (
-                <ProviderCard
-                  key={provider.id}
-                  provider={provider}
-                  isEditing={apiKeyProviderId === provider.id}
-                  apiKeyValue={apiKeyValue}
-                  onApiKeyChange={setApiKeyValue}
-                  onLogin={() =>
-                    provider.type === 'oauth'
-                      ? handleOAuthLogin(provider.id)
-                      : handleApiKeyLogin(provider.id)
-                  }
-                  onSaveApiKey={() => handleApiKeySave(provider.id)}
-                  onCancelApiKey={() => setApiKeyProviderId(null)}
-                  onLogout={() => handleLogout(provider.id)}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            <ul className="list-disc list-inside space-y-1">
+              <li>
+                <strong>OAuth</strong> - Browser-based authentication flow for
+                supported providers
+              </li>
+              <li>
+                <strong>API Key</strong> - Direct API key entry for providers
+                that support it
+              </li>
+            </ul>
+            <p className="text-xs">
+              Your credentials are stored securely by clankie and are never
+              shared with the web UI.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       <AuthLoginDialog
         open={loginDialogOpen}
         onOpenChange={setLoginDialogOpen}
       />
-    </>
+    </div>
   )
 }
 

@@ -6,8 +6,8 @@ import {
   shadcnComponents,
 } from '@json-render/shadcn'
 import { toast } from 'sonner'
-import { clientManager } from '@/lib/client-manager'
 import type { ExtensionUISpec } from './types'
+import { clientManager } from '@/lib/client-manager'
 
 const catalog = defineCatalog(schema, {
   components: shadcnComponentDefinitions,

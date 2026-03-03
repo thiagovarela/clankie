@@ -294,11 +294,7 @@
 
   /* Neutral gradient background for main chat area */
   .chat-background {
-    background: linear-gradient(
-      to bottom,
-      var(--background),
-      var(--secondary)
-    );
+    background: linear-gradient(to bottom, var(--background), var(--secondary));
   }
 
   .dark .chat-background {
