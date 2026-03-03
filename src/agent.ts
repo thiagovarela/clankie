@@ -21,6 +21,7 @@ import {
 } from "@mariozechner/pi-coding-agent";
 import { getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
 import { createCronExtension } from "./extensions/cron/index.ts";
+import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
 import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
 
 export interface SessionOptions {
@@ -66,6 +67,7 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 	// Build extension factories (workspace jail if enabled)
 	const extensionFactories: ExtensionFactory[] = [];
 	extensionFactories.push(createCronExtension());
+	extensionFactories.push(createHeartbeatExtension());
 	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
 	if (restrictToWorkspace) {
 		const configuredAllowedPaths = config.agent?.allowedPaths ?? [];
