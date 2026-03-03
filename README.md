@@ -61,6 +61,20 @@ You should see output like:
 
 Then open the connect URL printed by the daemon.
 
+## Screenshots
+
+### Chat view
+
+![clankie chat view](./docs/screenshots/chat-view.png)
+
+### API provider auth
+
+![clankie API provider auth](./docs/screenshots/api-provider-auth.png)
+
+### Extensions UI
+
+![clankie extensions UI](./docs/screenshots/extensions-ui.png)
+
 ## Using clankie
 
 ### Web UI
