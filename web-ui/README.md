@@ -32,7 +32,7 @@ clankie start
 You should see output like:
 
 ```
-[daemon] Channels: slack, web
+[daemon] Channels: web
 [web] WebSocket server listening on port 3100
 [daemon] Ready. Waiting for messages...
 ```

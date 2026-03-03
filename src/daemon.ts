@@ -10,7 +10,6 @@
 import { existsSync, readFileSync, unlinkSync, watch, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Channel, InboundMessage } from "./channels/channel.ts";
-import { SlackChannel } from "./channels/slack.ts";
 import { WebChannel } from "./channels/web.ts";
 import { getAppDir, getBundledWebUiDir, getConfigPath, getWorkspace, loadConfig } from "./config.ts";
 import { CronScheduler, getCronJobsPath, setCronScheduler } from "./extensions/cron/index.ts";
@@ -230,19 +229,6 @@ async function initializeChannels(): Promise<void> {
 
 	const channels: Channel[] = [];
 
-	// Slack
-	const slack = config.channels?.slack;
-	if (slack?.appToken && slack.botToken && slack.enabled !== false) {
-		channels.push(
-			new SlackChannel({
-				appToken: slack.appToken,
-				botToken: slack.botToken,
-				allowedUsers: slack.allowFrom ?? [],
-				allowedChannelIds: slack.allowedChannelIds,
-			}),
-		);
-	}
-
 	// Web
 	const web = config.channels?.web;
 	if (web?.authToken && web.enabled !== false) {
@@ -264,12 +250,7 @@ async function initializeChannels(): Promise<void> {
 
 	if (channels.length === 0) {
 		console.error(
-			"No channels configured. Set up Slack or Web:\n\n" +
-				"Slack:\n" +
-				"  clankie config set channels.slack.appToken <xapp-...>\n" +
-				"  clankie config set channels.slack.botToken <xoxb-...>\n" +
-				'  clankie config set channels.slack.allowFrom ["U12345678"]\n' +
-				"\nWeb:\n" +
+			"No channels configured. Set up Web:\n\n" +
 				'  clankie config set channels.web.authToken "your-secret-token"\n' +
 				"  clankie config set channels.web.port 3100\n" +
 				"\nOr edit ~/.clankie/clankie.json directly.\n",

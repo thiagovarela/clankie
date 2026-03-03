@@ -1,8 +1,7 @@
 /**
  * Shared session management for channels.
  *
- * Both daemon (for Slack) and WebChannel (for web-ui) use this
- * to create and cache agent sessions per chat.
+ * Channels use this to create and cache agent sessions per chat.
  */
 
 import { existsSync, mkdirSync } from "node:fs";

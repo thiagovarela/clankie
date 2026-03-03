@@ -1,7 +1,7 @@
 /**
  * Channel abstraction — a messaging surface that can receive and send messages.
  *
- * Each channel (Slack, etc.) implements this interface.
+ * Each channel (web, etc.) implements this interface.
  * The daemon routes inbound messages to the agent and delivers responses back.
  */
 
@@ -17,7 +17,7 @@ export interface Attachment {
 export interface InboundMessage {
 	/** Unique ID for this message (channel-specific) */
 	id: string;
-	/** Channel type (e.g. "slack") */
+	/** Channel type (e.g. "web") */
 	channel: string;
 	/** Sender identifier (channel-specific user ID) */
 	senderId: string;
@@ -25,7 +25,7 @@ export interface InboundMessage {
 	senderName?: string;
 	/** Chat/conversation identifier (for per-chat sessions) */
 	chatId: string;
-	/** Thread/topic ID (e.g., Slack thread) */
+	/** Thread/topic ID (channel-specific) */
 	threadId?: string;
 	/** Message text */
 	text: string;

@@ -45,17 +45,6 @@ export interface AppConfig {
 
 	/** Channel configuration — each channel starts when its section exists */
 	channels?: {
-		slack?: {
-			enabled?: boolean;
-			/** App token from Slack app settings (xapp-...) */
-			appToken?: string;
-			/** Bot token from Slack app settings (xoxb-...) */
-			botToken?: string;
-			/** Allowed Slack user IDs */
-			allowFrom?: string[];
-			/** Allowed Slack channel IDs (empty = allow all) */
-			allowedChannelIds?: string[];
-		};
 		web?: {
 			enabled?: boolean;
 			/** Port to listen on (default: 3100) */
