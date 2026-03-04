@@ -5,7 +5,8 @@
  */
 
 import { existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { homedir } from "node:os";
+import { basename, join, relative, resolve } from "node:path";
 import type { ImageContent } from "@mariozechner/pi-ai";
 import {
 	type AgentSession,
@@ -50,6 +51,90 @@ function buildExtensionFactories(config: AppConfig, cwd: string): ExtensionFacto
 	return extensionFactories;
 }
 
+type ResourcePathMetadata = {
+	source?: string;
+	scope?: "user" | "project" | "temporary";
+	baseDir?: string;
+};
+
+function toDisplayPath(filePath: string, baseDir?: string): string {
+	const resolvedFilePath = resolve(filePath);
+	if (baseDir) {
+		const rel = relative(baseDir, resolvedFilePath);
+		if (rel && rel !== "." && !rel.startsWith("..")) {
+			return rel;
+		}
+	}
+
+	const home = homedir();
+	if (resolvedFilePath === home) return "~";
+	if (resolvedFilePath.startsWith(`${home}/`)) {
+		return `~/${resolvedFilePath.slice(home.length + 1)}`;
+	}
+	return resolvedFilePath;
+}
+
+function inferSourceFromPath(filePath: string, cwd: string, agentDir: string): string {
+	const resolvedFilePath = resolve(filePath);
+	const resolvedCwd = resolve(cwd);
+	const resolvedAgentDir = resolve(agentDir);
+	const resolvedAgentsDir = resolve(join(homedir(), ".agents"));
+
+	if (resolvedFilePath.startsWith(`${resolvedCwd}/`)) return "project";
+	if (resolvedFilePath.startsWith(`${resolvedAgentDir}/`) || resolvedFilePath.startsWith(`${resolvedAgentsDir}/`)) {
+		return "user";
+	}
+	return "auto";
+}
+
+function normalizeSourceLabel(source: string): string {
+	if (source.startsWith("npm:") || source.startsWith("git:")) return source;
+	if (source === "cli" || source === "project" || source === "user") return source;
+	if (source.includes("/") || source.startsWith(".")) {
+		const name = basename(source);
+		return name || source;
+	}
+	return source;
+}
+
+function getSourceLabel(
+	metadata: ResourcePathMetadata | undefined,
+	filePath: string,
+	cwd: string,
+	agentDir: string,
+): string {
+	if (metadata?.source === "local") {
+		if (metadata.scope === "project") return "project";
+		return "user";
+	}
+	if (metadata?.source && metadata.source !== "auto") return normalizeSourceLabel(metadata.source);
+	return inferSourceFromPath(filePath, cwd, agentDir);
+}
+
+function formatSection(title: string, items: Array<{ source: string; path: string }>): string[] {
+	const lines = [`[${title}]`];
+	if (items.length === 0) {
+		lines.push("  (none)");
+		return lines;
+	}
+
+	const grouped = new Map<string, Set<string>>();
+	for (const item of items) {
+		const sourceItems = grouped.get(item.source) ?? new Set<string>();
+		sourceItems.add(item.path);
+		grouped.set(item.source, sourceItems);
+	}
+
+	for (const source of Array.from(grouped.keys()).sort((a, b) => a.localeCompare(b))) {
+		lines.push(`  ${source}`);
+		for (const path of Array.from(grouped.get(source) ?? []).sort((a, b) => a.localeCompare(b))) {
+			lines.push(`    ${path}`);
+		}
+	}
+
+	return lines;
+}
+
 export async function logStartupLoadedResources(config: AppConfig): Promise<void> {
 	const agentDir = getAgentDir(config);
 	const cwd = getWorkspace(config);
@@ -61,19 +146,33 @@ export async function logStartupLoadedResources(config: AppConfig): Promise<void
 	});
 	await loader.reload();
 
-	const extensions = loader
-		.getExtensions()
-		.extensions.map((extension) => extension.path)
-		.sort((a, b) => a.localeCompare(b));
-	const skills = loader
-		.getSkills()
-		.skills.map((skill) => skill.name)
-		.sort((a, b) => a.localeCompare(b));
+	const pathMetadata = loader.getPathMetadata();
 
-	console.log(
-		`[daemon] Loaded extensions (${extensions.length}): ${extensions.length > 0 ? extensions.join(", ") : "(none)"}`,
-	);
-	console.log(`[daemon] Loaded skills (${skills.length}): ${skills.length > 0 ? skills.join(", ") : "(none)"}`);
+	const extensionItems = loader
+		.getExtensions()
+		.extensions.filter((extension) => !extension.path.startsWith("<inline:"))
+		.map((extension) => {
+			const metadata =
+				(pathMetadata.get(extension.path) as ResourcePathMetadata | undefined) ??
+				(pathMetadata.get(extension.resolvedPath) as ResourcePathMetadata | undefined);
+			return {
+				source: getSourceLabel(metadata, extension.resolvedPath, cwd, agentDir),
+				path: toDisplayPath(extension.resolvedPath, metadata?.baseDir),
+			};
+		});
+
+	const skillItems = loader.getSkills().skills.map((skill) => {
+		const metadata = pathMetadata.get(skill.filePath) as ResourcePathMetadata | undefined;
+		return {
+			source: getSourceLabel(metadata, skill.filePath, cwd, agentDir),
+			path: toDisplayPath(skill.filePath, metadata?.baseDir),
+		};
+	});
+
+	console.log("[daemon] Loaded startup resources:");
+	for (const line of [...formatSection("Skills", skillItems), "", ...formatSection("Extensions", extensionItems)]) {
+		console.log(line);
+	}
 }
 
 // ─── Session factory ───────────────────────────────────────────────────────────
