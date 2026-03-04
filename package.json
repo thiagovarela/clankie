@@ -19,7 +19,9 @@
 		"prepublishOnly": "bun run build && bun run build:web-ui",
 		"check": "biome check .",
 		"check:fix": "biome check --fix .",
-		"format": "biome format --write ."
+		"format": "biome format --write .",
+		"typecheck": "tsgo --noEmit",
+		"typecheck:all": "tsgo --noEmit && cd web-ui && npx tsgo --noEmit && cd ../extensions/clankie-memory && npx tsgo --noEmit"
 	},
 	"engines": {
 		"node": ">=18.0.0"
@@ -38,6 +40,7 @@
 	"devDependencies": {
 		"@biomejs/biome": "^2.4.5",
 		"@types/node": "^25.3.3",
-		"@types/ws": "^8.18.1"
+		"@types/ws": "^8.18.1",
+		"@typescript/native-preview": "latest"
 	}
 }
