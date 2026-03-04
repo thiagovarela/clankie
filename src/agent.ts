@@ -1,12 +1,13 @@
 /**
  * clankie agent session wrapper
  *
- * Creates an AgentSession using pi's SDK with ScopedResourceLoader
+ * Creates an AgentSession using pi's SDK with DefaultResourceLoader
  * discovery — skills, extensions, prompt templates, context files all
  * load from clankie's own directories (~/.clankie/, .pi/, etc.).
  *
- * Unlike DefaultResourceLoader, this does NOT load from global pi directories
- * (~/.pi/agent/, ~/.agents/) to keep clankie self-contained.
+ * By setting agentDir to ~/.clankie/, we keep clankie isolated from
+ * pi's default directories (~/.pi/agent/) while leveraging pi's
+ * battle-tested resource loading (jiti, PackageManager, SettingsManager).
  *
  * Model is resolved from ~/.clankie/clankie.json → agent.model.primary (provider/model format).
  * If not set, falls back to pi's default resolution (settings → first available).
@@ -17,15 +18,16 @@ import {
 	AuthStorage,
 	type CreateAgentSessionResult,
 	createAgentSession,
+	DefaultResourceLoader,
 	type ExtensionFactory,
 	ModelRegistry,
 	SessionManager,
+	SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 import { getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
 import { createCronExtension } from "./extensions/cron/index.ts";
 import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
 import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
-import { ScopedResourceLoader } from "./lib/scoped-resource-loader.ts";
 
 export interface SessionOptions {
 	/**
@@ -54,9 +56,9 @@ export interface SessionOptions {
 /**
  * Create a pi agent session with the app's configuration.
  *
- * Uses pi's DefaultResourceLoader so the entire pi extension ecosystem
- * (~/.pi/agent/extensions/, ~/.agents/skills/, AGENTS.md, etc.) is
- * automatically available.
+ * Uses pi's DefaultResourceLoader configured to use clankie's directories,
+ * keeping the app isolated from pi's default agent directory (~/.pi/agent/)
+ * while properly supporting extension loading, package management, and settings.
  */
 export async function createSession(options: SessionOptions = {}): Promise<CreateAgentSessionResult> {
 	const config = loadConfig();
@@ -79,11 +81,14 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
 	}
 
-	// ScopedResourceLoader — only loads from clankie's directories
-	// Does NOT load from ~/.pi/agent/ or ~/.agents/ to keep clankie self-contained
-	const loader = new ScopedResourceLoader({
+	// DefaultResourceLoader with clankie-specific paths
+	// agentDir=~/.clankie isolates from ~/.pi/agent/ while supporting full
+	// extension loading (jiti), package management, and settings integration.
+	const settingsManager = SettingsManager.create(cwd, agentDir);
+	const loader = new DefaultResourceLoader({
 		cwd,
 		agentDir,
+		settingsManager,
 		extensionFactories,
 	});
 	await loader.reload();
@@ -125,5 +130,6 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 		resourceLoader: loader,
 		sessionManager,
 		model,
+		settingsManager,
 	});
 }

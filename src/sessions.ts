@@ -13,9 +13,11 @@ import {
 	AuthStorage,
 	type CreateAgentSessionResult,
 	createAgentSession,
+	DefaultResourceLoader,
 	type ExtensionFactory,
 	ModelRegistry,
 	SessionManager,
+	SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 import type { Attachment } from "./channels/channel.ts";
 import { type AppConfig, getAgentDir, getAppDir, getAuthPath, getWorkspace } from "./config.ts";
@@ -23,7 +25,6 @@ import { createCronExtension } from "./extensions/cron/index.ts";
 import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
 import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
 import { resolveScopedModels } from "./lib/scoped-model-resolver.ts";
-import { ScopedResourceLoader } from "./lib/scoped-resource-loader.ts";
 
 // ─── Session cache (one session per chat) ──────────────────────────────────────
 
@@ -139,33 +140,27 @@ export async function logStartupLoadedResources(config: AppConfig): Promise<void
 	const agentDir = getAgentDir(config);
 	const cwd = getWorkspace(config);
 
-	const loader = new ScopedResourceLoader({
+	// DefaultResourceLoader with clankie-specific paths
+	const settingsManager = SettingsManager.create(cwd, agentDir);
+	const loader = new DefaultResourceLoader({
 		cwd,
 		agentDir,
+		settingsManager,
 		extensionFactories: buildExtensionFactories(config, cwd),
 	});
 	await loader.reload();
 
 	const pathMetadata = loader.getPathMetadata();
 
-	const extensionItems = loader
-		.getExtensions()
-		.extensions.map((extension) => {
-			// Handle built-in extensions (cron, heartbeat, workspace-jail)
-			if (extension.path.startsWith("clankie:")) {
-				return {
-					source: "built-in",
-					path: extension.path.slice(8), // Remove "clankie:" prefix
-				};
-			}
-			const metadata =
-				(pathMetadata.get(extension.path) as ResourcePathMetadata | undefined) ??
-				(pathMetadata.get(extension.resolvedPath) as ResourcePathMetadata | undefined);
-			return {
-				source: getSourceLabel(metadata, extension.resolvedPath, cwd, agentDir),
-				path: toDisplayPath(extension.resolvedPath, metadata?.baseDir),
-			};
-		});
+	const extensionItems = loader.getExtensions().extensions.map((extension) => {
+		const metadata =
+			(pathMetadata.get(extension.path) as ResourcePathMetadata | undefined) ??
+			(pathMetadata.get(extension.resolvedPath) as ResourcePathMetadata | undefined);
+		return {
+			source: getSourceLabel(metadata, extension.resolvedPath, cwd, agentDir),
+			path: toDisplayPath(extension.resolvedPath, metadata?.baseDir),
+		};
+	});
 
 	const skillItems = loader.getSkills().skills.map((skill) => {
 		const metadata = pathMetadata.get(skill.filePath) as ResourcePathMetadata | undefined;
@@ -198,9 +193,12 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 	const authStorage = AuthStorage.create(getAuthPath());
 	const modelRegistry = new ModelRegistry(authStorage);
 
-	const loader = new ScopedResourceLoader({
+	// DefaultResourceLoader with clankie-specific paths
+	const settingsManager = SettingsManager.create(cwd, agentDir);
+	const loader = new DefaultResourceLoader({
 		cwd,
 		agentDir,
+		settingsManager,
 		extensionFactories: buildExtensionFactories(config, cwd),
 	});
 	await loader.reload();
@@ -241,6 +239,7 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 		resourceLoader: loader,
 		sessionManager,
 		model,
+		settingsManager,
 	});
 
 	const { session } = result;
