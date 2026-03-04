@@ -34,6 +34,48 @@ const activeSessionNames = new Map<string, string>();
 /** Lock to serialize message processing per chat */
 const chatLocks = new Map<string, Promise<void>>();
 
+function buildExtensionFactories(config: AppConfig, cwd: string): ExtensionFactory[] {
+	const extensionFactories: ExtensionFactory[] = [];
+	extensionFactories.push(createCronExtension());
+	extensionFactories.push(createHeartbeatExtension());
+
+	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
+	if (restrictToWorkspace) {
+		const configuredAllowedPaths = config.agent?.allowedPaths ?? [];
+		const attachmentRoot = join(getAppDir(), "attachments");
+		const allowedPaths = Array.from(new Set([...configuredAllowedPaths, attachmentRoot]));
+		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
+	}
+
+	return extensionFactories;
+}
+
+export async function logStartupLoadedResources(config: AppConfig): Promise<void> {
+	const agentDir = getAgentDir(config);
+	const cwd = getWorkspace(config);
+
+	const loader = new DefaultResourceLoader({
+		cwd,
+		agentDir,
+		extensionFactories: buildExtensionFactories(config, cwd),
+	});
+	await loader.reload();
+
+	const extensions = loader
+		.getExtensions()
+		.extensions.map((extension) => extension.path)
+		.sort((a, b) => a.localeCompare(b));
+	const skills = loader
+		.getSkills()
+		.skills.map((skill) => skill.name)
+		.sort((a, b) => a.localeCompare(b));
+
+	console.log(
+		`[daemon] Loaded extensions (${extensions.length}): ${extensions.length > 0 ? extensions.join(", ") : "(none)"}`,
+	);
+	console.log(`[daemon] Loaded skills (${skills.length}): ${skills.length > 0 ? skills.join(", ") : "(none)"}`);
+}
+
 // ─── Session factory ───────────────────────────────────────────────────────────
 
 export async function getOrCreateSession(chatKey: string, config: AppConfig): Promise<AgentSession> {
@@ -51,22 +93,10 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 	const authStorage = AuthStorage.create(getAuthPath());
 	const modelRegistry = new ModelRegistry(authStorage);
 
-	// Build extension factories (workspace jail if enabled)
-	const extensionFactories: ExtensionFactory[] = [];
-	extensionFactories.push(createCronExtension());
-	extensionFactories.push(createHeartbeatExtension());
-	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
-	if (restrictToWorkspace) {
-		const configuredAllowedPaths = config.agent?.allowedPaths ?? [];
-		const attachmentRoot = join(getAppDir(), "attachments");
-		const allowedPaths = Array.from(new Set([...configuredAllowedPaths, attachmentRoot]));
-		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
-	}
-
 	const loader = new DefaultResourceLoader({
 		cwd,
 		agentDir,
-		extensionFactories,
+		extensionFactories: buildExtensionFactories(config, cwd),
 	});
 	await loader.reload();
 
