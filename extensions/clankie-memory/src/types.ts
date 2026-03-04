@@ -6,11 +6,12 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 export interface EmbeddingConfig {
-	provider: "openai" | "ollama";
+	provider: "openai" | "ollama" | "local";
 	model: string;
 	apiKey?: string;
 	baseUrl?: string;
 	dimensions: number;
+	cacheDir?: string;
 }
 
 export interface SearchConfig {
@@ -42,9 +43,10 @@ export const DEFAULT_CONFIG: MemoryConfig = {
 	enabled: true,
 	dbPath: join(homedir(), ".clankie", "memory.sqlite"),
 	embedding: {
-		provider: "openai",
-		model: "text-embedding-3-small",
-		dimensions: 1536,
+		provider: "local",
+		model: "Xenova/all-MiniLM-L6-v2",
+		dimensions: 384,
+		cacheDir: join(homedir(), ".clankie", "models"),
 	},
 	search: {
 		vectorWeight: 0.7,

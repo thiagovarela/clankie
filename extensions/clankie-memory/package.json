@@ -1,25 +1,32 @@
 {
-  "name": "clankie-memory",
-  "version": "0.1.0",
-  "description": "Persistent memory with SQLite FTS5 + vector cosine similarity for clankie",
-  "type": "module",
-  "keywords": ["pi-package"],
-  "scripts": {
-    "typecheck": "bunx tsgo --noEmit"
-  },
-  "pi": {
-    "extensions": ["./src/index.ts"],
-    "skills": ["./skills"]
-  },
-  "peerDependencies": {
-    "@mariozechner/pi-coding-agent": "*",
-    "@sinclair/typebox": "*"
-  },
-  "dependencies": {
-    "better-sqlite3": "^12.6.2",
-    "sqlite-vec": "^0.1.7-alpha.2"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13"
-  }
+	"name": "clankie-memory",
+	"version": "0.1.0",
+	"description": "Persistent memory with SQLite FTS5 + vector cosine similarity for clankie",
+	"type": "module",
+	"keywords": [
+		"pi-package"
+	],
+	"scripts": {
+		"typecheck": "bunx tsgo --noEmit"
+	},
+	"pi": {
+		"extensions": [
+			"./src/index.ts"
+		],
+		"skills": [
+			"./skills"
+		]
+	},
+	"peerDependencies": {
+		"@mariozechner/pi-coding-agent": "*",
+		"@sinclair/typebox": "*"
+	},
+	"dependencies": {
+		"@huggingface/transformers": "^3.8.1",
+		"better-sqlite3": "^12.6.2",
+		"sqlite-vec": "^0.1.7-alpha.2"
+	},
+	"devDependencies": {
+		"@types/better-sqlite3": "^7.6.13"
+	}
 }
