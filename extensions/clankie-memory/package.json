@@ -4,6 +4,9 @@
   "description": "Persistent memory with SQLite FTS5 + vector cosine similarity for clankie",
   "type": "module",
   "keywords": ["pi-package"],
+  "scripts": {
+    "typecheck": "npx tsgo --noEmit"
+  },
   "pi": {
     "extensions": ["./src/index.ts"],
     "skills": ["./skills"]
@@ -16,7 +19,6 @@
     "better-sqlite3": "^12.6.2"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "typescript": "^5.9.3"
+    "@types/better-sqlite3": "^7.6.13"
   }
 }

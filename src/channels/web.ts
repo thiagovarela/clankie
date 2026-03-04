@@ -12,14 +12,20 @@
 import * as crypto from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import type { Server } from "node:http";
+import type { Http2Server, Http2SecureServer } from "node:http2";
 import { basename, dirname, join, resolve } from "node:path";
 import { serve } from "@hono/node-server";
+
+/** Server type from @hono/node-server (includes HTTP/2) */
+type ServerType = Server | Http2Server | Http2SecureServer;
+import type { WebSocket } from "ws";
 import { createNodeWebSocket } from "@hono/node-ws";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 import type { ImageContent, OAuthLoginCallbacks } from "@mariozechner/pi-ai";
 import { type AgentSession, type AgentSessionEvent, AuthStorage } from "@mariozechner/pi-coding-agent";
 import { Hono } from "hono";
 import { parse as parseCookie, serialize as serializeCookie } from "hono/utils/cookie";
+import type { Context } from "hono";
 import type { WSContext } from "hono/ws";
 import { buildApiKeyProviders } from "../auth/providers.ts";
 import { getAppDir, getAuthPath, loadConfig } from "../config.ts";
@@ -47,10 +53,16 @@ interface InboundWebMessage {
 	command: RpcCommand;
 }
 
+/** Extended session events including custom events */
+type ExtendedAgentSessionEvent =
+	| AgentSessionEvent
+	| { type: "model_changed"; model: { provider: string; id: string } }
+	| { type: "thinking_level_changed"; level: ThinkingLevel };
+
 /** Outbound message to client */
 interface OutboundWebMessage {
 	sessionId: string; // "_auth" for auth events
-	event: AgentSessionEvent | RpcResponse | RpcExtensionUIRequest | AuthEvent;
+	event: ExtendedAgentSessionEvent | RpcResponse | RpcExtensionUIRequest | AuthEvent;
 }
 
 /** RPC command types from pi */
@@ -414,7 +426,7 @@ function setAuthCookie(
 	c: { header: (name: string, value: string, options?: { append?: boolean }) => void },
 	name: string,
 	value: string,
-	options: Parameters<typeof getCookieOptions>[0],
+	options: ReturnType<typeof getCookieOptions>,
 ): void {
 	const cookieValue = serializeCookie(name, value, {
 		...options,
@@ -480,7 +492,7 @@ function getValidAuthToken(
 export class WebChannel implements Channel {
 	readonly name = "web";
 	private options: WebChannelOptions;
-	private server: Server | null = null;
+	private server: ServerType | null = null;
 
 	/** Map of sessionId → Set of WebSocket connections subscribed to that session */
 	private sessionSubscriptions = new Map<string, Set<WSContext>>();
@@ -521,9 +533,8 @@ export class WebChannel implements Channel {
 		// Note: upgradeWebSocket() handles WebSocket upgrade requests at the root path
 		// Regular HTTP requests fall through to static file serving
 
-		app.get(
-			"/",
-			wsUpgrade((c) => {
+		// Define the WebSocket handler with proper typing
+		const wsHandler = (c: Context) => {
 				// Validate auth token from Authorization header, cookie, or URL query param
 				const token = getValidAuthToken(c, this.options.authToken);
 
@@ -565,10 +576,10 @@ export class WebChannel implements Channel {
 
 				// Return WebSocket handlers
 				return {
-					onOpen: (_evt, _ws) => {
+					onOpen: (_evt: Event, _ws: WSContext<WebSocket>) => {
 						console.log("[web] Client connected");
 					},
-					onMessage: async (evt, ws) => {
+					onMessage: async (evt: MessageEvent, ws: WSContext<WebSocket>) => {
 						try {
 							const text = typeof evt.data === "string" ? evt.data : evt.data.toString();
 							const parsed = JSON.parse(text);
@@ -592,7 +603,7 @@ export class WebChannel implements Channel {
 							);
 						}
 					},
-					onClose: (_evt, ws) => {
+					onClose: (_evt: CloseEvent, ws: WSContext<WebSocket>) => {
 						console.log("[web] Client disconnected");
 
 						// Remove this connection from all session subscriptions
@@ -604,8 +615,8 @@ export class WebChannel implements Channel {
 						}
 					},
 				};
-			}),
-		);
+			};
+		app.get("/", wsUpgrade(wsHandler as any));
 
 		// ─── Auth API endpoints ─────────────────────────────────────────────
 		// Note: These endpoints need CORS headers for cross-origin access
@@ -1749,7 +1760,7 @@ export class WebChannel implements Channel {
 		}
 	}
 
-	private broadcastEvent(sessionId: string, event: AgentSessionEvent): void {
+	private broadcastEvent(sessionId: string, event: ExtendedAgentSessionEvent): void {
 		const subscribers = this.sessionSubscriptions.get(sessionId);
 		if (!subscribers) {
 			console.log(`[web] No subscribers for session ${sessionId}, event ${event.type}`);

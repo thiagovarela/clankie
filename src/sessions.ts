@@ -261,7 +261,10 @@ export async function withChatLock<T>(chatKey: string, action: () => Promise<T>)
 	const current = previous.then(action, action); // Run action even if previous failed
 	chatLocks.set(
 		chatKey,
-		current.catch(() => {}),
+		current.then(
+			() => {},
+			() => {},
+		),
 	); // Swallow errors in the chain
 	return current;
 }
