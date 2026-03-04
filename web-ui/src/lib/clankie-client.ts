@@ -81,7 +81,13 @@ export class ClankieClient {
 	}
 
 	async listSessions(): Promise<{
-		sessions: Array<{ sessionId: string; title?: string; messageCount: number }>;
+		sessions: Array<{
+			sessionId: string;
+			title?: string;
+			messageCount: number;
+			createdAt?: number;
+			updatedAt?: number;
+		}>;
 	}> {
 		const response = await this.sendCommand({ type: "list_sessions" });
 		return response as {
@@ -89,6 +95,8 @@ export class ClankieClient {
 				sessionId: string;
 				title?: string;
 				messageCount: number;
+				createdAt?: number;
+				updatedAt?: number;
 			}>;
 		};
 	}

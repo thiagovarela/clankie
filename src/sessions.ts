@@ -22,6 +22,7 @@ import { type AppConfig, getAgentDir, getAppDir, getAuthPath, getWorkspace } fro
 import { createCronExtension } from "./extensions/cron/index.ts";
 import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
 import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
+import { resolveScopedModels } from "./lib/scoped-model-resolver.ts";
 
 // ─── Session cache (one session per chat) ──────────────────────────────────────
 
@@ -116,12 +117,10 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 	const enabledModels = session.settingsManager.getEnabledModels();
 	if (enabledModels && enabledModels.length > 0) {
 		const available = await session.modelRegistry.getAvailable();
-		const resolved = [];
-		for (const pattern of enabledModels) {
-			const [provider, modelId] = pattern.split("/", 2);
-			const model = available.find((m) => m.provider === provider && m.id === modelId);
-			if (model) resolved.push({ model, thinkingLevel: session.thinkingLevel });
-		}
+		const resolved = resolveScopedModels(enabledModels, available).map((model) => ({
+			model,
+			thinkingLevel: session.thinkingLevel,
+		}));
 		if (resolved.length > 0) {
 			session.setScopedModels(resolved);
 			console.log(`[session] Applied ${resolved.length} scoped models for session ${chatKey}`);
