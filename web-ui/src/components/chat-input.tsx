@@ -1,11 +1,12 @@
 import { useStore } from '@tanstack/react-store'
-import { Paperclip, Send } from 'lucide-react'
-import { useCallback, useRef, useState } from 'react'
+import { Paperclip, Send, Slash } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ClipboardEvent, DragEvent, KeyboardEvent } from 'react'
 import type { AttachmentItem } from '@/components/attachment-preview'
 import type { ImageContent } from '@/lib/types'
 import type { DisplayAttachment } from '@/stores/messages'
 import { AttachmentPreview } from '@/components/attachment-preview'
+import { CommandPalette } from '@/components/command-palette'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { clientManager } from '@/lib/client-manager'
@@ -14,6 +15,7 @@ import { sessionStore } from '@/stores/session'
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB per file
 const MAX_TOTAL_SIZE = 20 * 1024 * 1024 // 20MB total
+const COMMAND_TRIGGER_REGEX = /^\/\S*$/
 
 export function ChatInput() {
   const { sessionId, isStreaming } = useStore(sessionStore, (state) => ({
@@ -24,9 +26,33 @@ export function ChatInput() {
   const [message, setMessage] = useState('')
   const [attachments, setAttachments] = useState<Array<AttachmentItem>>([])
   const [isDragging, setIsDragging] = useState(false)
+  const [isCommandPaletteDismissed, setIsCommandPaletteDismissed] =
+    useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const inputDockRef = useRef<HTMLDivElement>(null)
+
+  const isCommandMode = COMMAND_TRIGGER_REGEX.test(message)
+  const commandSearch = isCommandMode ? message.slice(1) : ''
+  const showCommandPalette =
+    isCommandMode && !isCommandPaletteDismissed && !!sessionId && !isStreaming
+
+  useEffect(() => {
+    if (!showCommandPalette) return
+
+    const handlePointerDownOutside = (event: MouseEvent) => {
+      if (!inputDockRef.current) return
+      if (!inputDockRef.current.contains(event.target as Node)) {
+        setIsCommandPaletteDismissed(true)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDownOutside)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDownOutside)
+    }
+  }, [showCommandPalette])
 
   // Convert File to base64
   const fileToBase64 = useCallback((file: File): Promise<string> => {
@@ -175,6 +201,23 @@ export function ChatInput() {
     [addFiles],
   )
 
+  const handleMessageChange = (value: string) => {
+    setMessage(value)
+    setIsCommandPaletteDismissed(false)
+  }
+
+  const handleCommandSelect = (commandName: string) => {
+    setMessage(`/${commandName} `)
+    setIsCommandPaletteDismissed(true)
+    textareaRef.current?.focus()
+  }
+
+  const handleInsertSlash = () => {
+    setMessage('/')
+    setIsCommandPaletteDismissed(false)
+    textareaRef.current?.focus()
+  }
+
   // Remove attachment
   const handleRemoveAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((att) => att.id !== id))
@@ -264,6 +307,12 @@ export function ChatInput() {
   }
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape' && showCommandPalette) {
+      e.preventDefault()
+      setIsCommandPaletteDismissed(true)
+      return
+    }
+
     if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault()
       handleSend()
@@ -279,7 +328,18 @@ export function ChatInput() {
     >
       <div className="mx-auto w-full max-w-3xl">
         {/* Floating dock container */}
-        <div className="relative rounded-2xl border border-border/40 bg-card/80 backdrop-blur-xl shadow-2xl shadow-black/10 dark:shadow-black/30">
+        <div
+          ref={inputDockRef}
+          className="relative rounded-2xl border border-border/40 bg-card/80 backdrop-blur-xl shadow-2xl shadow-black/10 dark:shadow-black/30"
+        >
+          {showCommandPalette && (
+            <CommandPalette
+              open={showCommandPalette}
+              search={commandSearch}
+              onSelect={handleCommandSelect}
+            />
+          )}
+
           {/* Attachment previews */}
           {attachments.length > 0 && (
             <div className="px-4 pt-3">
@@ -297,7 +357,7 @@ export function ChatInput() {
               id="chat-input"
               name="message"
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={(e) => handleMessageChange(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder="Send a message..."
@@ -337,6 +397,18 @@ export function ChatInput() {
               >
                 <Paperclip className="h-4 w-4" />
                 <span className="sr-only">Attach files</span>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                disabled={!sessionId || isStreaming}
+                onClick={handleInsertSlash}
+                title="Insert command"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+              >
+                <Slash className="h-4 w-4" />
+                <span className="sr-only">Insert command</span>
               </Button>
             </div>
 
