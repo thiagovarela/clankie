@@ -17,6 +17,7 @@ import {
 	getActiveSessionName,
 	getOrCreateSession,
 	listSessionNames,
+	logStartupLoadedResources,
 	saveNonImageAttachments,
 	setActiveSessionName,
 	toImageContents,
@@ -226,6 +227,12 @@ async function processMessage(
  */
 async function initializeChannels(): Promise<void> {
 	const config = loadConfig();
+
+	try {
+		await logStartupLoadedResources(config);
+	} catch (err) {
+		console.warn(`[daemon] Failed to list startup resources: ${err instanceof Error ? err.message : String(err)}`);
+	}
 
 	const channels: Channel[] = [];
 
