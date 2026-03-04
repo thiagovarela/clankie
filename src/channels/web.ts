@@ -1834,6 +1834,27 @@ export class WebChannel implements Channel {
 
 	// ─── Helpers ───────────────────────────────────────────────────────────────
 
+	private getSessionLatestJsonlMtime(sessionPath: string): number | undefined {
+		try {
+			const files = readdirSync(sessionPath)
+				.filter((f) => f.endsWith(".jsonl"))
+				.map((f) => {
+					const filePath = join(sessionPath, f);
+					try {
+						return statSync(filePath).mtime.getTime();
+					} catch {
+						return undefined;
+					}
+				})
+				.filter((mtime): mtime is number => mtime !== undefined)
+				.sort((a, b) => b - a);
+
+			return files[0];
+		} catch {
+			return undefined;
+		}
+	}
+
 	/**
 	 * Extract title from a session directory by reading the last user message from JSONL files
 	 */
@@ -1903,11 +1924,13 @@ export class WebChannel implements Channel {
 					try {
 						const stats = statSync(path);
 						if (!stats.isDirectory()) return null;
+
+						const latestJsonlMtime = this.getSessionLatestJsonlMtime(path);
 						return {
 							sessionId: dir,
 							path,
 							createdAt: stats.birthtime?.getTime(),
-							updatedAt: stats.mtime.getTime(),
+							updatedAt: latestJsonlMtime ?? stats.mtime.getTime(),
 						};
 					} catch {
 						return null;
