@@ -1,211 +1,278 @@
+/**
+ * Markdown indexer for clankie-memory
+ * Handles file watching, chunking, and sync logic
+ */
+
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, watch } from "node:fs";
-import { join, relative, resolve } from "node:path";
+import { type FSWatcher, readFileSync, watch } from "node:fs";
+import { join } from "node:path";
+import { glob } from "glob";
 import type { EmbeddingProvider } from "./embeddings.ts";
 import type { MemoryStore } from "./store.ts";
-import type { MemoryConfig } from "./types.ts";
+import type { Chunk, MemoryConfig } from "./types.ts";
 
-interface ChunkDraft {
-	id: string;
-	filePath: string;
-	lineStart: number;
-	lineEnd: number;
-	content: string;
+// Rough token estimation (characters / 4)
+function estimateTokens(text: string): number {
+	return Math.ceil(text.length / 4);
 }
 
-function hashContent(content: string): string {
+// Generate chunk ID
+function generateChunkId(filePath: string, index: number): string {
+	const hash = createHash("sha256").update(`${filePath}:${index}`).digest("hex").substring(0, 16);
+	return hash;
+}
+
+// Generate file content hash
+function generateFileHash(content: string): string {
 	return createHash("sha256").update(content).digest("hex");
 }
 
-function chunkText(
-	markdown: string,
-	targetTokens: number,
-	overlapTokens: number,
-): Array<{ text: string; lineStart: number; lineEnd: number }> {
-	const lines = markdown.split(/\r?\n/);
-	const sections: Array<{ startLine: number; text: string }> = [];
-	let buffer: string[] = [];
-	let sectionStart = 1;
+/**
+ * Chunk a markdown document into smaller pieces
+ * Strategy: heading-aware splitting with target token size
+ */
+export function chunkDocument(content: string, filePath: string, config: MemoryConfig): Chunk[] {
+	const lines = content.split("\n");
+	const chunks: Chunk[] = [];
+	let currentChunk: string[] = [];
+	let currentStartLine = 0;
+	let chunkIndex = 0;
 
-	for (let i = 0; i < lines.length; i += 1) {
+	function flushChunk(endLine: number): void {
+		if (currentChunk.length === 0) return;
+
+		const chunkContent = currentChunk.join("\n");
+		const now = new Date().toISOString();
+
+		chunks.push({
+			id: generateChunkId(filePath, chunkIndex++),
+			filePath,
+			lineStart: currentStartLine + 1, // 1-indexed
+			lineEnd: endLine,
+			content: chunkContent,
+			createdAt: now,
+			updatedAt: now,
+		});
+
+		// Keep overlap for context
+		const overlapLines = Math.min(currentChunk.length, Math.ceil(config.chunkOverlapTokens / 4));
+		currentChunk = currentChunk.slice(-overlapLines);
+		currentStartLine = endLine - overlapLines;
+	}
+
+	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
-		if ((line.startsWith("## ") || line.startsWith("### ")) && buffer.length > 0) {
-			sections.push({ startLine: sectionStart, text: buffer.join("\n") });
-			buffer = [line];
-			sectionStart = i + 1;
-		} else {
-			if (buffer.length === 0) sectionStart = i + 1;
-			buffer.push(line);
-		}
-	}
-	if (buffer.length > 0) {
-		sections.push({ startLine: sectionStart, text: buffer.join("\n") });
-	}
+		const isHeading = line.startsWith("#");
 
-	const chunks: Array<{ text: string; lineStart: number; lineEnd: number }> = [];
-	for (const section of sections) {
-		const words = section.text.split(/\s+/).filter(Boolean);
-		if (words.length <= targetTokens) {
-			const lineCount = section.text.split(/\r?\n/).length;
-			chunks.push({
-				text: section.text.trim(),
-				lineStart: section.startLine,
-				lineEnd: section.startLine + lineCount - 1,
-			});
-			continue;
-		}
-
-		let cursor = 0;
-		while (cursor < words.length) {
-			const end = Math.min(words.length, cursor + targetTokens);
-			const text = words.slice(cursor, end).join(" ").trim();
-			if (text.length > 0) {
-				chunks.push({
-					text,
-					lineStart: section.startLine,
-					lineEnd: section.startLine + section.text.split(/\r?\n/).length - 1,
-				});
+		// Flush at headings if we have enough content
+		if (isHeading && currentChunk.length > 0) {
+			const currentTokens = estimateTokens(currentChunk.join("\n"));
+			if (currentTokens >= config.chunkTargetTokens * 0.5) {
+				flushChunk(i);
 			}
-			if (end >= words.length) break;
-			cursor = Math.max(cursor + 1, end - overlapTokens);
+		}
+
+		currentChunk.push(line);
+
+		// Flush if we've hit target size
+		const currentTokens = estimateTokens(currentChunk.join("\n"));
+		if (currentTokens >= config.chunkTargetTokens) {
+			flushChunk(i + 1);
 		}
 	}
 
-	return chunks.filter((chunk) => chunk.text.length > 0);
+	// Flush remaining content
+	if (currentChunk.length > 0) {
+		flushChunk(lines.length);
+	}
+
+	return chunks;
 }
 
-function listMemoryFiles(workspaceDir: string): string[] {
-	const files: string[] = [];
-	const longTermFile = join(workspaceDir, "MEMORY.md");
-	if (existsSync(longTermFile)) files.push(longTermFile);
+/**
+ * Indexer manages file watching and syncing
+ */
+export class Indexer {
+	private config: MemoryConfig;
+	private store: MemoryStore;
+	private embeddingProvider: EmbeddingProvider;
+	private watchers: FSWatcher[] = [];
+	private debounceTimers = new Map<string, NodeJS.Timeout>();
+	private isSyncing = false;
 
-	const memoryDir = join(workspaceDir, "memory");
-	if (existsSync(memoryDir)) {
-		const stack = [memoryDir];
-		while (stack.length > 0) {
-			const dir = stack.pop();
-			if (!dir) continue;
-			for (const entry of readdirSync(dir, { withFileTypes: true })) {
-				const absolute = join(dir, entry.name);
-				if (entry.isDirectory()) {
-					stack.push(absolute);
-				} else if (entry.isFile() && entry.name.endsWith(".md")) {
-					files.push(absolute);
-				}
-			}
-		}
+	constructor(config: MemoryConfig, store: MemoryStore, embeddingProvider: EmbeddingProvider) {
+		this.config = config;
+		this.store = store;
+		this.embeddingProvider = embeddingProvider;
 	}
 
-	return files.sort();
-}
-
-export class MemoryIndexer {
-	private debounceTimer: ReturnType<typeof setTimeout> | null = null;
-	private watchers: Array<ReturnType<typeof watch>> = [];
-
-	constructor(
-		private readonly store: MemoryStore,
-		private readonly embeddingProvider: EmbeddingProvider,
-		private readonly config: MemoryConfig,
-	) {}
-
-	async syncAll(workspaceDir: string): Promise<void> {
-		const files = listMemoryFiles(workspaceDir);
-		const seen = new Set<string>();
-
-		for (const filePath of files) {
-			await this.syncFile(workspaceDir, filePath);
-			seen.add(relative(workspaceDir, filePath));
-		}
-
-		for (const indexedFile of this.store.listIndexedFiles()) {
-			if (!seen.has(indexedFile)) {
-				this.store.deleteByFile(indexedFile);
-			}
-		}
-
-		this.store.setMeta("last_sync_at", new Date().toISOString());
-	}
-
-	async syncFile(workspaceDir: string, absolutePath: string): Promise<void> {
-		const resolvedPath = resolve(absolutePath);
-		if (!existsSync(resolvedPath)) {
-			const rel = relative(workspaceDir, resolvedPath);
-			this.store.deleteByFile(rel);
-			this.store.setMeta(`filehash:${rel}`, "");
-			return;
-		}
-
-		const relPath = relative(workspaceDir, resolvedPath);
-		const content = readFileSync(resolvedPath, "utf8");
-		const contentHash = hashContent(content);
-		const previousHash = this.store.getMeta(`filehash:${relPath}`);
-		if (previousHash === contentHash) {
-			return;
-		}
-
-		const draftChunks = chunkText(content, this.config.chunkTargetTokens, this.config.chunkOverlapTokens);
-		const vectors = await this.embeddingProvider.embed(draftChunks.map((chunk) => chunk.text));
-
-		const records = draftChunks.map((chunk, index): ChunkDraft & { embedding?: number[] } => ({
-			id: `${relPath}:${index}`,
-			filePath: relPath,
-			lineStart: chunk.lineStart,
-			lineEnd: chunk.lineEnd,
-			content: chunk.text,
-			embedding: vectors[index],
-		}));
-
-		this.store.upsertChunks(relPath, records);
-		this.store.setMeta(`filehash:${relPath}`, contentHash);
-		this.store.setMeta("last_sync_at", new Date().toISOString());
-	}
-
-	watchMemoryFiles(workspaceDir: string, onChange?: () => void): void {
-		this.stopWatching();
-
-		const longTerm = join(workspaceDir, "MEMORY.md");
+	/**
+	 * Start watching memory files for changes
+	 */
+	watchMemoryFiles(workspaceDir: string, onChange?: (filePath: string) => void): void {
 		const memoryDir = join(workspaceDir, "memory");
-		if (!existsSync(memoryDir)) {
-			mkdirSync(memoryDir, { recursive: true });
-		}
+		const memoryFile = join(workspaceDir, "MEMORY.md");
 
-		const schedule = () => {
-			if (this.debounceTimer) clearTimeout(this.debounceTimer);
-			this.debounceTimer = setTimeout(async () => {
-				try {
-					await this.syncAll(workspaceDir);
-					onChange?.();
-				} catch (error) {
-					console.warn(`[clankie-memory] watch sync failed: ${error instanceof Error ? error.message : String(error)}`);
+		// Watch MEMORY.md
+		try {
+			const watcher = watch(memoryFile, (eventType) => {
+				if (eventType === "change") {
+					this.debouncedSync(memoryFile, onChange);
 				}
-			}, this.config.debounceMs);
-		};
-
-		try {
-			if (existsSync(longTerm)) {
-				this.watchers.push(watch(longTerm, schedule));
-			}
+			});
+			this.watchers.push(watcher);
 		} catch {
-			// ignore watcher setup errors
+			// File might not exist yet
 		}
 
+		// Watch memory/ directory
 		try {
-			this.watchers.push(watch(memoryDir, { recursive: true }, schedule));
+			const watcher = watch(memoryDir, { recursive: true }, (_eventType, filename) => {
+				if (filename?.endsWith(".md")) {
+					const filePath = join(memoryDir, filename);
+					this.debouncedSync(filePath, onChange);
+				}
+			});
+			this.watchers.push(watcher);
 		} catch {
-			// recursive watch unsupported on some platforms
-			this.watchers.push(watch(memoryDir, schedule));
+			// Directory might not exist yet
 		}
 	}
 
+	/**
+	 * Stop all file watchers
+	 */
 	stopWatching(): void {
-		if (this.debounceTimer) {
-			clearTimeout(this.debounceTimer);
-			this.debounceTimer = null;
-		}
 		for (const watcher of this.watchers) {
 			watcher.close();
 		}
 		this.watchers = [];
+		for (const [, timer] of this.debounceTimers) {
+			clearTimeout(timer);
+		}
+		this.debounceTimers.clear();
+	}
+
+	/**
+	 * Debounced sync for file changes
+	 */
+	private debouncedSync(filePath: string, onChange?: (filePath: string) => void): void {
+		const existing = this.debounceTimers.get(filePath);
+		if (existing) {
+			clearTimeout(existing);
+		}
+
+		const timer = setTimeout(() => {
+			this.debounceTimers.delete(filePath);
+			this.syncFile(filePath)
+				.then(() => onChange?.(filePath))
+				.catch((err) => console.error(`[memory] Sync error for ${filePath}:`, err));
+		}, this.config.debounceMs);
+
+		this.debounceTimers.set(filePath, timer);
+	}
+
+	/**
+	 * Sync a single file
+	 */
+	async syncFile(filePath: string): Promise<void> {
+		try {
+			const content = readFileSync(filePath, "utf-8");
+			const hash = generateFileHash(content);
+
+			// Check if file has changed
+			const existing = this.store.getFileHash(filePath);
+			if (existing?.hash === hash) {
+				return; // No change
+			}
+
+			// Delete old chunks for this file
+			this.store.deleteByFile(filePath);
+
+			// Chunk the document
+			const chunks = chunkDocument(content, filePath, this.config);
+
+			// Generate embeddings for chunks
+			if (chunks.length > 0) {
+				const texts = chunks.map((c) => c.content);
+				const embeddings = await this.embeddingProvider.embed(texts);
+
+				for (let i = 0; i < chunks.length; i++) {
+					chunks[i].embedding = new Float64Array(embeddings[i]);
+				}
+
+				// Store chunks
+				this.store.upsertChunks(chunks);
+			}
+
+			// Update file hash
+			this.store.setFileHash(filePath, hash);
+
+			console.log(`[memory] Indexed ${chunks.length} chunks from ${filePath}`);
+		} catch (error) {
+			console.error(`[memory] Failed to sync ${filePath}:`, error);
+		}
+	}
+
+	/**
+	 * Sync all memory files in workspace
+	 */
+	async syncAll(workspaceDir: string): Promise<void> {
+		if (this.isSyncing) {
+			console.log("[memory] Sync already in progress, skipping");
+			return;
+		}
+
+		this.isSyncing = true;
+		console.log("[memory] Starting full sync...");
+
+		try {
+			const files = await this.findMemoryFiles(workspaceDir);
+
+			for (const filePath of files) {
+				await this.syncFile(filePath);
+			}
+
+			console.log(`[memory] Full sync complete. Indexed ${files.length} files.`);
+		} catch (error) {
+			console.error("[memory] Full sync failed:", error);
+		} finally {
+			this.isSyncing = false;
+		}
+	}
+
+	/**
+	 * Find all memory files in workspace
+	 */
+	private async findMemoryFiles(workspaceDir: string): Promise<string[]> {
+		const files: string[] = [];
+
+		// MEMORY.md in root
+		const memoryFile = join(workspaceDir, "MEMORY.md");
+		try {
+			readFileSync(memoryFile);
+			files.push(memoryFile);
+		} catch {
+			// File doesn't exist
+		}
+
+		// All .md files in memory/ directory
+		try {
+			const memoryDir = join(workspaceDir, "memory");
+			const pattern = join(memoryDir, "**/*.md");
+			const matches = await glob(pattern);
+			files.push(...matches);
+		} catch {
+			// Directory might not exist
+		}
+
+		return files;
+	}
+
+	/**
+	 * Check if sync is currently running
+	 */
+	get isRunning(): boolean {
+		return this.isSyncing;
 	}
 }
