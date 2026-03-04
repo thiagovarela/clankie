@@ -5,7 +5,7 @@
   "type": "module",
   "keywords": ["pi-package"],
   "scripts": {
-    "typecheck": "npx tsgo --noEmit"
+    "typecheck": "bunx tsgo --noEmit"
   },
   "pi": {
     "extensions": ["./src/index.ts"],
@@ -16,7 +16,8 @@
     "@sinclair/typebox": "*"
   },
   "dependencies": {
-    "better-sqlite3": "^12.6.2"
+    "better-sqlite3": "^12.6.2",
+    "sqlite-vec": "^0.1.7-alpha.2"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13"
