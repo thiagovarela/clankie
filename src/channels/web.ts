@@ -1834,25 +1834,66 @@ export class WebChannel implements Channel {
 
 	// ─── Helpers ───────────────────────────────────────────────────────────────
 
-	private getSessionLatestJsonlMtime(sessionPath: string): number | undefined {
+	private getSessionJsonlFiles(sessionPath: string): Array<{ path: string; mtime: number }> {
 		try {
-			const files = readdirSync(sessionPath)
+			return readdirSync(sessionPath)
 				.filter((f) => f.endsWith(".jsonl"))
 				.map((f) => {
 					const filePath = join(sessionPath, f);
 					try {
-						return statSync(filePath).mtime.getTime();
+						return { path: filePath, mtime: statSync(filePath).mtime.getTime() };
 					} catch {
 						return undefined;
 					}
 				})
-				.filter((mtime): mtime is number => mtime !== undefined)
-				.sort((a, b) => b - a);
+				.filter((file): file is { path: string; mtime: number } => file !== undefined)
+				.sort((a, b) => b.mtime - a.mtime);
+		} catch {
+			return [];
+		}
+	}
 
-			return files[0];
+	private parseEntryTimestampMs(value: unknown): number | undefined {
+		if (typeof value !== "string") return undefined;
+		const parsed = Date.parse(value);
+		return Number.isNaN(parsed) ? undefined : parsed;
+	}
+
+	private getLatestMessageTimestampFromJsonl(filePath: string): number | undefined {
+		try {
+			const content = readFileSync(filePath, "utf-8");
+			const lines = content.trim().split("\n");
+
+			for (let i = lines.length - 1; i >= 0; i--) {
+				try {
+					const entry = JSON.parse(lines[i]);
+					if (entry?.type !== "message") continue;
+
+					const fromEntry = this.parseEntryTimestampMs(entry.timestamp);
+					if (fromEntry !== undefined) return fromEntry;
+
+					const fromMessage = this.parseEntryTimestampMs(entry.message?.timestamp);
+					if (fromMessage !== undefined) return fromMessage;
+				} catch {}
+			}
+
+			return undefined;
 		} catch {
 			return undefined;
 		}
+	}
+
+	private getSessionLatestMessageTimestamp(sessionPath: string): number | undefined {
+		const jsonlFiles = this.getSessionJsonlFiles(sessionPath);
+		for (const file of jsonlFiles) {
+			const timestamp = this.getLatestMessageTimestampFromJsonl(file.path);
+			if (timestamp !== undefined) return timestamp;
+		}
+		return undefined;
+	}
+
+	private getSessionLatestJsonlMtime(sessionPath: string): number | undefined {
+		return this.getSessionJsonlFiles(sessionPath)[0]?.mtime;
 	}
 
 	/**
@@ -1925,12 +1966,13 @@ export class WebChannel implements Channel {
 						const stats = statSync(path);
 						if (!stats.isDirectory()) return null;
 
+						const latestMessageTimestamp = this.getSessionLatestMessageTimestamp(path);
 						const latestJsonlMtime = this.getSessionLatestJsonlMtime(path);
 						return {
 							sessionId: dir,
 							path,
 							createdAt: stats.birthtime?.getTime(),
-							updatedAt: latestJsonlMtime ?? stats.mtime.getTime(),
+							updatedAt: latestMessageTimestamp ?? latestJsonlMtime ?? stats.mtime.getTime(),
 						};
 					} catch {
 						return null;
