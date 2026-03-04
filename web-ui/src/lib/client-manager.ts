@@ -130,7 +130,8 @@ class ClientManager {
 					sessionId: session.sessionId,
 					title: session.title,
 					messageCount: session.messageCount,
-					createdAt: Date.now(),
+					createdAt: session.createdAt ?? session.updatedAt ?? Date.now(),
+					updatedAt: session.updatedAt,
 				});
 			}
 		} catch (err) {
@@ -176,6 +177,7 @@ class ClientManager {
 				title: undefined,
 				messageCount: 0,
 				createdAt: Date.now(),
+				updatedAt: Date.now(),
 			});
 
 			// Set it as active
@@ -332,6 +334,7 @@ class ClientManager {
 					title,
 					messageCount: state.messageCount,
 					createdAt: Date.now(),
+					updatedAt: Date.now(),
 				});
 			}
 

@@ -103,7 +103,7 @@ export function NavRecentSessions() {
                 
                 {/* Date */}
                 <span className="text-[11px] text-muted-foreground/50">
-                  {formatSessionDate(session.updatedAt)}
+                  {formatSessionDate(session.updatedAt ?? session.createdAt)}
                 </span>
               </SidebarMenuButton>
               

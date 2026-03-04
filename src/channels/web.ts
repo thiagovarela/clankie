@@ -31,6 +31,7 @@ import { buildApiKeyProviders } from "../auth/providers.ts";
 import { getAppDir, getAuthPath, loadConfig } from "../config.ts";
 import { reloadSharedHeartbeatRunnerSettings } from "../extensions/heartbeat/index.ts";
 import { HEARTBEAT_EXTENSION_UI_SPEC } from "../extensions/heartbeat/ui-spec.ts";
+import { resolveScopedModels } from "../lib/scoped-model-resolver.ts";
 import { getOrCreateSession } from "../sessions.ts";
 import type { Channel, MessageHandler } from "./channel.ts";
 
@@ -1471,22 +1472,26 @@ export class WebChannel implements Channel {
 
 			case "set_scoped_models": {
 				// 1. Persist patterns to settings.json
-				const patterns = command.models; // e.g. ["anthropic/claude-sonnet-4-5", "openai/gpt-4o"]
+				const patterns = command.models.map((pattern) => pattern.trim()).filter(Boolean);
 				session.settingsManager.setEnabledModels(patterns.length > 0 ? patterns : undefined);
 				await session.settingsManager.flush();
 
 				// 2. Resolve patterns to Model objects and update live session
 				const available = await session.modelRegistry.getAvailable();
-				const resolved = [];
-				for (const pattern of patterns) {
-					const [provider, modelId] = pattern.split("/", 2);
-					const model = available.find((m) => m.provider === provider && m.id === modelId);
-					if (model) resolved.push({ model, thinkingLevel: session.thinkingLevel });
-				}
+				const resolved = resolveScopedModels(patterns, available).map((model) => ({
+					model,
+					thinkingLevel: session.thinkingLevel,
+				}));
 				session.setScopedModels(resolved);
 
-				return { id, type: "response", command: "set_scoped_models", success: true,
-					data: { enabledModels: patterns } };
+				const enabledModels = session.settingsManager.getEnabledModels() ?? [];
+				return {
+					id,
+					type: "response",
+					command: "set_scoped_models",
+					success: true,
+					data: { enabledModels },
+				};
 			}
 
 			default: {
@@ -1877,8 +1882,11 @@ export class WebChannel implements Channel {
 		}
 	}
 
-	private async listAllSessions(): Promise<Array<{ sessionId: string; title?: string; messageCount: number }>> {
-		const sessions: Array<{ sessionId: string; title?: string; messageCount: number }> = [];
+	private async listAllSessions(): Promise<
+		Array<{ sessionId: string; title?: string; messageCount: number; createdAt?: number; updatedAt?: number }>
+	> {
+		const sessions: Array<{ sessionId: string; title?: string; messageCount: number; createdAt?: number; updatedAt?: number }> =
+			[];
 		const sessionsDir = join(getAppDir(), "sessions");
 
 		if (!existsSync(sessionsDir)) {
@@ -1890,27 +1898,27 @@ export class WebChannel implements Channel {
 			const dirs = readdirSync(sessionsDir);
 			const webSessions = dirs
 				.filter((dir) => dir.startsWith("web_"))
-				.map((dir) => ({ sessionId: dir, path: join(sessionsDir, dir) }))
-				.filter(({ path }) => {
+				.map((dir) => {
+					const path = join(sessionsDir, dir);
 					try {
-						return statSync(path).isDirectory();
+						const stats = statSync(path);
+						if (!stats.isDirectory()) return null;
+						return {
+							sessionId: dir,
+							path,
+							createdAt: stats.birthtime?.getTime(),
+							updatedAt: stats.mtime.getTime(),
+						};
 					} catch {
-						return false;
+						return null;
 					}
 				})
+				.filter((session): session is NonNullable<typeof session> => session !== null)
 				// Sort by modification time, newest first
-				.sort((a, b) => {
-					try {
-						const aMtime = statSync(a.path).mtime.getTime();
-						const bMtime = statSync(b.path).mtime.getTime();
-						return bMtime - aMtime;
-					} catch {
-						return 0;
-					}
-				});
+				.sort((a, b) => b.updatedAt - a.updatedAt);
 
 			// For each session directory, check if it's in memory or read from disk
-			for (const { sessionId, path } of webSessions) {
+			for (const { sessionId, path, createdAt, updatedAt } of webSessions) {
 				const inMemorySession = this.sessions.get(sessionId);
 
 				if (inMemorySession) {
@@ -1942,6 +1950,8 @@ export class WebChannel implements Channel {
 						sessionId,
 						title,
 						messageCount: inMemorySession.messages.length,
+						createdAt,
+						updatedAt,
 					});
 				} else {
 					// For sessions not in memory, read title from disk
@@ -1951,6 +1961,8 @@ export class WebChannel implements Channel {
 						sessionId,
 						title,
 						messageCount: 0, // We don't count messages for sessions not in memory
+						createdAt,
+						updatedAt,
 					});
 				}
 			}
