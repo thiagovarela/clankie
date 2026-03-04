@@ -1,3 +1,8 @@
+---
+name: clankie-memory
+description: A persistent memory for your personal agent
+---
+
 # Memory
 
 You have persistent memory stored as Markdown files in the workspace. This memory persists across sessions and allows you to recall facts, preferences, decisions, and context from previous conversations.
