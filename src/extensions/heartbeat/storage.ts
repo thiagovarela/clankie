@@ -4,6 +4,9 @@ import { isAbsolute, join, resolve } from "node:path";
 import type { HeartbeatRunResult } from "./types.ts";
 
 export function resolveResultsDir(cwd: string, configuredDir: string): string {
+	if (!configuredDir) {
+		return join(homedir(), ".clankie", "workspace", "heartbeat");
+	}
 	if (configuredDir.startsWith("~/")) {
 		return join(homedir(), configuredDir.slice(2));
 	}

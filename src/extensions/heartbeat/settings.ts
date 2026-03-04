@@ -55,6 +55,17 @@ function parseNamespace(raw: Record<string, unknown>): Partial<HeartbeatSettings
 	};
 }
 
+/** Strip undefined values from an object so spread merges don't clobber defaults */
+function stripUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {
+	const result: Partial<T> = {};
+	for (const key of Object.keys(obj) as (keyof T)[]) {
+		if (obj[key] !== undefined) {
+			result[key] = obj[key];
+		}
+	}
+	return result;
+}
+
 export function resolveHeartbeatSettings(cwd: string): HeartbeatSettings {
 	try {
 		const config = loadConfig();
@@ -76,8 +87,8 @@ export function resolveHeartbeatSettings(cwd: string): HeartbeatSettings {
 
 		const merged = {
 			...DEFAULTS,
-			...parseNamespace(globalRaw),
-			...parseNamespace(projectRaw),
+			...stripUndefined(parseNamespace(globalRaw)),
+			...stripUndefined(parseNamespace(projectRaw)),
 		};
 
 		return {
