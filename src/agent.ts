@@ -1,9 +1,12 @@
 /**
  * clankie agent session wrapper
  *
- * Creates an AgentSession using pi's SDK with full DefaultResourceLoader
+ * Creates an AgentSession using pi's SDK with ScopedResourceLoader
  * discovery — skills, extensions, prompt templates, context files all
- * load from the standard pi directories (~/.pi/agent/, .pi/, etc.).
+ * load from clankie's own directories (~/.clankie/, .pi/, etc.).
+ *
+ * Unlike DefaultResourceLoader, this does NOT load from global pi directories
+ * (~/.pi/agent/, ~/.agents/) to keep clankie self-contained.
  *
  * Model is resolved from ~/.clankie/clankie.json → agent.model.primary (provider/model format).
  * If not set, falls back to pi's default resolution (settings → first available).
@@ -14,7 +17,6 @@ import {
 	AuthStorage,
 	type CreateAgentSessionResult,
 	createAgentSession,
-	DefaultResourceLoader,
 	type ExtensionFactory,
 	ModelRegistry,
 	SessionManager,
@@ -23,6 +25,7 @@ import { getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from ".
 import { createCronExtension } from "./extensions/cron/index.ts";
 import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
 import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
+import { ScopedResourceLoader } from "./lib/scoped-resource-loader.ts";
 
 export interface SessionOptions {
 	/**
@@ -76,8 +79,9 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
 	}
 
-	// DefaultResourceLoader with standard pi discovery
-	const loader = new DefaultResourceLoader({
+	// ScopedResourceLoader — only loads from clankie's directories
+	// Does NOT load from ~/.pi/agent/ or ~/.agents/ to keep clankie self-contained
+	const loader = new ScopedResourceLoader({
 		cwd,
 		agentDir,
 		extensionFactories,

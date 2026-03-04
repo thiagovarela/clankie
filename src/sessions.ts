@@ -13,7 +13,6 @@ import {
 	AuthStorage,
 	type CreateAgentSessionResult,
 	createAgentSession,
-	DefaultResourceLoader,
 	type ExtensionFactory,
 	ModelRegistry,
 	SessionManager,
@@ -24,6 +23,7 @@ import { createCronExtension } from "./extensions/cron/index.ts";
 import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
 import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
 import { resolveScopedModels } from "./lib/scoped-model-resolver.ts";
+import { ScopedResourceLoader } from "./lib/scoped-resource-loader.ts";
 
 // ─── Session cache (one session per chat) ──────────────────────────────────────
 
@@ -139,7 +139,7 @@ export async function logStartupLoadedResources(config: AppConfig): Promise<void
 	const agentDir = getAgentDir(config);
 	const cwd = getWorkspace(config);
 
-	const loader = new DefaultResourceLoader({
+	const loader = new ScopedResourceLoader({
 		cwd,
 		agentDir,
 		extensionFactories: buildExtensionFactories(config, cwd),
@@ -150,8 +150,14 @@ export async function logStartupLoadedResources(config: AppConfig): Promise<void
 
 	const extensionItems = loader
 		.getExtensions()
-		.extensions.filter((extension) => !extension.path.startsWith("<inline:"))
-		.map((extension) => {
+		.extensions.map((extension) => {
+			// Handle built-in extensions (cron, heartbeat, workspace-jail)
+			if (extension.path.startsWith("clankie:")) {
+				return {
+					source: "built-in",
+					path: extension.path.slice(8), // Remove "clankie:" prefix
+				};
+			}
 			const metadata =
 				(pathMetadata.get(extension.path) as ResourcePathMetadata | undefined) ??
 				(pathMetadata.get(extension.resolvedPath) as ResourcePathMetadata | undefined);
@@ -192,7 +198,7 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 	const authStorage = AuthStorage.create(getAuthPath());
 	const modelRegistry = new ModelRegistry(authStorage);
 
-	const loader = new DefaultResourceLoader({
+	const loader = new ScopedResourceLoader({
 		cwd,
 		agentDir,
 		extensionFactories: buildExtensionFactories(config, cwd),
