@@ -120,7 +120,9 @@ type RpcCommand =
 	| { id?: string; type: "auth_set_api_key"; providerId: string; apiKey: string }
 	| { id?: string; type: "auth_login_input"; loginFlowId: string; value: string }
 	| { id?: string; type: "auth_login_cancel"; loginFlowId: string }
-	| { id?: string; type: "auth_logout"; providerId: string };
+	| { id?: string; type: "auth_logout"; providerId: string }
+	| { id?: string; type: "get_scoped_models" }
+	| { id?: string; type: "set_scoped_models"; models: string[] };  // "provider/modelId" strings
 
 /** RPC response types from pi */
 type RpcResponse =
@@ -1459,6 +1461,32 @@ export class WebChannel implements Channel {
 			case "reload": {
 				await session.reload();
 				return { id, type: "response", command: "reload", success: true };
+			}
+
+			case "get_scoped_models": {
+				const enabledModels = session.settingsManager.getEnabledModels() ?? [];
+				return { id, type: "response", command: "get_scoped_models", success: true,
+					data: { enabledModels } };
+			}
+
+			case "set_scoped_models": {
+				// 1. Persist patterns to settings.json
+				const patterns = command.models; // e.g. ["anthropic/claude-sonnet-4-5", "openai/gpt-4o"]
+				session.settingsManager.setEnabledModels(patterns.length > 0 ? patterns : undefined);
+				await session.settingsManager.flush();
+
+				// 2. Resolve patterns to Model objects and update live session
+				const available = await session.modelRegistry.getAvailable();
+				const resolved = [];
+				for (const pattern of patterns) {
+					const [provider, modelId] = pattern.split("/", 2);
+					const model = available.find((m) => m.provider === provider && m.id === modelId);
+					if (model) resolved.push({ model, thinkingLevel: session.thinkingLevel });
+				}
+				session.setScopedModels(resolved);
+
+				return { id, type: "response", command: "set_scoped_models", success: true,
+					data: { enabledModels: patterns } };
 			}
 
 			default: {

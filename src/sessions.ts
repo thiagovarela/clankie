@@ -112,6 +112,22 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 		`[session] Created AgentSession - chatKey: ${chatKey}, session.sessionId: ${session.sessionId}, session.sessionFile: ${session.sessionFile}`,
 	);
 
+	// Apply scoped models if configured
+	const enabledModels = session.settingsManager.getEnabledModels();
+	if (enabledModels && enabledModels.length > 0) {
+		const available = await session.modelRegistry.getAvailable();
+		const resolved = [];
+		for (const pattern of enabledModels) {
+			const [provider, modelId] = pattern.split("/", 2);
+			const model = available.find((m) => m.provider === provider && m.id === modelId);
+			if (model) resolved.push({ model, thinkingLevel: session.thinkingLevel });
+		}
+		if (resolved.length > 0) {
+			session.setScopedModels(resolved);
+			console.log(`[session] Applied ${resolved.length} scoped models for session ${chatKey}`);
+		}
+	}
+
 	// Bind extensions (headless — no UI)
 	await session.bindExtensions({
 		commandContextActions: {
