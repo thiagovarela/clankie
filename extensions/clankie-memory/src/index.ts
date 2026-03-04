@@ -81,6 +81,22 @@ async function initializeMemory(pi: ExtensionAPI, cwd: string): Promise<void> {
 	const store = new MemoryStore(config);
 	await store.open();
 
+	// Detect embedding provider/dimension changes and force reindex when needed
+	const currentEmbeddingProvider = config.embedding.provider;
+	const currentEmbeddingDimensions = String(config.embedding.dimensions);
+	const storedEmbeddingProvider = store.getMeta("embedding_provider");
+	const storedEmbeddingDimensions = store.getMeta("embedding_dimensions");
+
+	if (
+		storedEmbeddingProvider !== currentEmbeddingProvider ||
+		storedEmbeddingDimensions !== currentEmbeddingDimensions
+	) {
+		console.log("[memory] Embedding configuration changed, forcing full reindex");
+		store.clearAllFileHashes();
+		store.setMeta("embedding_provider", currentEmbeddingProvider);
+		store.setMeta("embedding_dimensions", currentEmbeddingDimensions);
+	}
+
 	// Initialize embedding provider
 	const embeddingProvider = createEmbeddingProvider(config.embedding, () => undefined);
 
@@ -298,12 +314,15 @@ export default function memoryExtension(pi: ExtensionAPI) {
 						return;
 					}
 					const stats = state.store.getStats();
+					const embeddingConfig = state.config.embedding;
+					const cacheLine =
+						embeddingConfig.provider === "local" ? `\n- Model cache: ${embeddingConfig.cacheDir ?? "default"}` : "";
 					const text = `Memory Status:
 - Chunks indexed: ${stats.chunkCount}
 - Files tracked: ${stats.fileCount}
 - File hashes stored: ${stats.trackedFileCount}
 - Database: ${state.config.dbPath}
-- Embedding provider: ${state.config.embedding.provider}/${state.config.embedding.model}`;
+- Embedding: ${embeddingConfig.provider}/${embeddingConfig.model} (${embeddingConfig.dimensions} dims)${cacheLine}`;
 					ctx.ui.notify(text, "info");
 					break;
 				}
@@ -317,10 +336,7 @@ export default function memoryExtension(pi: ExtensionAPI) {
 					console.log("[memory] Starting forced reindex...");
 					await state.indexer.syncAll(state.workspaceDir);
 					const stats = state.store.getStats();
-					ctx.ui.notify(
-						`Reindex complete. Indexed ${stats.chunkCount} chunks from ${stats.fileCount} files.`,
-						"info",
-					);
+					ctx.ui.notify(`Reindex complete. Indexed ${stats.chunkCount} chunks from ${stats.fileCount} files.`, "info");
 					break;
 				}
 
@@ -346,10 +362,7 @@ export default function memoryExtension(pi: ExtensionAPI) {
 				}
 
 				default: {
-					ctx.ui.notify(
-						"Usage: /memory [status|reindex|search <query>]",
-						"error",
-					);
+					ctx.ui.notify("Usage: /memory [status|reindex|search <query>]", "error");
 				}
 			}
 		},

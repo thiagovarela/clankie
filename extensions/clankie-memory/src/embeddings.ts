@@ -1,6 +1,6 @@
 /**
  * Embedding provider for clankie-memory
- * Supports OpenAI-compatible APIs including OpenAI, Ollama, and custom endpoints
+ * Supports OpenAI-compatible APIs and local embeddings via Transformers.js
  */
 
 import { createHash } from "node:crypto";
@@ -14,6 +14,18 @@ interface CacheEntry {
 	embedding: number[];
 	timestamp: number;
 }
+
+interface FeatureExtractionOutput {
+	tolist(): number[] | number[][] | number[][][];
+}
+
+type FeatureExtractor = (
+	text: string | string[],
+	options?: { pooling?: "mean"; normalize?: boolean },
+) => Promise<FeatureExtractionOutput>;
+
+let localExtractor: FeatureExtractor | null = null;
+let localExtractorKey: string | null = null;
 
 // Simple LRU cache for embeddings
 class EmbeddingCache {
@@ -85,7 +97,10 @@ export function createEmbeddingProvider(
 
 			// Fetch uncached embeddings
 			if (uncachedTexts.length > 0) {
-				const embeddings = await fetchEmbeddings(uncachedTexts, config, getApiKey);
+				const embeddings =
+					config.provider === "local"
+						? await fetchLocalEmbeddings(uncachedTexts, config)
+						: await fetchEmbeddings(uncachedTexts, config, getApiKey);
 
 				// Store in cache and fill results
 				for (let i = 0; i < uncachedIndices.length; i++) {
@@ -99,6 +114,74 @@ export function createEmbeddingProvider(
 			return results as number[][];
 		},
 	};
+}
+
+async function fetchLocalEmbeddings(texts: string[], config: EmbeddingConfig): Promise<number[][]> {
+	const extractor = await getLocalExtractor(config);
+	const output = await extractor(texts, { pooling: "mean", normalize: true });
+	const raw = output.tolist();
+
+	if (!Array.isArray(raw)) {
+		throw new Error("Unexpected local embedding output format");
+	}
+
+	if (raw.length === 0) {
+		return [];
+	}
+
+	if (Array.isArray(raw[0]) && typeof raw[0][0] === "number") {
+		return raw as number[][];
+	}
+
+	if (Array.isArray(raw[0]) && Array.isArray(raw[0][0]) && typeof raw[0][0][0] === "number") {
+		return (raw as number[][][]).map((row) => row[0]);
+	}
+
+	throw new Error("Unable to parse local embedding output");
+}
+
+async function getLocalExtractor(config: EmbeddingConfig): Promise<FeatureExtractor> {
+	const key = `${config.model}:${config.cacheDir ?? "default"}`;
+	if (localExtractor && localExtractorKey === key) {
+		return localExtractor;
+	}
+
+	console.log(`[memory] Loading local embedding model: ${config.model}`);
+
+	const { env, pipeline } = await import("@huggingface/transformers");
+	env.allowRemoteModels = true;
+	env.allowLocalModels = true;
+	if (config.cacheDir) {
+		env.cacheDir = config.cacheDir;
+	}
+
+	const extractor = await pipeline("feature-extraction", config.model, {
+		dtype: "fp32",
+		progress_callback(progress) {
+			if (progress.status === "progress" && typeof progress.progress === "number") {
+				console.log(`[memory] Embedding model download: ${Math.round(progress.progress)}%`);
+			}
+		},
+	});
+
+	localExtractor = extractor as FeatureExtractor;
+	localExtractorKey = key;
+	console.log(`[memory] Local embedding model ready: ${config.model}`);
+	return localExtractor;
+}
+
+function clearLocalExtractor(): void {
+	if (!localExtractor) return;
+
+	const extractor = localExtractor as unknown as { dispose?: () => Promise<void> | void };
+	if (typeof extractor.dispose === "function") {
+		void Promise.resolve(extractor.dispose()).catch((error) => {
+			console.warn("[memory] Failed to dispose local embedding model:", error);
+		});
+	}
+
+	localExtractor = null;
+	localExtractorKey = null;
 }
 
 /**
@@ -149,10 +232,12 @@ async function fetchEmbeddings(
 				return data.data
 					.sort((a: { index: number }, b: { index: number }) => a.index - b.index)
 					.map((item: { embedding: number[] }) => item.embedding);
-			} else if (Array.isArray(data.embeddings)) {
+			}
+			if (Array.isArray(data.embeddings)) {
 				// Alternative format
 				return data.embeddings;
-			} else if (Array.isArray(data)) {
+			}
+			if (Array.isArray(data)) {
 				// Direct array
 				return data;
 			}
@@ -211,8 +296,9 @@ function resolveApiKey(
 }
 
 /**
- * Clear the global embedding cache
+ * Clear the global embedding cache and local model
  */
 export function clearEmbeddingCache(): void {
 	globalCache.clear();
+	clearLocalExtractor();
 }

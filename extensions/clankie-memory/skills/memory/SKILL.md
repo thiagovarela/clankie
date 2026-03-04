@@ -7,6 +7,8 @@ description: A persistent memory for your personal agent
 
 You have persistent memory stored as Markdown files in the workspace. This memory persists across sessions and allows you to recall facts, preferences, decisions, and context from previous conversations.
 
+By default, semantic search uses a **local embedding model** (Transformers.js) so no API key is required. The first embedding call in a session may be slower while the model is loaded/downloaded and cached.
+
 ## Memory Structure
 
 - `MEMORY.md` - Long-term memory for durable facts, preferences, and decisions

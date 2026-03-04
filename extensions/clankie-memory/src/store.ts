@@ -339,6 +339,14 @@ export class MemoryStore {
 	}
 
 	/**
+	 * Clear all file hash tracking (forces full reindex)
+	 */
+	clearAllFileHashes(): void {
+		if (!this.db) throw new Error("Database not open");
+		this.db.exec("DELETE FROM file_hashes");
+	}
+
+	/**
 	 * Search using FTS5
 	 */
 	searchFTS(query: string, limit: number): Chunk[] {
