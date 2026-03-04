@@ -336,6 +336,27 @@ export class ClankieClient {
     }
   }
 
+  async getCommands(sessionId: string): Promise<{
+    commands: Array<{
+      name: string
+      description?: string
+      source: string
+      location?: string
+      path?: string
+    }>
+  }> {
+    const response = await this.sendCommand({ type: 'get_commands' }, sessionId)
+    return response as {
+      commands: Array<{
+        name: string
+        description?: string
+        source: string
+        location?: string
+        path?: string
+      }>
+    }
+  }
+
   async installPackage(
     sessionId: string,
     source: string,

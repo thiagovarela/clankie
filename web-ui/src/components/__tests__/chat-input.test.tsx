@@ -21,11 +21,21 @@ describe('ChatInput', () => {
   const mockClient = {
     prompt: vi.fn(),
     uploadAttachment: vi.fn(),
+    getCommands: vi.fn(),
   }
 
   beforeEach(() => {
     vi.clearAllMocks()
     mockAlert.mockClear()
+    mockClient.getCommands.mockResolvedValue({
+      commands: [
+        {
+          name: 'heartbeat',
+          description: 'Run heartbeat check',
+          source: 'extension',
+        },
+      ],
+    })
     ;(clientManager.getClient as any).mockReturnValue(mockClient)
 
     // Set up a valid session
@@ -56,6 +66,12 @@ describe('ChatInput', () => {
       render(<ChatInput />)
 
       expect(screen.getByTitle('Attach files')).toBeInTheDocument()
+    })
+
+    it('renders insert command button', () => {
+      render(<ChatInput />)
+
+      expect(screen.getByTitle('Insert command')).toBeInTheDocument()
     })
 
     it('renders hidden file input with correct attributes', () => {
@@ -180,6 +196,75 @@ describe('ChatInput', () => {
 
       // Textarea should still have content (Enter adds newline)
       expect(textarea).toHaveValue('Test message\n')
+    })
+  })
+
+  describe('Slash commands', () => {
+    it('shows command palette when typing slash command', async () => {
+      const user = userEvent.setup()
+      render(<ChatInput />)
+
+      const textarea = screen.getByPlaceholderText(/Send a message/i)
+      await user.type(textarea, '/')
+
+      await waitFor(() => {
+        expect(screen.getByTestId('command-palette')).toBeInTheDocument()
+      })
+      expect(mockClient.getCommands).toHaveBeenCalledWith('test-session-123')
+    })
+
+    it('hides command palette when text no longer matches slash trigger', async () => {
+      const user = userEvent.setup()
+      render(<ChatInput />)
+
+      const textarea = screen.getByPlaceholderText(/Send a message/i)
+      await user.type(textarea, '/abc test')
+
+      expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument()
+    })
+
+    it('hides command palette on Escape', async () => {
+      const user = userEvent.setup()
+      render(<ChatInput />)
+
+      const textarea = screen.getByPlaceholderText(/Send a message/i)
+      await user.type(textarea, '/')
+
+      await waitFor(() => {
+        expect(screen.getByTestId('command-palette')).toBeInTheDocument()
+      })
+
+      await user.keyboard('{Escape}')
+
+      expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument()
+    })
+
+    it('inserts selected command into textarea', async () => {
+      const user = userEvent.setup()
+      render(<ChatInput />)
+
+      const textarea = screen.getByPlaceholderText(/Send a message/i)
+      await user.type(textarea, '/')
+
+      const commandItem = await screen.findByText('/heartbeat')
+      await user.click(commandItem)
+
+      expect(textarea).toHaveValue('/heartbeat ')
+      expect(screen.queryByTestId('command-palette')).not.toBeInTheDocument()
+    })
+
+    it('inserts slash and opens palette from toolbar button', async () => {
+      const user = userEvent.setup()
+      render(<ChatInput />)
+
+      await user.click(screen.getByTitle('Insert command'))
+
+      const textarea = screen.getByPlaceholderText(/Send a message/i)
+      expect(textarea).toHaveValue('/')
+
+      await waitFor(() => {
+        expect(screen.getByTestId('command-palette')).toBeInTheDocument()
+      })
     })
   })
 

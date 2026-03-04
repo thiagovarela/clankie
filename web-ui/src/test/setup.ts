@@ -24,6 +24,7 @@ const INITIAL_CONNECTION_STATE = {
   settings: {
     url: 'ws://localhost:3100',
     authToken: '',
+    useCookieAuth: false,
   },
   status: 'disconnected' as const,
   error: undefined,
@@ -98,4 +99,11 @@ beforeEach(() => {
   localStorage.clear()
   // Mock scrollIntoView (not implemented in jsdom)
   Element.prototype.scrollIntoView = vi.fn()
+
+  // Mock ResizeObserver (used by cmdk)
+  global.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  }
 })
