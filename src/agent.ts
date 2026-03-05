@@ -13,6 +13,7 @@
  * If not set, falls back to pi's default resolution (settings → first available).
  */
 
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
 	AuthStorage,
@@ -85,11 +86,14 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 	// agentDir=~/.clankie isolates from ~/.pi/agent/ while supporting full
 	// extension loading (jiti), package management, and settings integration.
 	const settingsManager = SettingsManager.create(cwd, agentDir);
+	const bundledSkillsDir = join(import.meta.dirname, "..", "skills");
+	const additionalSkillPaths = existsSync(bundledSkillsDir) ? [bundledSkillsDir] : [];
 	const loader = new DefaultResourceLoader({
 		cwd,
 		agentDir,
 		settingsManager,
 		extensionFactories,
+		additionalSkillPaths,
 	});
 	await loader.reload();
 
