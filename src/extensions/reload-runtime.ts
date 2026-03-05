@@ -16,6 +16,8 @@ import { Type } from "@sinclair/typebox";
  */
 export function createReloadRuntimeExtension(reloadAllSessions: () => Promise<void>): ExtensionFactory {
 	return function reloadRuntime(pi: ExtensionAPI) {
+		let pendingReload = false;
+
 		// Command entrypoint for reload. Treat reload as terminal for this handler.
 		pi.registerCommand("reload-runtime", {
 			description: "Reload extensions, skills, prompts, and themes for all sessions",
@@ -28,8 +30,18 @@ export function createReloadRuntimeExtension(reloadAllSessions: () => Promise<vo
 			},
 		});
 
-		// LLM-callable tool. Tools get ExtensionContext, so they cannot call ctx.reload() directly.
-		// Instead, queue a follow-up user command that executes the command above.
+		// Defer tool-triggered runtime reload until the current agent run completes.
+		// This avoids sending /reload-runtime as a user follow-up, which can loop.
+		pi.on("agent_end", () => {
+			if (!pendingReload) return;
+			pendingReload = false;
+			setTimeout(() => {
+				reloadAllSessions().catch((err) => {
+					console.error("[reload-runtime] Failed to reload sessions:", err);
+				});
+			}, 0);
+		});
+
 		pi.registerTool({
 			name: "reload_runtime",
 			label: "Reload Runtime",
@@ -37,12 +49,12 @@ export function createReloadRuntimeExtension(reloadAllSessions: () => Promise<vo
 				"Reload extensions, skills, prompts, and themes for all sessions. Call this after installing or creating new skills/extensions.",
 			parameters: Type.Object({}),
 			async execute() {
-				pi.sendUserMessage("/reload-runtime", { deliverAs: "followUp" });
+				pendingReload = true;
 				return {
 					content: [
 						{
 							type: "text",
-							text: "Queued /reload-runtime — all sessions will reload to pick up any newly installed resources.",
+							text: "Runtime reload scheduled. All sessions will reload to pick up newly installed resources after this response completes.",
 						},
 					],
 					details: {},
