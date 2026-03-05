@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsThemeRouteImport } from './routes/settings/theme'
 import { Route as SettingsSkillsRouteImport } from './routes/settings/skills'
+import { Route as SettingsScopedModelsRouteImport } from './routes/settings/scoped-models'
 import { Route as SettingsExtensionsRouteImport } from './routes/settings/extensions'
 import { Route as SettingsConnectionRouteImport } from './routes/settings/connection'
 import { Route as SettingsAuthRouteImport } from './routes/settings/auth'
@@ -36,6 +37,11 @@ const SettingsThemeRoute = SettingsThemeRouteImport.update({
 const SettingsSkillsRoute = SettingsSkillsRouteImport.update({
   id: '/settings/skills',
   path: '/settings/skills',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsScopedModelsRoute = SettingsScopedModelsRouteImport.update({
+  id: '/settings/scoped-models',
+  path: '/settings/scoped-models',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsExtensionsRoute = SettingsExtensionsRouteImport.update({
@@ -65,6 +71,7 @@ export interface FileRoutesByFullPath {
   '/settings/auth': typeof SettingsAuthRoute
   '/settings/connection': typeof SettingsConnectionRoute
   '/settings/extensions': typeof SettingsExtensionsRoute
+  '/settings/scoped-models': typeof SettingsScopedModelsRoute
   '/settings/skills': typeof SettingsSkillsRoute
   '/settings/theme': typeof SettingsThemeRoute
   '/settings/': typeof SettingsIndexRoute
@@ -75,6 +82,7 @@ export interface FileRoutesByTo {
   '/settings/auth': typeof SettingsAuthRoute
   '/settings/connection': typeof SettingsConnectionRoute
   '/settings/extensions': typeof SettingsExtensionsRoute
+  '/settings/scoped-models': typeof SettingsScopedModelsRoute
   '/settings/skills': typeof SettingsSkillsRoute
   '/settings/theme': typeof SettingsThemeRoute
   '/settings': typeof SettingsIndexRoute
@@ -86,6 +94,7 @@ export interface FileRoutesById {
   '/settings/auth': typeof SettingsAuthRoute
   '/settings/connection': typeof SettingsConnectionRoute
   '/settings/extensions': typeof SettingsExtensionsRoute
+  '/settings/scoped-models': typeof SettingsScopedModelsRoute
   '/settings/skills': typeof SettingsSkillsRoute
   '/settings/theme': typeof SettingsThemeRoute
   '/settings/': typeof SettingsIndexRoute
@@ -98,6 +107,7 @@ export interface FileRouteTypes {
     | '/settings/auth'
     | '/settings/connection'
     | '/settings/extensions'
+    | '/settings/scoped-models'
     | '/settings/skills'
     | '/settings/theme'
     | '/settings/'
@@ -108,6 +118,7 @@ export interface FileRouteTypes {
     | '/settings/auth'
     | '/settings/connection'
     | '/settings/extensions'
+    | '/settings/scoped-models'
     | '/settings/skills'
     | '/settings/theme'
     | '/settings'
@@ -118,6 +129,7 @@ export interface FileRouteTypes {
     | '/settings/auth'
     | '/settings/connection'
     | '/settings/extensions'
+    | '/settings/scoped-models'
     | '/settings/skills'
     | '/settings/theme'
     | '/settings/'
@@ -129,6 +141,7 @@ export interface RootRouteChildren {
   SettingsAuthRoute: typeof SettingsAuthRoute
   SettingsConnectionRoute: typeof SettingsConnectionRoute
   SettingsExtensionsRoute: typeof SettingsExtensionsRoute
+  SettingsScopedModelsRoute: typeof SettingsScopedModelsRoute
   SettingsSkillsRoute: typeof SettingsSkillsRoute
   SettingsThemeRoute: typeof SettingsThemeRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
@@ -162,6 +175,13 @@ declare module '@tanstack/react-router' {
       path: '/settings/skills'
       fullPath: '/settings/skills'
       preLoaderRoute: typeof SettingsSkillsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/scoped-models': {
+      id: '/settings/scoped-models'
+      path: '/settings/scoped-models'
+      fullPath: '/settings/scoped-models'
+      preLoaderRoute: typeof SettingsScopedModelsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/extensions': {
@@ -201,6 +221,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsAuthRoute: SettingsAuthRoute,
   SettingsConnectionRoute: SettingsConnectionRoute,
   SettingsExtensionsRoute: SettingsExtensionsRoute,
+  SettingsScopedModelsRoute: SettingsScopedModelsRoute,
   SettingsSkillsRoute: SettingsSkillsRoute,
   SettingsThemeRoute: SettingsThemeRoute,
   SettingsIndexRoute: SettingsIndexRoute,

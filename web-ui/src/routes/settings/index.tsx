@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
 import {
   ChevronRight,
+  Filter,
   Globe,
   KeyRound,
   Palette,
@@ -34,6 +35,13 @@ const settingsPages = [
     description: 'Manage AI provider authentication (OpenAI, Anthropic, etc.)',
     icon: KeyRound,
     href: '/settings/auth',
+  },
+  {
+    id: 'scoped-models',
+    title: 'Scoped Models',
+    description: 'Choose which models are available in the model selector',
+    icon: Filter,
+    href: '/settings/scoped-models',
   },
   {
     id: 'extensions',
