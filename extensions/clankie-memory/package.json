@@ -22,7 +22,6 @@
 		"@sinclair/typebox": "*"
 	},
 	"dependencies": {
-		"@huggingface/transformers": "^3.8.1",
 		"better-sqlite3": "^12.6.2",
 		"sqlite-vec": "^0.1.7-alpha.2"
 	},
