@@ -16,8 +16,7 @@ A minimal AI assistant built on [pi](https://github.com/badlogic/pi-mono)'s SDK.
 
 ### 1. Install Dependencies
 
-**Runtime:** [Node.js](https://nodejs.org) v18+  
-**Build:** [Bun](https://bun.sh) v1.0+ (for bundling only)
+**Runtime:** [Node.js](https://nodejs.org) v18+
 
 ```bash
 # Check Node version
