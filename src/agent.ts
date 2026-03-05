@@ -25,10 +25,93 @@ import {
 	SessionManager,
 	SettingsManager,
 } from "@mariozechner/pi-coding-agent";
-import { getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
+import { type AppConfig, getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
 import { createCronExtension } from "./extensions/cron/index.ts";
 import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
 import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
+
+// ─── Shared loader infrastructure ──────────────────────────────────────────────
+
+/**
+ * Build the standard set of extension factories for clankie sessions.
+ * Includes cron, heartbeat, and (optionally) workspace jail.
+ */
+export function buildExtensionFactories(config: AppConfig, cwd: string): ExtensionFactory[] {
+	const extensionFactories: ExtensionFactory[] = [];
+	extensionFactories.push(createCronExtension());
+	extensionFactories.push(createHeartbeatExtension());
+
+	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
+	if (restrictToWorkspace) {
+		const configuredAllowedPaths = config.agent?.allowedPaths ?? [];
+		const attachmentRoot = join(getAppDir(), "attachments");
+		const allowedPaths = Array.from(new Set([...configuredAllowedPaths, attachmentRoot]));
+		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
+	}
+
+	return extensionFactories;
+}
+
+/**
+ * Create a fully configured DefaultResourceLoader with clankie's paths.
+ *
+ * This is the single source of truth for resource loading configuration.
+ * Both CLI sessions and daemon sessions must use this to ensure consistent
+ * discovery of extensions, skills, prompts, and themes.
+ */
+export async function createResourceLoader(
+	config: AppConfig,
+	options?: { cwd?: string },
+): Promise<{ loader: DefaultResourceLoader; settingsManager: SettingsManager }> {
+	const agentDir = getAgentDir(config);
+	const cwd = options?.cwd ?? getWorkspace(config);
+
+	const settingsManager = SettingsManager.create(cwd, agentDir);
+	const extensionFactories = buildExtensionFactories(config, cwd);
+
+	// Bundled skills shipped with clankie (e.g. clankie-admin)
+	const bundledSkillsDir = join(import.meta.dirname, "..", "skills");
+	const additionalSkillPaths = existsSync(bundledSkillsDir) ? [bundledSkillsDir] : [];
+
+	const loader = new DefaultResourceLoader({
+		cwd,
+		agentDir,
+		settingsManager,
+		extensionFactories,
+		additionalSkillPaths,
+	});
+	await loader.reload();
+
+	return { loader, settingsManager };
+}
+
+/**
+ * Resolve model from clankie config (provider/model format).
+ * Returns undefined if not configured or not found in registry.
+ */
+export function resolveModelFromConfig(
+	config: AppConfig,
+	modelRegistry: ModelRegistry,
+): ReturnType<typeof ModelRegistry.prototype.find> | undefined {
+	const modelSpec = config.agent?.model?.primary;
+	if (!modelSpec) return undefined;
+
+	const slash = modelSpec.indexOf("/");
+	if (slash === -1) {
+		console.warn(`Warning: model should be "provider/model" format (got "${modelSpec}")`);
+		return undefined;
+	}
+
+	const provider = modelSpec.substring(0, slash);
+	const modelId = modelSpec.substring(slash + 1);
+	const model = modelRegistry.find(provider, modelId);
+	if (!model) {
+		console.warn(`Warning: model "${modelSpec}" from config not found in registry, falling back to auto-detection`);
+	}
+	return model;
+}
+
+// ─── CLI session creation ──────────────────────────────────────────────────────
 
 export interface SessionOptions {
 	/**
@@ -39,7 +122,7 @@ export interface SessionOptions {
 
 	/**
 	 * If true, session is NOT persisted to disk (ephemeral in-memory session).
-	 * Default: false — creates a new persistent session under ~/.pi/agent/sessions/.
+	 * Default: false — creates a new persistent session under ~/.clankie/sessions/.
 	 */
 	ephemeral?: boolean;
 
@@ -57,9 +140,7 @@ export interface SessionOptions {
 /**
  * Create a pi agent session with the app's configuration.
  *
- * Uses pi's DefaultResourceLoader configured to use clankie's directories,
- * keeping the app isolated from pi's default agent directory (~/.pi/agent/)
- * while properly supporting extension loading, package management, and settings.
+ * Uses the shared createResourceLoader to ensure consistent resource discovery.
  */
 export async function createSession(options: SessionOptions = {}): Promise<CreateAgentSessionResult> {
 	const config = loadConfig();
@@ -70,32 +151,7 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 	const authStorage = AuthStorage.create(getAuthPath());
 	const modelRegistry = new ModelRegistry(authStorage);
 
-	// Build extension factories (workspace jail if enabled)
-	const extensionFactories: ExtensionFactory[] = [];
-	extensionFactories.push(createCronExtension());
-	extensionFactories.push(createHeartbeatExtension());
-	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
-	if (restrictToWorkspace) {
-		const configuredAllowedPaths = config.agent?.allowedPaths ?? [];
-		const attachmentRoot = join(getAppDir(), "attachments");
-		const allowedPaths = Array.from(new Set([...configuredAllowedPaths, attachmentRoot]));
-		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
-	}
-
-	// DefaultResourceLoader with clankie-specific paths
-	// agentDir=~/.clankie isolates from ~/.pi/agent/ while supporting full
-	// extension loading (jiti), package management, and settings integration.
-	const settingsManager = SettingsManager.create(cwd, agentDir);
-	const bundledSkillsDir = join(import.meta.dirname, "..", "skills");
-	const additionalSkillPaths = existsSync(bundledSkillsDir) ? [bundledSkillsDir] : [];
-	const loader = new DefaultResourceLoader({
-		cwd,
-		agentDir,
-		settingsManager,
-		extensionFactories,
-		additionalSkillPaths,
-	});
-	await loader.reload();
+	const { loader, settingsManager } = await createResourceLoader(config, { cwd });
 
 	// Session management
 	let sessionManager: SessionManager;
@@ -109,22 +165,7 @@ export async function createSession(options: SessionOptions = {}): Promise<Creat
 		sessionManager = SessionManager.create(cwd);
 	}
 
-	// Resolve model from config → pi auto-detection
-	const modelSpec = config.agent?.model?.primary;
-	let model: ReturnType<typeof modelRegistry.find> | undefined;
-	if (modelSpec) {
-		const slash = modelSpec.indexOf("/");
-		if (slash !== -1) {
-			const provider = modelSpec.substring(0, slash);
-			const modelId = modelSpec.substring(slash + 1);
-			model = modelRegistry.find(provider, modelId);
-			if (!model) {
-				console.warn(`Warning: model "${modelSpec}" from config not found in registry, falling back to auto-detection`);
-			}
-		} else {
-			console.warn(`Warning: model should be "provider/model" format (got "${modelSpec}")`);
-		}
-	}
+	const model = resolveModelFromConfig(config, modelRegistry);
 
 	return createAgentSession({
 		cwd,

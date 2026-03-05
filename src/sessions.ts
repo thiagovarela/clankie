@@ -13,17 +13,12 @@ import {
 	AuthStorage,
 	type CreateAgentSessionResult,
 	createAgentSession,
-	DefaultResourceLoader,
-	type ExtensionFactory,
 	ModelRegistry,
 	SessionManager,
-	SettingsManager,
 } from "@mariozechner/pi-coding-agent";
+import { createResourceLoader, resolveModelFromConfig } from "./agent.ts";
 import type { Attachment } from "./channels/channel.ts";
 import { type AppConfig, getAgentDir, getAppDir, getAuthPath, getWorkspace } from "./config.ts";
-import { createCronExtension } from "./extensions/cron/index.ts";
-import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
-import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
 import { resolveScopedModels } from "./lib/scoped-model-resolver.ts";
 
 // ─── Session cache (one session per chat) ──────────────────────────────────────
@@ -35,22 +30,6 @@ const activeSessionNames = new Map<string, string>();
 
 /** Lock to serialize message processing per chat */
 const chatLocks = new Map<string, Promise<void>>();
-
-function buildExtensionFactories(config: AppConfig, cwd: string): ExtensionFactory[] {
-	const extensionFactories: ExtensionFactory[] = [];
-	extensionFactories.push(createCronExtension());
-	extensionFactories.push(createHeartbeatExtension());
-
-	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
-	if (restrictToWorkspace) {
-		const configuredAllowedPaths = config.agent?.allowedPaths ?? [];
-		const attachmentRoot = join(getAppDir(), "attachments");
-		const allowedPaths = Array.from(new Set([...configuredAllowedPaths, attachmentRoot]));
-		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
-	}
-
-	return extensionFactories;
-}
 
 type ResourcePathMetadata = {
 	source?: string;
@@ -140,15 +119,7 @@ export async function logStartupLoadedResources(config: AppConfig): Promise<void
 	const agentDir = getAgentDir(config);
 	const cwd = getWorkspace(config);
 
-	// DefaultResourceLoader with clankie-specific paths
-	const settingsManager = SettingsManager.create(cwd, agentDir);
-	const loader = new DefaultResourceLoader({
-		cwd,
-		agentDir,
-		settingsManager,
-		extensionFactories: buildExtensionFactories(config, cwd),
-	});
-	await loader.reload();
+	const { loader } = await createResourceLoader(config);
 
 	const pathMetadata = loader.getPathMetadata();
 
@@ -193,15 +164,7 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 	const authStorage = AuthStorage.create(getAuthPath());
 	const modelRegistry = new ModelRegistry(authStorage);
 
-	// DefaultResourceLoader with clankie-specific paths
-	const settingsManager = SettingsManager.create(cwd, agentDir);
-	const loader = new DefaultResourceLoader({
-		cwd,
-		agentDir,
-		settingsManager,
-		extensionFactories: buildExtensionFactories(config, cwd),
-	});
-	await loader.reload();
+	const { loader, settingsManager } = await createResourceLoader(config);
 
 	// Use a stable session directory per chat so conversations persist across restarts
 	const sessionDir = join(getAppDir(), "sessions", chatKey);
@@ -216,20 +179,7 @@ export async function getOrCreateSession(chatKey: string, config: AppConfig): Pr
 	const sessionManager = SessionManager.continueRecent(cwd, sessionDir);
 	console.log(`[session] SessionManager created for chatKey: ${chatKey}, sessionDir: ${sessionDir}`);
 
-	// Resolve model from config → pi auto-detection
-	const modelSpec = config.agent?.model?.primary;
-	let model: ReturnType<typeof modelRegistry.find> | undefined;
-	if (modelSpec) {
-		const slash = modelSpec.indexOf("/");
-		if (slash !== -1) {
-			const provider = modelSpec.substring(0, slash);
-			const modelId = modelSpec.substring(slash + 1);
-			model = modelRegistry.find(provider, modelId);
-			if (!model) {
-				console.warn(`[session] Warning: model "${modelSpec}" from config not found, falling back to auto-detection`);
-			}
-		}
-	}
+	const model = resolveModelFromConfig(config, modelRegistry);
 
 	const result: CreateAgentSessionResult = await createAgentSession({
 		cwd,
