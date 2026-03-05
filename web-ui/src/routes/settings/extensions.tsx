@@ -1,7 +1,23 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useStore } from '@tanstack/react-store'
-import { AlertCircle, Lightbulb, Loader2, Package, Puzzle } from 'lucide-react'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  AlertCircle,
+  ChevronDown,
+  Command,
+  Flag,
+  Folder,
+  Keyboard,
+  Lightbulb,
+  Loader2,
+  Package,
+  Puzzle,
+  Search,
+  Sparkles,
+  Wrench,
+} from 'lucide-react'
+import type { ComponentProps } from 'react'
+import type { ExtensionCategory } from '@/lib/extension-utils'
 import type { ExtensionInfo } from '@/lib/types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -12,7 +28,17 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible'
+import { Input } from '@/components/ui/input'
 import { clientManager } from '@/lib/client-manager'
+import {
+  deriveExtensionDisplayName,
+  getExtensionCategory,
+} from '@/lib/extension-utils'
 import { JsonRenderRenderer } from '@/lib/tool-renderers/json-render-renderer'
 import { connectionStore } from '@/stores/connection'
 import { extensionsStore, setExtensions, setLoading } from '@/stores/extensions'
@@ -21,6 +47,37 @@ import { sessionsListStore } from '@/stores/sessions-list'
 export const Route = createFileRoute('/settings/extensions')({
   component: ExtensionsSettingsPage,
 })
+
+type ExtensionListItem = {
+  ext: ExtensionInfo
+  displayName: string
+  category: ExtensionCategory
+  searchBlob: string
+}
+
+const categoryOrder: Array<ExtensionCategory> = ['builtIn', 'packages', 'local']
+
+const categoryMeta = {
+  builtIn: {
+    label: 'Built-in',
+    description: 'Inline and core extensions bundled with clankie',
+    icon: Sparkles,
+  },
+  packages: {
+    label: 'Packages',
+    description: 'Extensions loaded from packages and extension folders',
+    icon: Package,
+  },
+  local: {
+    label: 'Local',
+    description: 'Extensions loaded from your workspace files',
+    icon: Folder,
+  },
+} as const
+
+function formatCount(value: number, singular: string): string {
+  return `${value} ${singular}${value === 1 ? '' : 's'}`
+}
 
 function ExtensionsSettingsPage() {
   const { status } = useStore(connectionStore, (state) => ({
@@ -36,6 +93,8 @@ function ExtensionsSettingsPage() {
     (state) => state,
   )
 
+  const [searchValue, setSearchValue] = useState('')
+
   const isConnected = status === 'connected'
 
   const loadExtensions = useCallback(async () => {
@@ -44,7 +103,6 @@ function ExtensionsSettingsPage() {
 
     setLoading(true)
     try {
-      // Reload session resources first to pick up extensions installed via chat
       await client.reload(activeSessionId)
 
       const { extensions: extList, errors } =
@@ -62,6 +120,83 @@ function ExtensionsSettingsPage() {
       loadExtensions()
     }
   }, [isConnected, activeSessionId, loadExtensions])
+
+  const extensionItems = useMemo<Array<ExtensionListItem>>(
+    () =>
+      extensions.map((ext) => {
+        const displayName = deriveExtensionDisplayName(
+          ext.path,
+          ext.resolvedPath,
+        )
+
+        return {
+          ext,
+          displayName,
+          category: getExtensionCategory(ext),
+          searchBlob: [
+            displayName,
+            ext.path,
+            ext.resolvedPath,
+            ext.tools.join(' '),
+            ext.commands.join(' '),
+            ext.flags.join(' '),
+            ext.shortcuts.join(' '),
+          ]
+            .join(' ')
+            .toLowerCase(),
+        }
+      }),
+    [extensions],
+  )
+
+  const normalizedSearch = searchValue.trim().toLowerCase()
+
+  const filteredExtensions = useMemo(
+    () =>
+      normalizedSearch.length === 0
+        ? extensionItems
+        : extensionItems.filter((item) =>
+            item.searchBlob.includes(normalizedSearch),
+          ),
+    [extensionItems, normalizedSearch],
+  )
+
+  const groupedExtensions = useMemo(
+    () =>
+      filteredExtensions.reduce<
+        Record<ExtensionCategory, Array<ExtensionListItem>>
+      >(
+        (acc, item) => {
+          acc[item.category].push(item)
+          return acc
+        },
+        {
+          builtIn: [],
+          packages: [],
+          local: [],
+        },
+      ),
+    [filteredExtensions],
+  )
+
+  const summary = useMemo(
+    () =>
+      filteredExtensions.reduce(
+        (acc, item) => ({
+          extensions: acc.extensions + 1,
+          tools: acc.tools + item.ext.tools.length,
+          commands: acc.commands + item.ext.commands.length,
+          flags: acc.flags + item.ext.flags.length,
+        }),
+        {
+          extensions: 0,
+          tools: 0,
+          commands: 0,
+          flags: 0,
+        },
+      ),
+    [filteredExtensions],
+  )
 
   if (!isConnected) {
     return (
@@ -98,54 +233,28 @@ function ExtensionsSettingsPage() {
 
   return (
     <div className="h-full overflow-y-auto chat-background">
-      <div className="container max-w-4xl py-8 px-4 space-y-6">
-        {/* Install Package Hint */}
-        <Card className="card-depth border-primary/20 bg-primary/5">
-          <CardContent className="pt-6">
-            <div className="flex items-start gap-4">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <Lightbulb className="h-5 w-5 text-primary" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-medium mb-1">Installing Packages</h3>
-                <p className="text-sm text-muted-foreground">
-                  To install extensions and packages, simply ask the AI in chat.
-                  For example:
-                </p>
-                <code className="block mt-2 rounded bg-muted/50 p-2 text-xs font-mono">
-                  install @pi/heartbeat
-                </code>
-                <p className="text-xs text-muted-foreground mt-2">
-                  The AI will handle the installation process for you.
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Extensions Section */}
+      <div className="container max-w-5xl py-8 px-4 space-y-6">
         <Card className="card-depth">
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Puzzle className="h-5 w-5" />
                 Extensions
               </CardTitle>
               <CardDescription>
-                Loaded extensions with their registered tools and commands
+                Loaded extensions with tools, commands, flags, and optional
+                configuration
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={loadExtensions}>
-              <Loader2
-                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-                className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : 'hidden'}`}
-              />
+              <Loader2 className="h-4 w-4 mr-2" />
               Refresh
             </Button>
           </CardHeader>
-          <CardContent>
+
+          <CardContent className="space-y-4">
             {extensionErrors.length > 0 && (
-              <div className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 p-3">
+              <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
                 <div className="flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-destructive mt-0.5" />
                   <div className="flex-1">
@@ -178,17 +287,111 @@ function ExtensionsSettingsPage() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {extensions.map((ext, idx) => (
-                  <ExtensionCard
-                    key={idx}
-                    ext={ext}
-                    activeSessionId={activeSessionId}
-                    onConfigSaved={loadExtensions}
-                  />
-                ))}
-              </div>
+              <>
+                <div className="space-y-3">
+                  <div className="relative">
+                    <Search className="h-4 w-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                    <Input
+                      value={searchValue}
+                      onChange={(event) => setSearchValue(event.target.value)}
+                      placeholder="Search extensions, tools, or commands"
+                      className="pl-9"
+                    />
+                  </div>
+
+                  <div className="grid gap-2 sm:grid-cols-4">
+                    <SummaryStat
+                      label="Extensions"
+                      value={summary.extensions}
+                    />
+                    <SummaryStat label="Tools" value={summary.tools} />
+                    <SummaryStat label="Commands" value={summary.commands} />
+                    <SummaryStat label="Flags" value={summary.flags} />
+                  </div>
+
+                  {normalizedSearch.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Showing {filteredExtensions.length} of {extensions.length}{' '}
+                      extensions
+                    </p>
+                  )}
+                </div>
+
+                {filteredExtensions.length === 0 ? (
+                  <div className="rounded-lg border border-dashed p-6 text-center">
+                    <p className="text-sm font-medium">
+                      No matching extensions
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Try searching by extension name, path, tool, or command.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {categoryOrder.map((category) => {
+                      const items = groupedExtensions[category]
+                      if (items.length === 0) {
+                        return null
+                      }
+
+                      const metadata = categoryMeta[category]
+                      const CategoryIcon = metadata.icon
+
+                      return (
+                        <section key={category} className="space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <CategoryIcon className="h-4 w-4 text-primary" />
+                              <p className="text-sm font-medium">
+                                {metadata.label}
+                              </p>
+                              <Badge variant="outline" className="text-[10px]">
+                                {items.length}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground hidden sm:block">
+                              {metadata.description}
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            {items.map((item) => (
+                              <ExtensionCard
+                                key={`${item.ext.path}-${item.ext.resolvedPath}`}
+                                ext={item.ext}
+                                displayName={item.displayName}
+                                category={item.category}
+                                activeSessionId={activeSessionId}
+                                onConfigSaved={loadExtensions}
+                              />
+                            ))}
+                          </div>
+                        </section>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
             )}
+          </CardContent>
+        </Card>
+
+        <Card className="card-depth border-primary/20 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <Lightbulb className="h-5 w-5 text-primary" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-medium mb-1">Installing Packages</h3>
+                <p className="text-sm text-muted-foreground">
+                  Ask the AI in chat to install extensions for you.
+                </p>
+                <code className="block mt-2 rounded bg-muted/50 p-2 text-xs font-mono">
+                  install @pi/heartbeat
+                </code>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -196,95 +399,193 @@ function ExtensionsSettingsPage() {
   )
 }
 
+function SummaryStat({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-md border bg-muted/20 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </p>
+      <p className="text-sm font-semibold">{value}</p>
+    </div>
+  )
+}
+
 function ExtensionCard({
   ext,
+  displayName,
+  category,
   activeSessionId,
   onConfigSaved,
 }: {
   ext: ExtensionInfo
+  displayName: string
+  category: ExtensionCategory
   activeSessionId: string | null
   onConfigSaved: () => void
 }) {
+  const [isOpen, setIsOpen] = useState(Boolean(ext.uiSpec))
+
+  const categoryIconByType: Record<ExtensionCategory, typeof Sparkles> = {
+    builtIn: Sparkles,
+    packages: Package,
+    local: Folder,
+  }
+
+  const Icon = categoryIconByType[category]
+
+  const summaryItems = [
+    formatCount(ext.tools.length, 'tool'),
+    formatCount(ext.commands.length, 'command'),
+    formatCount(ext.flags.length, 'flag'),
+    formatCount(ext.shortcuts.length, 'shortcut'),
+  ]
+
   return (
-    <div className="rounded-lg border p-3">
-      <div className="space-y-2">
-        <div>
-          <p className="text-sm font-medium font-mono break-all">{ext.path}</p>
-          {ext.resolvedPath !== ext.path && (
-            <p className="text-xs text-muted-foreground font-mono mt-1 break-all">
-              → {ext.resolvedPath}
+    <Collapsible
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      className="rounded-lg border bg-card/40"
+    >
+      <CollapsibleTrigger className="group w-full rounded-lg px-4 py-3 text-left transition-colors hover:bg-muted/20">
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 rounded-md border bg-primary/10 p-2">
+            <Icon className="h-4 w-4 text-primary" />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-sm font-semibold">{displayName}</p>
+              {ext.uiSpec && (
+                <Badge variant="default" className="text-[10px]">
+                  Config UI
+                </Badge>
+              )}
+            </div>
+
+            <p className="mt-1 truncate font-mono text-xs text-muted-foreground">
+              {ext.path}
             </p>
-          )}
-        </div>
 
-        <div className="flex flex-wrap gap-2">
-          {ext.tools.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              <span className="text-xs text-muted-foreground mr-1">Tools:</span>
-              {ext.tools.map((tool) => (
-                <Badge key={tool} variant="secondary" className="text-xs">
-                  {tool}
-                </Badge>
-              ))}
-            </div>
-          )}
-
-          {ext.commands.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              <span className="text-xs text-muted-foreground mr-1">
-                Commands:
-              </span>
-              {ext.commands.map((cmd) => (
-                <Badge key={cmd} variant="default" className="text-xs">
-                  /{cmd}
-                </Badge>
-              ))}
-            </div>
-          )}
-
-          {ext.flags.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              <span className="text-xs text-muted-foreground mr-1">Flags:</span>
-              {ext.flags.map((flag) => (
-                <Badge key={flag} variant="outline" className="text-xs">
-                  --{flag}
-                </Badge>
-              ))}
-            </div>
-          )}
-
-          {ext.shortcuts.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              <span className="text-xs text-muted-foreground mr-1">
-                Shortcuts:
-              </span>
-              {ext.shortcuts.map((shortcut) => (
-                <Badge
-                  key={shortcut}
-                  variant="outline"
-                  className="text-xs font-mono"
-                >
-                  {shortcut}
-                </Badge>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {ext.uiSpec && activeSessionId && (
-          <div className="rounded-md border bg-muted/30 p-3">
-            <p className="mb-2 text-xs font-medium text-muted-foreground">
-              Extension UI
+            <p className="mt-2 text-xs text-muted-foreground">
+              {summaryItems.join(' · ')}
             </p>
-            <JsonRenderRenderer
-              spec={ext.uiSpec}
-              sessionId={activeSessionId}
-              extensionPath={ext.path}
-              initialState={ext.uiState}
-              onConfigSaved={onConfigSaved}
+          </div>
+
+          <ChevronDown
+            className={`mt-1 h-4 w-4 text-muted-foreground transition-transform ${
+              isOpen ? 'rotate-180' : ''
+            }`}
+          />
+        </div>
+      </CollapsibleTrigger>
+
+      <CollapsibleContent className="border-t px-4 pb-4 pt-3">
+        <div className="space-y-4">
+          <div className="rounded-md border bg-muted/20 p-3 text-xs">
+            <p className="uppercase tracking-wide text-muted-foreground">
+              Path
+            </p>
+            <p className="mt-1 font-mono break-all">{ext.path}</p>
+            {ext.resolvedPath !== ext.path && (
+              <>
+                <p className="mt-2 uppercase tracking-wide text-muted-foreground">
+                  Resolved
+                </p>
+                <p className="mt-1 font-mono break-all">{ext.resolvedPath}</p>
+              </>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <CapabilityGroup
+              icon={Wrench}
+              label="Tools"
+              values={ext.tools}
+              variant="secondary"
+            />
+            <CapabilityGroup
+              icon={Command}
+              label="Commands"
+              values={ext.commands}
+              valuePrefix="/"
+              variant="default"
+            />
+            <CapabilityGroup
+              icon={Flag}
+              label="Flags"
+              values={ext.flags}
+              valuePrefix="--"
+              variant="outline"
+            />
+            <CapabilityGroup
+              icon={Keyboard}
+              label="Shortcuts"
+              values={ext.shortcuts}
+              variant="outline"
+              mono
             />
           </div>
-        )}
+
+          {ext.uiSpec && activeSessionId && (
+            <div className="rounded-md border bg-muted/30 p-3">
+              <p className="mb-2 text-xs font-medium text-muted-foreground">
+                Extension Configuration
+              </p>
+              <JsonRenderRenderer
+                spec={ext.uiSpec}
+                sessionId={activeSessionId}
+                extensionPath={ext.path}
+                initialState={ext.uiState}
+                onConfigSaved={onConfigSaved}
+              />
+            </div>
+          )}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+function CapabilityGroup({
+  icon: Icon,
+  label,
+  values,
+  valuePrefix,
+  variant,
+  mono,
+}: {
+  icon: typeof Sparkles
+  label: string
+  values: Array<string>
+  valuePrefix?: string
+  variant: ComponentProps<typeof Badge>['variant']
+  mono?: boolean
+}) {
+  if (values.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Icon className="h-3.5 w-3.5" />
+        <span className="font-medium">{label}</span>
+        <Badge variant="outline" className="h-4 px-1.5 text-[10px]">
+          {values.length}
+        </Badge>
+      </div>
+
+      <div className="flex flex-wrap gap-1.5">
+        {values.map((value) => (
+          <Badge
+            key={value}
+            variant={variant}
+            className={mono ? 'font-mono text-[11px]' : ''}
+          >
+            {valuePrefix}
+            {value}
+          </Badge>
+        ))}
       </div>
     </div>
   )
