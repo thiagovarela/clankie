@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -57,8 +58,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarContent className="gap-2 px-2 py-2">
         <NavMain />
         <NavRecentSessions />
-        <NavSecondary className="mt-auto" />
       </SidebarContent>
+
+      <SidebarFooter className="px-2 py-2">
+        <NavSecondary />
+      </SidebarFooter>
     </Sidebar>
   )
 }
