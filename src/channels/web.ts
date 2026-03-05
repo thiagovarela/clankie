@@ -18,7 +18,7 @@ import { serve } from "@hono/node-server";
 
 /** Server type from @hono/node-server (includes HTTP/2) */
 type ServerType = Server | Http2Server | Http2SecureServer;
-import type { WebSocket } from "ws";
+import type { WebSocket, WebSocketServer } from "ws";
 import { createNodeWebSocket } from "@hono/node-ws";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 import type { ImageContent, OAuthLoginCallbacks } from "@mariozechner/pi-ai";
@@ -496,6 +496,7 @@ export class WebChannel implements Channel {
 	readonly name = "web";
 	private options: WebChannelOptions;
 	private server: ServerType | null = null;
+	private wss: WebSocketServer | null = null;
 
 	/** Map of sessionId → Set of WebSocket connections subscribed to that session */
 	private sessionSubscriptions = new Map<string, Set<WSContext>>();
@@ -531,6 +532,7 @@ export class WebChannel implements Channel {
 
 		// Create WebSocket adapter
 		const { wss, injectWebSocket, upgradeWebSocket: wsUpgrade } = createNodeWebSocket({ app });
+		this.wss = wss;
 
 		// ─── WebSocket route ──────────────────────────────────────────────────
 		// Note: upgradeWebSocket() handles WebSocket upgrade requests at the root path
@@ -819,6 +821,21 @@ export class WebChannel implements Channel {
 		if (this.heartbeatInterval) {
 			clearInterval(this.heartbeatInterval);
 			this.heartbeatInterval = null;
+		}
+
+		if (this.wss) {
+			for (const client of this.wss.clients) {
+				try {
+					client.close(1001, "Server shutting down");
+				} catch {
+					client.terminate();
+				}
+			}
+
+			await new Promise<void>((resolve) => {
+				this.wss?.close(() => resolve());
+			});
+			this.wss = null;
 		}
 
 		if (this.server) {
