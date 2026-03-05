@@ -29,15 +29,16 @@ export function ToolExecutionCard({ execution }: { execution: ToolExecution }) {
   const hasSpecialRendering = Boolean(renderHint || uiSpec)
 
   // Tool icon color mapping
-  const toolColorClass = {
-    bash: 'tool-icon-bash',
-    read: 'tool-icon-read',
-    write: 'tool-icon-write',
-    edit: 'tool-icon-edit',
-    grep: 'tool-icon-grep',
-    find: 'tool-icon-find',
-    ls: 'tool-icon-ls',
-  }[execution.toolName] || 'tool-icon-default'
+  const toolColorClass =
+    {
+      bash: 'tool-icon-bash',
+      read: 'tool-icon-read',
+      write: 'tool-icon-write',
+      edit: 'tool-icon-edit',
+      grep: 'tool-icon-grep',
+      find: 'tool-icon-find',
+      ls: 'tool-icon-ls',
+    }[execution.toolName] || 'tool-icon-default'
 
   return (
     <div
@@ -61,21 +62,25 @@ export function ToolExecutionCard({ execution }: { execution: ToolExecution }) {
           className={cn(
             'h-3.5 w-3.5 shrink-0 transition-transform duration-150',
             expanded && 'rotate-90',
-            execution.status === 'error' ? 'text-destructive/60' : 'text-muted-foreground/50',
+            execution.status === 'error'
+              ? 'text-destructive/60'
+              : 'text-muted-foreground/50',
           )}
         />
-        
-        <div className={cn(
-          'flex items-center justify-center w-5 h-5 rounded bg-muted/50',
-          toolColorClass,
-        )}>
+
+        <div
+          className={cn(
+            'flex items-center justify-center w-5 h-5 rounded bg-muted/50',
+            toolColorClass,
+          )}
+        >
           <Icon className="h-3 w-3" />
         </div>
-        
+
         <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground/70">
           {execution.toolName}
         </span>
-        
+
         {summary.command && (
           <>
             <span className="text-muted-foreground/30">›</span>
@@ -84,7 +89,7 @@ export function ToolExecutionCard({ execution }: { execution: ToolExecution }) {
             </span>
           </>
         )}
-        
+
         {execution.status === 'running' && (
           <Loader2 className="ml-auto h-3 w-3 shrink-0 animate-spin text-primary/60" />
         )}

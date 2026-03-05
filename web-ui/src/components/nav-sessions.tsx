@@ -28,8 +28,10 @@ function formatSessionDate(timestamp?: number): string {
   if (!timestamp) return ''
   const date = new Date(timestamp)
   const now = new Date()
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
-  
+  const diffDays = Math.floor(
+    (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
+  )
+
   if (diffDays === 0) {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   } else if (diffDays === 1) {
@@ -72,7 +74,9 @@ export function NavRecentSessions() {
         {recentSessions.length === 0 ? (
           <SidebarMenuItem>
             <SidebarMenuButton disabled className="h-12 opacity-40">
-              <span className="text-sm text-sidebar-foreground/40">No sessions yet</span>
+              <span className="text-sm text-sidebar-foreground/40">
+                No sessions yet
+              </span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         ) : (
@@ -82,31 +86,34 @@ export function NavRecentSessions() {
                 isActive={session.sessionId === activeSessionId}
                 onClick={() => handleSwitchSession(session.sessionId)}
                 className={cn(
-                  "h-auto py-3 px-3 group/item relative overflow-hidden flex-col items-start gap-1 rounded-xl",
+                  'h-auto py-3 px-3 group/item relative overflow-hidden flex-col items-start gap-1 rounded-xl',
                   session.sessionId === activeSessionId
                     ? 'bg-primary/10 text-foreground'
-                    : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40'
+                    : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent/40',
                 )}
               >
                 {/* Active indicator bar */}
                 {session.sessionId === activeSessionId && (
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-6 bg-primary rounded-r-full" />
                 )}
-                
+
                 {/* Title */}
-                <span className={cn(
-                  "w-full truncate text-sm leading-tight",
-                  session.sessionId === activeSessionId && "font-medium text-foreground"
-                )}>
+                <span
+                  className={cn(
+                    'w-full truncate text-sm leading-tight',
+                    session.sessionId === activeSessionId &&
+                      'font-medium text-foreground',
+                  )}
+                >
                   {session.title || 'New Chat'}
                 </span>
-                
+
                 {/* Date */}
                 <span className="text-[11px] text-muted-foreground/50">
                   {formatSessionDate(session.updatedAt ?? session.createdAt)}
                 </span>
               </SidebarMenuButton>
-              
+
               <DropdownMenu>
                 <DropdownMenuTrigger
                   render={

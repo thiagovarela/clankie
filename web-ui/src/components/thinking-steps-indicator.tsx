@@ -52,7 +52,9 @@ export function ThinkingStepsIndicator({
 
           <div className="flex items-center gap-1.5 text-xs font-medium text-foreground/90">
             <span>Thinking</span>
-            {isLive && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+            {isLive && (
+              <Loader2 className="h-3 w-3 animate-spin text-primary" />
+            )}
           </div>
 
           {!isExpanded && latestThinking && (
@@ -86,23 +88,31 @@ export function ThinkingStepsIndicator({
               const thinkingText = getThinkingText(msg)
               const isActive = msg.isThinking || msg.isStreaming
               return (
-                <li 
-                  key={msg.id} 
+                <li
+                  key={msg.id}
                   className={cn(
-                    "flex gap-2 p-1.5 rounded",
-                    isActive && "bg-primary/5"
+                    'flex gap-2 p-1.5 rounded',
+                    isActive && 'bg-primary/5',
                   )}
                 >
-                  <span className={cn(
-                    "shrink-0 font-mono text-[10px] w-4 h-4 flex items-center justify-center rounded",
-                    isActive ? "bg-primary/20 text-primary" : "text-muted-foreground/50"
-                  )}>
+                  <span
+                    className={cn(
+                      'shrink-0 font-mono text-[10px] w-4 h-4 flex items-center justify-center rounded',
+                      isActive
+                        ? 'bg-primary/20 text-primary'
+                        : 'text-muted-foreground/50',
+                    )}
+                  >
                     {index + 1}
                   </span>
-                  <span className={cn(
-                    "whitespace-pre-wrap italic leading-relaxed",
-                    isActive ? "text-foreground/80" : "text-muted-foreground/60"
-                  )}>
+                  <span
+                    className={cn(
+                      'whitespace-pre-wrap italic leading-relaxed',
+                      isActive
+                        ? 'text-foreground/80'
+                        : 'text-muted-foreground/60',
+                    )}
+                  >
                     {thinkingText || '(empty)'}
                   </span>
                 </li>

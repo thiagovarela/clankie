@@ -16,8 +16,8 @@ import {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar 
-      collapsible="offcanvas" 
+    <Sidebar
+      collapsible="offcanvas"
       className="border-r border-border/20"
       {...props}
     >
@@ -25,8 +25,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* Brand row */}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton 
-              size="lg" 
+            <SidebarMenuButton
+              size="lg"
               render={<Link to="/" />}
               className="h-10"
             >

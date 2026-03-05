@@ -107,7 +107,7 @@ export type RpcCommand =
   | { id?: string; type: 'auth_login_cancel'; loginFlowId: string }
   | { id?: string; type: 'auth_logout'; providerId: string }
   | { id?: string; type: 'get_scoped_models' }
-  | { id?: string; type: 'set_scoped_models'; models: string[] }
+  | { id?: string; type: 'set_scoped_models'; models: Array<string> }
 
 // ─── RPC Responses (Server → Client) ──────────────────────────────────────────
 
