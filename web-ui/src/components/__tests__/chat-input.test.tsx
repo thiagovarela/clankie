@@ -89,8 +89,7 @@ describe('ChatInput', () => {
       expect(fileInput).toHaveClass('hidden')
     })
 
-    // NOTE: ModelSelector has been moved to ChatTopbar, so it no longer appears in ChatInput
-    it('does not render ModelSelector inside ChatInput', () => {
+    it('renders ModelSelector inside ChatInput', () => {
       sessionStore.setState((state) => ({
         ...state,
         sessionId: 'test-session-123',
@@ -108,8 +107,8 @@ describe('ChatInput', () => {
 
       render(<ChatInput />)
 
-      // ModelSelector should NOT be in ChatInput anymore
-      expect(screen.queryByText('Claude 3.5 Sonnet')).not.toBeInTheDocument()
+      // ModelSelector should be in ChatInput now
+      expect(screen.getByText('Claude 3.5 Sonnet')).toBeInTheDocument()
     })
   })
 
@@ -144,7 +143,7 @@ describe('ChatInput', () => {
   })
 
   describe('Keyboard shortcuts', () => {
-    it('sends message on Ctrl+Enter', async () => {
+    it('sends message on Enter', async () => {
       const user = userEvent.setup()
       mockClient.prompt.mockResolvedValue({})
 
@@ -152,7 +151,7 @@ describe('ChatInput', () => {
 
       const textarea = screen.getByPlaceholderText(/Send a message/i)
       await user.type(textarea, 'Test message')
-      await user.keyboard('{Control>}{Enter}{/Control}')
+      await user.keyboard('{Enter}')
 
       await waitFor(() => {
         expect(mockClient.prompt).toHaveBeenCalledWith(
@@ -163,7 +162,7 @@ describe('ChatInput', () => {
       })
     })
 
-    it('sends message on Cmd+Enter (Mac)', async () => {
+    it('does not send on Shift+Enter', async () => {
       const user = userEvent.setup()
       mockClient.prompt.mockResolvedValue({})
 
@@ -171,30 +170,12 @@ describe('ChatInput', () => {
 
       const textarea = screen.getByPlaceholderText(/Send a message/i)
       await user.type(textarea, 'Test message')
-      await user.keyboard('{Meta>}{Enter}{/Meta}')
-
-      await waitFor(() => {
-        expect(mockClient.prompt).toHaveBeenCalledWith(
-          'test-session-123',
-          'Test message',
-          undefined,
-        )
-      })
-    })
-
-    it('does not send on Enter without modifier key', async () => {
-      const user = userEvent.setup()
-      mockClient.prompt.mockResolvedValue({})
-
-      render(<ChatInput />)
-
-      const textarea = screen.getByPlaceholderText(/Send a message/i)
-      await user.type(textarea, 'Test message{Enter}')
+      await user.keyboard('{Shift>}{Enter}{/Shift}')
 
       // Should not have sent
       expect(mockClient.prompt).not.toHaveBeenCalled()
 
-      // Textarea should still have content (Enter adds newline)
+      // Textarea should have a newline
       expect(textarea).toHaveValue('Test message\n')
     })
   })
