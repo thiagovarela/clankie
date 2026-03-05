@@ -61,12 +61,12 @@ function parseSchedule(params: CronParams): CronSchedule | undefined {
 
 export function createCronExtension() {
 	return function cronExtension(pi: ExtensionAPI) {
-		pi.on("before_agent_start", async () => {
+		pi.on("before_agent_start", async (event) => {
 			const now = new Date();
 			const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 			const local = now.toLocaleString("sv-SE", { timeZone: timezone, hour12: false }).replace(" ", "T");
 			return {
-				systemPrompt: `\n\nYou can manage scheduled tasks with the cron tool.\nCurrent UTC time: ${now.toISOString()}\nCurrent timezone: ${timezone} (local: ${local})`,
+				systemPrompt: `${event.systemPrompt}\n\nYou can manage scheduled tasks with the cron tool.\nCurrent UTC time: ${now.toISOString()}\nCurrent timezone: ${timezone} (local: ${local})`,
 			};
 		});
 

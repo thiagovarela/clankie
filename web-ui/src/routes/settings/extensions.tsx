@@ -41,7 +41,13 @@ import {
 } from '@/lib/extension-utils'
 import { JsonRenderRenderer } from '@/lib/tool-renderers/json-render-renderer'
 import { connectionStore } from '@/stores/connection'
-import { extensionsStore, setExtensions, setLoading } from '@/stores/extensions'
+import {
+  extensionsStore,
+  resetInstallStatus,
+  setExtensions,
+  setInstallStatus,
+  setLoading,
+} from '@/stores/extensions'
 import { sessionsListStore } from '@/stores/sessions-list'
 
 export const Route = createFileRoute('/settings/extensions')({
@@ -88,12 +94,14 @@ function ExtensionsSettingsPage() {
     activeSessionId: state.activeSessionId,
   }))
 
-  const { extensions, extensionErrors, isLoading } = useStore(
+  const { extensions, extensionErrors, isLoading, installStatus } = useStore(
     extensionsStore,
     (state) => state,
   )
 
   const [searchValue, setSearchValue] = useState('')
+  const [packageSource, setPackageSource] = useState('')
+  const [installScope, setInstallScope] = useState<'user' | 'project'>('user')
 
   const isConnected = status === 'connected'
 
@@ -114,6 +122,52 @@ function ExtensionsSettingsPage() {
       setLoading(false)
     }
   }, [activeSessionId])
+
+  const installPackage = useCallback(async () => {
+    const client = clientManager.getClient()
+    if (!client || !activeSessionId) return
+
+    const source = packageSource.trim()
+    if (!source) {
+      setInstallStatus({
+        isInstalling: false,
+        error: 'Package source is required',
+      })
+      return
+    }
+
+    resetInstallStatus()
+    setInstallStatus({
+      isInstalling: true,
+      output: `Installing ${source} (${installScope} scope)...`,
+      exitCode: null,
+      error: undefined,
+    })
+
+    try {
+      const result = await client.installPackage(
+        activeSessionId,
+        source,
+        installScope === 'project',
+      )
+
+      setInstallStatus({
+        isInstalling: false,
+        output: result.output,
+        exitCode: result.exitCode,
+        error: undefined,
+      })
+      setPackageSource('')
+      await loadExtensions()
+    } catch (err) {
+      setInstallStatus({
+        isInstalling: false,
+        error:
+          err instanceof Error ? err.message : 'Failed to install package',
+        exitCode: 1,
+      })
+    }
+  }, [activeSessionId, installScope, loadExtensions, packageSource])
 
   useEffect(() => {
     if (isConnected && activeSessionId) {
@@ -262,8 +316,8 @@ function ExtensionsSettingsPage() {
                       Extension Load Errors
                     </p>
                     <div className="mt-2 space-y-2">
-                      {extensionErrors.map((err, idx) => (
-                        <div key={idx} className="text-xs">
+                      {extensionErrors.map((err) => (
+                        <div key={`${err.path}-${err.error}`} className="text-xs">
                           <p className="font-mono text-muted-foreground">
                             {err.path}
                           </p>
@@ -283,7 +337,7 @@ function ExtensionsSettingsPage() {
                   No extensions loaded.
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Ask the AI to install extensions for you.
+                  Install packages below or ask the AI to use manage_packages.
                 </p>
               </div>
             ) : (
@@ -377,21 +431,96 @@ function ExtensionsSettingsPage() {
         </Card>
 
         <Card className="card-depth border-primary/20 bg-primary/5">
-          <CardContent className="pt-6">
+          <CardContent className="pt-6 space-y-4">
             <div className="flex items-start gap-3">
               <div className="p-2 rounded-lg bg-primary/10">
                 <Lightbulb className="h-5 w-5 text-primary" />
               </div>
-              <div className="flex-1">
-                <h3 className="font-medium mb-1">Installing Packages</h3>
-                <p className="text-sm text-muted-foreground">
-                  Ask the AI in chat to install extensions for you.
-                </p>
-                <code className="block mt-2 rounded bg-muted/50 p-2 text-xs font-mono">
-                  install @pi/heartbeat
-                </code>
+              <div className="flex-1 space-y-3">
+                <div>
+                  <h3 className="font-medium mb-1">Install Package</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Use this controlled installer to ensure packages are installed
+                    in clankie paths.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Input
+                    value={packageSource}
+                    onChange={(event) => setPackageSource(event.target.value)}
+                    placeholder="npm:@foo/pi-tools or git:github.com/user/repo"
+                    disabled={installStatus.isInstalling}
+                  />
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={installScope === 'user' ? 'default' : 'outline'}
+                      onClick={() => setInstallScope('user')}
+                      disabled={installStatus.isInstalling}
+                    >
+                      User scope (~/.clankie)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={
+                        installScope === 'project' ? 'default' : 'outline'
+                      }
+                      onClick={() => setInstallScope('project')}
+                      disabled={installStatus.isInstalling}
+                    >
+                      Project scope (.pi)
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={installPackage}
+                      disabled={installStatus.isInstalling}
+                    >
+                      {installStatus.isInstalling ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Installing...
+                        </>
+                      ) : (
+                        'Install'
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
+
+            {(installStatus.output || installStatus.error) && (
+              <div className="rounded-md border bg-background/70 p-3 space-y-2">
+                {installStatus.error && (
+                  <p className="text-xs text-destructive">{installStatus.error}</p>
+                )}
+                {installStatus.output && (
+                  <pre className="text-xs whitespace-pre-wrap font-mono text-muted-foreground">
+                    {installStatus.output}
+                  </pre>
+                )}
+                {installStatus.exitCode !== null && (
+                  <p className="text-xs text-muted-foreground">
+                    Exit code: {installStatus.exitCode}
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  onClick={resetInstallStatus}
+                  disabled={installStatus.isInstalling}
+                >
+                  Clear output
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

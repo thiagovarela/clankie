@@ -88,6 +88,15 @@ export function createWorkspaceJailExtension(workspaceDir: string, allowedPaths:
 		 * This is defense-in-depth, not a complete sandbox.
 		 */
 		function scanBashCommand(command: string): { allowed: boolean; reason?: string } {
+			const packageCommandPattern = /(^|\s)(pi\s+(install|remove|update))(\s|$)/;
+			if (packageCommandPattern.test(command)) {
+				return {
+					allowed: false,
+					reason:
+						"Blocked: use the manage_packages tool (or Settings → Extensions install UI) instead of running `pi install/remove/update` in bash.",
+				};
+			}
+
 			// Validate explicit absolute/tilde paths mentioned in command text.
 			const absolutePathPattern = /(?:^|\s)([~/][\w\-./]+)/g;
 			let match: RegExpExecArray | null;
@@ -157,12 +166,12 @@ export function createWorkspaceJailExtension(workspaceDir: string, allowedPaths:
 		});
 
 		// Inject system prompt reminder
-		pi.on("before_agent_start", async () => {
+		pi.on("before_agent_start", async (event) => {
 			const allowedPathsNote = normalizedAllowedPaths.length
 				? `\nAlso allowed: ${normalizedAllowedPaths.join(", ")}`
 				: "";
 			return {
-				systemPrompt: `\n\nIMPORTANT: You are restricted to working within the directory: ${workspaceDir}${allowedPathsNote}
+				systemPrompt: `${event.systemPrompt}\n\nIMPORTANT: You are restricted to working within the directory: ${workspaceDir}${allowedPathsNote}
 Do not access files, run commands, or reference paths outside the allowed directories.`,
 			};
 		});
