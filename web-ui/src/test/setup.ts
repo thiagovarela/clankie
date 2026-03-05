@@ -12,6 +12,7 @@ import { messagesStore } from '@/stores/messages'
 import { sessionStore } from '@/stores/session'
 import { sessionsListStore } from '@/stores/sessions-list'
 import { toolExecutionsStore } from '@/stores/tool-executions'
+import { resetTheme } from '@/stores/theme'
 
 // Store initial states for reset
 const INITIAL_AUTH_STATE = {
@@ -85,6 +86,7 @@ export function resetAllStores(): void {
   sessionStore.setState(() => INITIAL_SESSION_STATE)
   sessionsListStore.setState(() => INITIAL_SESSIONS_LIST_STATE)
   toolExecutionsStore.setState(() => INITIAL_TOOL_EXECUTIONS_STATE)
+  resetTheme()
 }
 
 // Clean up after each test
@@ -106,4 +108,19 @@ beforeEach(() => {
     unobserve() {}
     disconnect() {}
   }
+
+  // Mock matchMedia for theme system mode
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: vi.fn(), // deprecated
+      removeListener: vi.fn(), // deprecated
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })),
+  })
 })

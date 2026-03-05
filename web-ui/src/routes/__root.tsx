@@ -21,6 +21,7 @@ import {
   updateConnectionSettings,
 } from '@/stores/connection'
 import { ExtensionUIProvider } from '@/components/extension-ui/provider'
+import { initializeTheme, themeStore } from '@/stores/theme'
 
 export const Route = createRootRoute({
   head: () => ({
@@ -53,6 +54,23 @@ export const Route = createRootRoute({
 })
 
 function RootComponent() {
+  // Initialize theme on mount
+  useEffect(() => {
+    initializeTheme()
+
+    // Subscribe to theme changes for system mode
+    const subscription = themeStore.subscribe((state: { mode: string }) => {
+      if (state.mode === 'system') {
+        // Re-initialize to set up system preference listener
+        initializeTheme()
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
+
   // Auto-detect cookie auth and auto-connect
   useEffect(() => {
     async function checkCookieAuth() {
@@ -136,8 +154,10 @@ function RootComponent() {
 }
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  // Theme is applied client-side via initializeTheme()
+  // Avoid SSR mismatch by not setting className here
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>

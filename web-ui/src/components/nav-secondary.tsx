@@ -3,6 +3,7 @@ import {
   ChevronDown,
   Globe,
   KeyRound,
+  Palette,
   Puzzle,
   Settings,
   Sparkles,
@@ -26,6 +27,7 @@ import {
 } from '@/components/ui/sidebar'
 
 const settingsLinks = [
+  { to: '/settings/theme', label: 'Appearance', icon: Palette },
   { to: '/settings/connection', label: 'Connection', icon: Globe },
   { to: '/settings/auth', label: 'Auth', icon: KeyRound },
   { to: '/settings/extensions', label: 'Extensions', icon: Puzzle },

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
+import { Route as SettingsThemeRouteImport } from './routes/settings/theme'
 import { Route as SettingsSkillsRouteImport } from './routes/settings/skills'
 import { Route as SettingsExtensionsRouteImport } from './routes/settings/extensions'
 import { Route as SettingsConnectionRouteImport } from './routes/settings/connection'
@@ -25,6 +26,11 @@ const IndexRoute = IndexRouteImport.update({
 const SettingsIndexRoute = SettingsIndexRouteImport.update({
   id: '/settings/',
   path: '/settings/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsThemeRoute = SettingsThemeRouteImport.update({
+  id: '/settings/theme',
+  path: '/settings/theme',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsSkillsRoute = SettingsSkillsRouteImport.update({
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/settings/connection': typeof SettingsConnectionRoute
   '/settings/extensions': typeof SettingsExtensionsRoute
   '/settings/skills': typeof SettingsSkillsRoute
+  '/settings/theme': typeof SettingsThemeRoute
   '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/settings/connection': typeof SettingsConnectionRoute
   '/settings/extensions': typeof SettingsExtensionsRoute
   '/settings/skills': typeof SettingsSkillsRoute
+  '/settings/theme': typeof SettingsThemeRoute
   '/settings': typeof SettingsIndexRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/settings/connection': typeof SettingsConnectionRoute
   '/settings/extensions': typeof SettingsExtensionsRoute
   '/settings/skills': typeof SettingsSkillsRoute
+  '/settings/theme': typeof SettingsThemeRoute
   '/settings/': typeof SettingsIndexRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/settings/connection'
     | '/settings/extensions'
     | '/settings/skills'
+    | '/settings/theme'
     | '/settings/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/settings/connection'
     | '/settings/extensions'
     | '/settings/skills'
+    | '/settings/theme'
     | '/settings'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/settings/connection'
     | '/settings/extensions'
     | '/settings/skills'
+    | '/settings/theme'
     | '/settings/'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   SettingsConnectionRoute: typeof SettingsConnectionRoute
   SettingsExtensionsRoute: typeof SettingsExtensionsRoute
   SettingsSkillsRoute: typeof SettingsSkillsRoute
+  SettingsThemeRoute: typeof SettingsThemeRoute
   SettingsIndexRoute: typeof SettingsIndexRoute
 }
 
@@ -135,6 +148,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings/'
       preLoaderRoute: typeof SettingsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings/theme': {
+      id: '/settings/theme'
+      path: '/settings/theme'
+      fullPath: '/settings/theme'
+      preLoaderRoute: typeof SettingsThemeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings/skills': {
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsConnectionRoute: SettingsConnectionRoute,
   SettingsExtensionsRoute: SettingsExtensionsRoute,
   SettingsSkillsRoute: SettingsSkillsRoute,
+  SettingsThemeRoute: SettingsThemeRoute,
   SettingsIndexRoute: SettingsIndexRoute,
 }
 export const routeTree = rootRouteImport

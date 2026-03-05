@@ -1,5 +1,12 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { ChevronRight, Globe, KeyRound, Puzzle, Sparkles } from 'lucide-react'
+import {
+  ChevronRight,
+  Globe,
+  KeyRound,
+  Palette,
+  Puzzle,
+  Sparkles,
+} from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const Route = createFileRoute('/settings/')({
@@ -7,6 +14,13 @@ export const Route = createFileRoute('/settings/')({
 })
 
 const settingsPages = [
+  {
+    id: 'theme',
+    title: 'Appearance',
+    description: 'Choose your theme and color mode preference',
+    icon: Palette,
+    href: '/settings/theme',
+  },
   {
     id: 'connection',
     title: 'Connection',
