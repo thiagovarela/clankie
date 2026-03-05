@@ -7,7 +7,7 @@
 		"pi-package"
 	],
 	"scripts": {
-		"typecheck": "bunx tsgo --noEmit"
+		"typecheck": "npx tsgo --noEmit"
 	},
 	"pi": {
 		"extensions": [

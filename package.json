@@ -13,10 +13,10 @@
 		"README.md"
 	],
 	"scripts": {
-		"dev": "bun src/cli.ts",
+		"dev": "node src/cli.ts",
 		"build": "bun build src/cli.ts --outdir dist --target node --format esm --external koffi --external @silvia-odwyer/photon-node --external @mariozechner/clipboard && chmod +x dist/cli.js",
-		"build:web-ui": "cd web-ui && bun install && bun run build && cd .. && rm -rf web-ui-dist && cp -r web-ui/.output/public web-ui-dist",
-		"prepublishOnly": "bun run build && bun run build:web-ui",
+		"build:web-ui": "cd web-ui && npm install && npm run build && cd .. && rm -rf web-ui-dist && cp -r web-ui/.output/public web-ui-dist",
+		"prepublishOnly": "npm run build && npm run build:web-ui",
 		"check": "biome check .",
 		"check:fix": "biome check --fix .",
 		"format": "biome format --write .",

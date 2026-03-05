@@ -17,15 +17,11 @@ A minimal AI assistant built on [pi](https://github.com/badlogic/pi-mono)'s SDK.
 ### 1. Install Dependencies
 
 **Runtime:** [Node.js](https://nodejs.org) v18+  
-**Build:** [Bun](https://bun.sh) v1.0+ (for bundling and building web-ui)
+**Build:** [Bun](https://bun.sh) v1.0+ (for bundling only)
 
 ```bash
 # Check Node version
 node --version  # Should be >= v18.0.0
-
-# Install Bun (if not already installed)
-curl -fsSL https://bun.sh/install | bash
-bun --version
 ```
 
 ### 2. Quick Install via npm
@@ -175,12 +171,11 @@ clankie daemon uninstall
 ## Development
 
 ```bash
-bun src/cli.ts send "hello"
-bun run dev send "hello"
-bun run build
-bun run check
-bun run check:fix
-bun run format
+npm run dev send "hello"
+npm run build
+npm run check
+npm run check:fix
+npm run format
 ```
 
 ## Troubleshooting

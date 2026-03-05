@@ -41,13 +41,13 @@ You should see output like:
 
 ```bash
 cd web-ui
-bun install
+npm install
 ```
 
 ### 4. Start the development server
 
 ```bash
-bun dev
+npm run dev
 ```
 
 The web-ui will be available at http://localhost:3000
@@ -63,16 +63,16 @@ The web-ui will be available at http://localhost:3000
 
 ```bash
 # Start dev server (http://localhost:3000)
-bun dev
+npm run dev
 
 # Build for production
-bun build
+npm run build
 
 # Preview production build
-bun preview
+npm run preview
 
 # Lint & format
-bun run check
+npm run check
 ```
 
 ## Architecture
@@ -124,7 +124,7 @@ For now, the web-ui stores the auth token in `connectionStore` but doesn't send 
 - **Tailwind CSS 4** — Styling with CSS variables
 - **react-markdown** — Markdown rendering with GitHub Flavored Markdown
 - **Lucide React** — Icon library
-- **Bun** — Package manager & runtime
+- **npm** — Package manager
 
 ## License
 

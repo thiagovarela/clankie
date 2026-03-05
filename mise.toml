@@ -64,10 +64,10 @@ fi
 
 # Install & build
 echo "==> Installing web-ui dependencies…"
-(cd web-ui && bun install)
+(cd web-ui && npm install)
 
 echo "==> Building web-ui…"
-(cd web-ui && bun run build)
+(cd web-ui && npm run build)
 
 # Package
 echo "==> Packaging .output → ${TARBALL}…"
@@ -84,3 +84,6 @@ rm -f "${TARBALL}"
 
 echo "✓ Released web-ui v${VERSION} → https://github.com/thiagovarela/lil/releases/tag/${TAG}"
 """
+
+[tools]
+node = "latest"
