@@ -1,5 +1,6 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
+  Filter,
   Globe,
   KeyRound,
   Palette,
@@ -25,6 +26,7 @@ const settingsLinks = [
   { to: '/settings/theme', label: 'Appearance', icon: Palette },
   { to: '/settings/connection', label: 'Connection', icon: Globe },
   { to: '/settings/auth', label: 'Auth', icon: KeyRound },
+  { to: '/settings/scoped-models', label: 'Scoped Models', icon: Filter },
   { to: '/settings/extensions', label: 'Extensions', icon: Puzzle },
   { to: '/settings/skills', label: 'Skills', icon: Sparkles },
 ]

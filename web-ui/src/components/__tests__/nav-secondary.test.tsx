@@ -56,6 +56,7 @@ describe('NavSecondary', () => {
 
     expect(screen.getByText('Connection')).toBeInTheDocument()
     expect(screen.getByText('Auth')).toBeInTheDocument()
+    expect(screen.getByText('Scoped Models')).toBeInTheDocument()
     expect(screen.getByText('Extensions')).toBeInTheDocument()
     expect(screen.getByText('Skills')).toBeInTheDocument()
   })
@@ -76,6 +77,9 @@ describe('NavSecondary', () => {
 
       const authLink = screen.getByText('Auth').closest('a')
       expect(authLink).toHaveAttribute('href', '/settings/auth')
+
+      const scopedModelsLink = screen.getByText('Scoped Models').closest('a')
+      expect(scopedModelsLink).toHaveAttribute('href', '/settings/scoped-models')
 
       const extensionsLink = screen.getByText('Extensions').closest('a')
       expect(extensionsLink).toHaveAttribute('href', '/settings/extensions')
