@@ -7,13 +7,22 @@ import { SidebarProvider } from '@/components/ui/sidebar'
 
 // Mock tanstack router
 vi.mock('@tanstack/react-router', async () => {
-  const actual = await vi.importActual<typeof import('@tanstack/react-router')>('@tanstack/react-router')
+  const actual = await vi.importActual<typeof import('@tanstack/react-router')>(
+    '@tanstack/react-router',
+  )
   return {
     ...actual,
     useRouterState: () => ({
       location: { pathname: '/settings/theme' },
     }),
-    Link: ({ to, children, ...props }: { to: string; children: React.ReactNode }) => (
+    Link: ({
+      to,
+      children,
+      ...props
+    }: {
+      to: string
+      children: React.ReactNode
+    }) => (
       <a href={to} {...props}>
         {children}
       </a>
@@ -23,11 +32,7 @@ vi.mock('@tanstack/react-router', async () => {
 
 // A simple wrapper that provides the SidebarProvider
 function renderWithSidebar(ui: React.ReactElement) {
-  return render(
-    <SidebarProvider>
-      {ui}
-    </SidebarProvider>
-  )
+  return render(<SidebarProvider>{ui}</SidebarProvider>)
 }
 
 describe('NavSecondary', () => {
@@ -79,7 +84,10 @@ describe('NavSecondary', () => {
       expect(authLink).toHaveAttribute('href', '/settings/auth')
 
       const scopedModelsLink = screen.getByText('Scoped Models').closest('a')
-      expect(scopedModelsLink).toHaveAttribute('href', '/settings/scoped-models')
+      expect(scopedModelsLink).toHaveAttribute(
+        'href',
+        '/settings/scoped-models',
+      )
 
       const extensionsLink = screen.getByText('Extensions').closest('a')
       expect(extensionsLink).toHaveAttribute('href', '/settings/extensions')

@@ -1,12 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useStore } from '@tanstack/react-store'
-import {
-  CheckCircle2,
-  KeyRound,
-  Loader2,
-  Shield,
-  XCircle,
-} from 'lucide-react'
+import { CheckCircle2, KeyRound, Loader2, Shield, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import type { AuthProvider } from '@/lib/types'
 import { AuthLoginDialog } from '@/components/auth-login-dialog'
@@ -349,4 +343,3 @@ function ProviderCard({
     </div>
   )
 }
-

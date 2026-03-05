@@ -2,11 +2,20 @@ import { createFileRoute } from '@tanstack/react-router'
 import { useStore } from '@tanstack/react-store'
 import { Filter, Loader2, Sparkles, XCircle } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
 import { clientManager } from '@/lib/client-manager'
 import { connectionStore } from '@/stores/connection'
 import { sessionStore } from '@/stores/session'
-import { scopedModelsStore, setScopedEnabledModels } from '@/stores/scoped-models'
+import {
+  scopedModelsStore,
+  setScopedEnabledModels,
+} from '@/stores/scoped-models'
 
 export const Route = createFileRoute('/settings/scoped-models')({
   component: ScopedModelsSettingsPage,
@@ -151,8 +160,8 @@ function ScopedModelsSection() {
               Scoped Models
             </CardTitle>
             <CardDescription>
-              Choose which models are available in the model selector. Leave empty
-              to show all available models.
+              Choose which models are available in the model selector. Leave
+              empty to show all available models.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -201,7 +210,9 @@ function ScopedModelsSection() {
                     className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                   >
                     <option value="">
-                      {hasSelection ? 'Add another model...' : 'Select models...'}
+                      {hasSelection
+                        ? 'Add another model...'
+                        : 'Select models...'}
                     </option>
                     {options
                       .filter((opt) => !selectedModels.includes(opt.value))

@@ -1,10 +1,8 @@
-import { Link } from '@tanstack/react-router'
-import { Search } from 'lucide-react'
+import { Link, useNavigate } from '@tanstack/react-router'
+import { CirclePlusIcon } from 'lucide-react'
 import type * as React from 'react'
-import { NavMain } from '@/components/nav-main'
 import { NavSecondary } from '@/components/nav-secondary'
 import { NavRecentSessions } from '@/components/nav-sessions'
-import { Input } from '@/components/ui/input'
 import {
   Sidebar,
   SidebarContent,
@@ -14,8 +12,22 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@/components/ui/sidebar'
+import { clientManager } from '@/lib/client-manager'
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const navigate = useNavigate()
+
+  const handleCreateChat = async () => {
+    try {
+      const sessionId = await clientManager.createNewSession()
+      if (sessionId) {
+        navigate({ to: '/sessions/$sessionId', params: { sessionId } })
+      }
+    } catch (error) {
+      console.error('[app-sidebar] Failed to create new session:', error)
+    }
+  }
+
   return (
     <Sidebar
       collapsible="offcanvas"
@@ -45,18 +57,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
 
-        {/* Search input - Tau-style search-first */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/40" />
-          <Input
-            placeholder="Search sessions..."
-            className="h-10 pl-10 text-sm bg-sidebar-accent/50 border-0 rounded-xl focus-visible:ring-1 focus-visible:ring-primary/30 placeholder:text-muted-foreground/40"
-          />
-        </div>
+        {/* New Chat button - fixed in header */}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip="New Chat"
+              className="h-10 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground active:bg-primary/90 active:text-primary-foreground transition-all rounded-xl"
+              onClick={handleCreateChat}
+            >
+              <CirclePlusIcon className="h-4 w-4 mr-1" />
+              <span>New Chat</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
 
       <SidebarContent className="gap-2 px-2 py-2">
-        <NavMain />
         <NavRecentSessions />
       </SidebarContent>
 
