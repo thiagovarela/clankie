@@ -22,13 +22,19 @@ import type { WebSocket, WebSocketServer } from "ws";
 import { createNodeWebSocket } from "@hono/node-ws";
 import type { ThinkingLevel } from "@mariozechner/pi-agent-core";
 import type { ImageContent, OAuthLoginCallbacks } from "@mariozechner/pi-ai";
-import { type AgentSession, type AgentSessionEvent, AuthStorage } from "@mariozechner/pi-coding-agent";
+import {
+	type AgentSession,
+	type AgentSessionEvent,
+	AuthStorage,
+	DefaultPackageManager,
+	SettingsManager,
+} from "@mariozechner/pi-coding-agent";
 import { Hono } from "hono";
 import { parse as parseCookie, serialize as serializeCookie } from "hono/utils/cookie";
 import type { Context } from "hono";
 import type { WSContext } from "hono/ws";
 import { buildApiKeyProviders } from "../auth/providers.ts";
-import { getAppDir, getAuthPath, loadConfig } from "../config.ts";
+import { getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from "../config.ts";
 import { reloadSharedHeartbeatRunnerSettings } from "../extensions/heartbeat/index.ts";
 import { HEARTBEAT_EXTENSION_UI_SPEC } from "../extensions/heartbeat/ui-spec.ts";
 import { resolveScopedModels } from "../lib/scoped-model-resolver.ts";
@@ -1432,37 +1438,40 @@ export class WebChannel implements Channel {
 
 			case "install_package": {
 				const { source, local } = command;
-				const installCommand = `pi install ${local ? "-l " : ""}${source}`;
+				const config = loadConfig();
+				const cwd = getWorkspace(config);
+				const agentDir = getAgentDir(config);
+				const settingsManager = SettingsManager.create(cwd, agentDir);
+				const packageManager = new DefaultPackageManager({ cwd, agentDir, settingsManager });
+				const output: string[] = [];
+
+				packageManager.setProgressCallback((event) => {
+					if (event.type === "start" && event.message) {
+						output.push(event.message);
+					}
+					if (event.type === "error" && event.message) {
+						output.push(`Error: ${event.message}`);
+					}
+				});
 
 				try {
-					// Run pi install via bash
-					const result = await session.executeBash(installCommand);
-
-					if (result.exitCode === 0) {
-						// Successful install - reload the session to pick up new extensions/skills
-						await session.reload();
-
-						return {
-							id,
-							type: "response",
-							command: "install_package",
-							success: true,
-							data: {
-								output: result.output,
-								exitCode: result.exitCode,
-							},
-						};
+					await packageManager.install(source, { local: local === true });
+					const added = packageManager.addSourceToSettings(source, { local: local === true });
+					if (!added) {
+						output.push(`Package source already configured: ${source}`);
 					}
 
-					// Non-zero exit code - return as success but with exitCode info
+					// Successful install - reload the session to pick up new extensions/skills
+					await session.reload();
+
 					return {
 						id,
 						type: "response",
 						command: "install_package",
 						success: true,
 						data: {
-							output: result.output,
-							exitCode: result.exitCode,
+							output: output.join("\n") || `Installed ${source}`,
+							exitCode: 0,
 						},
 					};
 				} catch (err) {
