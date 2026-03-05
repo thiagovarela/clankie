@@ -28,7 +28,9 @@ import {
 import { type AppConfig, getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
 import { createCronExtension } from "./extensions/cron/index.ts";
 import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
+import { createReloadRuntimeExtension } from "./extensions/reload-runtime.ts";
 import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
+import { reloadAllSessions } from "./sessions.ts";
 
 // ─── Shared loader infrastructure ──────────────────────────────────────────────
 
@@ -40,6 +42,7 @@ export function buildExtensionFactories(config: AppConfig, cwd: string): Extensi
 	const extensionFactories: ExtensionFactory[] = [];
 	extensionFactories.push(createCronExtension());
 	extensionFactories.push(createHeartbeatExtension());
+	extensionFactories.push(createReloadRuntimeExtension(reloadAllSessions));
 
 	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
 	if (restrictToWorkspace) {

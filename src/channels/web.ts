@@ -38,7 +38,7 @@ import { getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from ".
 import { reloadSharedHeartbeatRunnerSettings } from "../extensions/heartbeat/index.ts";
 import { HEARTBEAT_EXTENSION_UI_SPEC } from "../extensions/heartbeat/ui-spec.ts";
 import { resolveScopedModels } from "../lib/scoped-model-resolver.ts";
-import { getOrCreateSession } from "../sessions.ts";
+import { getOrCreateSession, reloadAllSessions } from "../sessions.ts";
 import type { Channel, MessageHandler } from "./channel.ts";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -1461,8 +1461,8 @@ export class WebChannel implements Channel {
 						output.push(`Package source already configured: ${source}`);
 					}
 
-					// Successful install - reload the session to pick up new extensions/skills
-					await session.reload();
+					// Successful install - reload all sessions to pick up new extensions/skills
+					await reloadAllSessions();
 
 					return {
 						id,
@@ -1486,7 +1486,7 @@ export class WebChannel implements Channel {
 			}
 
 			case "reload": {
-				await session.reload();
+				await reloadAllSessions();
 				return { id, type: "response", command: "reload", success: true };
 			}
 

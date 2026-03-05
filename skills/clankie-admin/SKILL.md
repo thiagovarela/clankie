@@ -46,6 +46,14 @@ Create extensions under:
 
 Keep extension code and any package metadata there. If the extension ships skills, place them under a `skills/` folder in the extension package and expose them through the package manifest.
 
+## After creating or modifying resources
+
+After creating, installing, updating, or removing any skill, extension, prompt template, or theme, **you MUST call the `reload_runtime` tool** to ensure all active sessions pick up the changes. Without this step, the newly installed resources will not be available until the daemon is restarted.
+
+```
+reload_runtime: {}
+```
+
 ## Safety checks
 
 Before changing files, confirm target paths are under `~/.clankie/` for global clankie resources.

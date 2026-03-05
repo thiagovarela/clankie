@@ -310,6 +310,42 @@ export function setActiveSessionName(chatIdentifier: string, sessionName: string
 	activeSessionNames.set(chatIdentifier, sessionName);
 }
 
+// ─── Session cache management ────────────────────────────────────────────────────
+
+/**
+ * Reload all cached sessions to pick up newly installed skills, extensions,
+ * prompts, and themes. Used after package installation or file changes.
+ */
+export async function reloadAllSessions(): Promise<void> {
+	const entries = Array.from(sessionCache.entries());
+	if (entries.length === 0) {
+		console.log("[session] No cached sessions to reload");
+		return;
+	}
+
+	console.log(`[session] Reloading ${entries.length} cached session(s)...`);
+
+	const results = await Promise.allSettled(
+		entries.map(async ([chatKey, session]) => {
+			try {
+				await session.reload();
+				console.log(`[session] Reloaded session: ${chatKey}`);
+			} catch (err) {
+				console.error(
+					`[session] Failed to reload session ${chatKey}:`,
+					err instanceof Error ? err.message : String(err),
+				);
+			}
+		}),
+	);
+
+	const failed = results.filter((r) => r.status === "rejected").length;
+	if (failed > 0) {
+		console.warn(`[session] ${failed}/${entries.length} session(s) failed to reload`);
+	}
+	console.log(`[session] All session reloads complete`);
+}
+
 // ─── Attachment helpers ────────────────────────────────────────────────────────
 
 const IMAGE_MIME_PREFIXES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
