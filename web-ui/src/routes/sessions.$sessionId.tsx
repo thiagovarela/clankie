@@ -4,7 +4,6 @@ import { Settings } from 'lucide-react'
 import { useEffect } from 'react'
 import { ChatInput } from '@/components/chat-input'
 import { ChatMessages } from '@/components/chat-messages'
-import { ChatTopbar } from '@/components/chat-topbar'
 import { Button } from '@/components/ui/button'
 import { clientManager } from '@/lib/client-manager'
 import { connectionStore } from '@/stores/connection'
@@ -60,7 +59,6 @@ function SessionPage() {
   if (!isConnected) {
     return (
       <div className="flex h-full flex-col">
-        <ChatTopbar />
         <div className="flex flex-1 items-center justify-center chat-background">
           <div className="text-center space-y-4 max-w-md p-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-destructive/10 border border-destructive/20 mb-2">
@@ -88,7 +86,6 @@ function SessionPage() {
   if (activeSessionId !== urlSessionId) {
     return (
       <div className="flex h-full flex-col">
-        <ChatTopbar />
         <div className="flex flex-1 items-center justify-center chat-background">
           <div className="text-center space-y-3">
             <div className="inline-flex gap-1 mb-2">
@@ -110,7 +107,6 @@ function SessionPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <ChatTopbar />
       <ChatMessages />
       <ChatInput />
     </div>

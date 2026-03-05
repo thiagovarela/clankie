@@ -7,6 +7,7 @@ import type { ImageContent } from '@/lib/types'
 import type { DisplayAttachment } from '@/stores/messages'
 import { AttachmentPreview } from '@/components/attachment-preview'
 import { CommandPalette } from '@/components/command-palette'
+import { ModelSelector } from '@/components/model-selector'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { clientManager } from '@/lib/client-manager'
@@ -313,7 +314,7 @@ export function ChatInput() {
       return
     }
 
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSend()
     }
@@ -378,6 +379,7 @@ export function ChatInput() {
           {/* Toolbar row */}
           <div className="flex items-center justify-between gap-2 px-3 pb-3">
             <div className="flex items-center gap-1">
+              <ModelSelector />
               <input
                 ref={fileInputRef}
                 type="file"
@@ -413,9 +415,8 @@ export function ChatInput() {
             </div>
 
             <div className="flex items-center gap-2">
-              <kbd className="hidden sm:inline-flex h-6 items-center gap-1 rounded border border-border/50 bg-muted/50 px-2 text-[10px] font-medium text-muted-foreground">
-                <span>⌘</span>
-                <span>↵</span>
+              <kbd className="hidden sm:inline-flex h-6 items-center rounded border border-border/50 bg-muted/50 px-2 text-[10px] font-medium text-muted-foreground">
+                Enter
               </kbd>
               <Button
                 onClick={handleSend}
