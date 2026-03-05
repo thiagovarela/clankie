@@ -24,7 +24,11 @@ Clankie uses `~/.clankie/` as its global agent directory:
 
 1. Prefer **user scope** installs for clankie-managed packages.
 2. Avoid project-local installs into `~/.clankie/workspace/.pi/` unless the user explicitly asks for project scope.
-3. After install/update/remove, reload the session so newly loaded resources become available.
+3. Prefer clankie's controlled package flows:
+   - LLM: `manage_packages` tool
+   - UI: Settings → Extensions install panel
+4. Do **not** use raw `pi install/remove/update` commands in bash unless explicitly requested for debugging.
+5. After install/update/remove, reload the session so newly loaded resources become available.
 
 ## Creating a skill
 

@@ -102,8 +102,9 @@ function SettingsIndexPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-muted-foreground">
             <p>
-              <strong>Installing packages:</strong> Ask the AI in chat to
-              install packages for you. For example: "install @pi/heartbeat"
+              <strong>Installing packages:</strong> Use Settings → Extensions
+              install panel (recommended), or ask the AI to use
+              <code className="mx-1">manage_packages</code>.
             </p>
             <p>
               <strong>Connection:</strong> Make sure clankie is running and the

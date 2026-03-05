@@ -9,6 +9,7 @@
 	"files": [
 		"dist/",
 		"web-ui-dist/",
+		"skills/",
 		"package.json",
 		"README.md"
 	],
