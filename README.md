@@ -118,6 +118,9 @@ clankie "Summarize recent git commits"
 # Check daemon status
 clankie status
 
+# Update clankie and restart daemon/service if needed
+clankie self-update
+
 # Stop daemon
 clankie stop
 

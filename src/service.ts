@@ -342,6 +342,64 @@ export async function uninstallService(): Promise<void> {
 	}
 }
 
+export function hasInstalledService(): boolean {
+	if (isMac) return existsSync(launchdPlistPath());
+	if (isLinux) return existsSync(systemdUnitPath());
+	return false;
+}
+
+export function restartInstalledService(): void {
+	if (isMac) {
+		const plistPath = launchdPlistPath();
+		if (!existsSync(plistPath)) {
+			console.error("Clankie is not installed as a launchd agent.");
+			process.exit(1);
+		}
+
+		const uid = typeof process.getuid === "function" ? process.getuid() : undefined;
+		if (uid === undefined) {
+			console.error("Could not determine current user ID for launchd restart.");
+			process.exit(1);
+		}
+
+		const bootout = execSafe(`launchctl bootout gui/${uid} "${plistPath}"`);
+		if (!bootout.ok) {
+			execSafe(`launchctl unload "${plistPath}"`);
+		}
+
+		const bootstrap = execSafe(`launchctl bootstrap gui/${uid} "${plistPath}"`);
+		if (!bootstrap.ok) {
+			const load = execSafe(`launchctl load "${plistPath}"`);
+			if (!load.ok) {
+				console.error(`launchctl restart failed: ${bootstrap.stderr || load.stderr}`);
+				process.exit(1);
+			}
+		}
+
+		console.log(`Restarted launchd agent: ${LAUNCHD_LABEL}`);
+		return;
+	}
+
+	if (isLinux) {
+		if (!existsSync(systemdUnitPath())) {
+			console.error("Clankie is not installed as a systemd user service.");
+			process.exit(1);
+		}
+
+		const restart = execSafe(`systemctl --user restart ${SERVICE_NAME}.service`);
+		if (!restart.ok) {
+			console.error(`systemd restart failed: ${restart.stderr || restart.stdout}`);
+			process.exit(1);
+		}
+
+		console.log(`Restarted systemd service: ${SERVICE_NAME}.service`);
+		return;
+	}
+
+	console.error(`Service management not supported on ${platform()}.`);
+	process.exit(1);
+}
+
 export function showServiceLogs(): void {
 	if (isMac) {
 		logsLaunchd();

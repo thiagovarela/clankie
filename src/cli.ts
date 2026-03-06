@@ -9,6 +9,8 @@
  *   clankie start                       Start the daemon (channels + agent)
  *   clankie stop                        Stop the daemon
  *   clankie restart                     Restart the daemon
+ *   clankie update                      Update clankie via npm and restart daemon/service if needed
+ *   clankie self-update                 Alias for update
  *   clankie status                      Check daemon status
  *   clankie daemon install              Install as a system service (systemd/launchd)
  *   clankie daemon uninstall            Remove the system service
@@ -21,6 +23,7 @@
  *   clankie config path                 Show config file path
  */
 
+import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -31,7 +34,7 @@ import { createSession } from "./agent.ts";
 import { buildApiKeyProviders } from "./auth/providers.ts";
 import { getAuthPath, getByPath, getConfigPath, loadConfig, saveConfig, setByPath, unsetByPath } from "./config.ts";
 import { isRunning, restartDaemon, startDaemon, stopDaemon } from "./daemon.ts";
-import { installService, showServiceLogs, showServiceStatus, uninstallService } from "./service.ts";
+import { hasInstalledService, installService, restartInstalledService, showServiceLogs, showServiceStatus, uninstallService } from "./service.ts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -45,6 +48,8 @@ Usage:
   clankie start [--foreground]      Start the daemon (foreground by default)
   clankie stop                      Stop the daemon
   clankie restart                   Restart the daemon
+  clankie update                    Update clankie via npm and restart daemon/service if needed
+  clankie self-update               Alias for update
   clankie status                    Check if daemon is running
   clankie daemon install            Install as a system service (systemd/launchd)
   clankie daemon uninstall          Remove the system service
@@ -95,15 +100,43 @@ Credentials are stored at ~/.clankie/auth.json (separate from pi's auth).
 `);
 }
 
-function printVersion(): void {
-	// Read version from package.json at repo root (../ from src/)
+function getCurrentVersion(): string | undefined {
 	const packagePath = join(import.meta.dirname, "..", "package.json");
 	try {
 		const pkg = JSON.parse(readFileSync(packagePath, "utf-8"));
-		console.log(`clankie ${pkg.version}`);
+		return typeof pkg.version === "string" ? pkg.version : undefined;
 	} catch {
+		return undefined;
+	}
+}
+
+function printVersion(): void {
+	const version = getCurrentVersion();
+	if (version) {
+		console.log(`clankie ${version}`);
+	} else {
 		console.log("clankie (version unknown)");
 	}
+}
+
+function getGlobalNpmRoot(): string | undefined {
+	const result = spawnSync("npm", ["root", "-g"], { encoding: "utf-8" });
+	if (result.status !== 0) return undefined;
+	return result.stdout.trim() || undefined;
+}
+
+function isInstalledFromGlobalNpm(): boolean {
+	const globalRoot = getGlobalNpmRoot();
+	if (!globalRoot) return false;
+	const packageRoot = join(import.meta.dirname, "..");
+	return packageRoot === join(globalRoot, "clankie") || packageRoot.startsWith(`${join(globalRoot, "clankie")}/`);
+}
+
+function getLatestPublishedVersion(): string | undefined {
+	const result = spawnSync("npm", ["view", "clankie", "version"], { encoding: "utf-8" });
+	if (result.status !== 0) return undefined;
+	const version = result.stdout.trim();
+	return version || undefined;
 }
 
 // ─── Command handlers ─────────────────────────────────────────────────────────
@@ -299,6 +332,60 @@ async function cmdRestart(): Promise<void> {
 	await restartDaemon();
 }
 
+async function cmdUpdate(): Promise<void> {
+	const packageName = "clankie";
+	const currentVersion = getCurrentVersion();
+	const latestVersion = getLatestPublishedVersion();
+	const serviceInstalled = hasInstalledService();
+	const daemonRunning = isRunning().running;
+
+	if (!isInstalledFromGlobalNpm()) {
+		console.error("Self-update only supports npm global installs.");
+		console.error("Please update clankie with the same package manager or workflow you used to install it.");
+		process.exit(1);
+	}
+
+	if (currentVersion && latestVersion) {
+		console.log(`Current version: ${currentVersion}`);
+		console.log(`Latest version:  ${latestVersion}`);
+		if (currentVersion === latestVersion) {
+			console.log("clankie is already up to date.");
+			return;
+		}
+		console.log();
+	} else {
+		console.log("Checking latest version via npm failed or returned no version; proceeding with update.");
+	}
+
+	console.log(`Updating ${packageName} via npm...`);
+	const update = spawnSync("npm", ["install", "-g", `${packageName}@latest`], {
+		stdio: "inherit",
+	});
+
+	if (update.status !== 0) {
+		process.exit(update.status ?? 1);
+	}
+
+	console.log("\n✓ clankie updated.");
+
+	if (serviceInstalled) {
+		console.log("Restarting installed service...");
+		restartInstalledService();
+		return;
+	}
+
+	if (daemonRunning) {
+		console.log("Restarting daemon with the updated CLI...");
+		const restart = spawnSync("clankie", ["restart"], { stdio: "inherit" });
+		if (restart.status !== 0) {
+			process.exit(restart.status ?? 1);
+		}
+		return;
+	}
+
+	console.log("Daemon is not running. Start it with 'clankie start' when ready.");
+}
+
 function cmdStatus(): void {
 	const status = isRunning();
 	if (status.running) {
@@ -467,6 +554,11 @@ async function main(): Promise<void> {
 
 		case "restart":
 			await cmdRestart();
+			break;
+
+		case "update":
+		case "self-update":
+			await cmdUpdate();
 			break;
 
 		case "status":
