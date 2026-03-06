@@ -1,6 +1,12 @@
+import { useStore } from '@tanstack/react-store'
 import { ChevronDown, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { ToolExecutionCard } from './tool-execution-card'
 import type { DisplayMessage } from '@/stores/messages'
+import {
+  getToolExecutionsForMessages,
+  toolExecutionsStore,
+} from '@/stores/tool-executions'
 import { cn } from '@/lib/utils'
 
 interface ThinkingStepsIndicatorProps {
@@ -21,6 +27,11 @@ export function ThinkingStepsIndicator({
   messages,
 }: ThinkingStepsIndicatorProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+
+  const messageIds = useMemo(() => messages.map((message) => message.id), [messages])
+  const executions = useStore(toolExecutionsStore, (state) =>
+    getToolExecutionsForMessages(messageIds, state),
+  )
 
   // Determine if any message in the group is actively streaming/thinking
   const isLive = messages.some((msg) => msg.isThinking || msg.isStreaming)
@@ -82,7 +93,7 @@ export function ThinkingStepsIndicator({
 
       {/* Expanded thinking steps */}
       {isExpanded && (
-        <div className="mt-2 rounded-lg border border-border/50 bg-card/80 p-3 shadow-sm backdrop-blur-sm animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="mt-2 space-y-2 rounded-lg border border-border/50 bg-card/80 p-3 shadow-sm backdrop-blur-sm animate-in fade-in slide-in-from-top-1 duration-150">
           <ol className="space-y-2 text-xs">
             {messages.map((msg, index) => {
               const thinkingText = getThinkingText(msg)
@@ -119,6 +130,17 @@ export function ThinkingStepsIndicator({
               )
             })}
           </ol>
+
+          {executions.length > 0 && (
+            <div className="border-t border-border/50 pt-3 space-y-2">
+              {executions.map((execution) => (
+                <ToolExecutionCard
+                  key={execution.toolCallId}
+                  execution={execution}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>

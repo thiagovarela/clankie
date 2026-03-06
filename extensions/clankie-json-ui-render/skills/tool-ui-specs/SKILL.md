@@ -1,35 +1,30 @@
 ---
 name: tool-ui-specs
-description: Generate structured web UI payloads for clankie tool results and extension configuration using details.uiSpec, renderHint, and json-render shadcn components. Use when asked to make tool output render as cards, forms, lists, tables, or other rich UI in the web app.
+description: Generate structured web UI payloads for clankie tool results and extension configuration using details.uiSpec and json-render shadcn components. Use when asked to make tool output render as cards, forms, lists, tables, or other rich UI in the web app.
 ---
 
 # Tool UI Specs
 
 Use this skill when generating structured UI for the clankie web app.
 
-## Choose the simplest renderer
+## Rendering model
 
-Prefer `details.renderHint` for simple formatted output:
+Always prefer `details.uiSpec`.
 
-- `code`
-- `diff`
-- `terminal`
-- `table`
-- `list`
-- `json`
-- `markdown`
+For this package, `render_json_ui` should always return json-render payloads instead of `details.renderHint`, even for content that could also be shown as markdown, json, lists, or tables.
 
-Use `details.uiSpec` when the output needs richer layout or form-like structure:
+Use `details.uiSpec` for:
 
 - cards with grouped content
 - multiple sections
 - settings-like forms
 - dashboards / summaries
-- composed shadcn components
+- list-like content rendered as structured child nodes
+- data previews rendered inside card sections
 
 ## Preferred tool path
 
-If the `render_json_ui` tool is available, prefer calling it instead of hand-authoring a long JSON payload in chat. It produces valid `details.renderHint` / `details.uiSpec` results that the web client can render directly.
+If the `render_json_ui` tool is available, prefer calling it instead of hand-authoring a long JSON payload in chat. It produces valid `details.uiSpec` results that the web client can render directly.
 
 Use direct payload authoring only when:
 - you are writing extension/tool code
@@ -221,28 +216,11 @@ So:
 - for tool results: prefer read-only or local-state UI
 - for extension settings: actions like save are appropriate
 
-## When to use renderHint instead
+## Do not use renderHint in this package
 
-Prefer `renderHint` instead of `uiSpec` when the output is naturally one of:
+For `clankie-json-ui-render`, do not return `details.renderHint`.
 
-- code block
-- terminal log
-- markdown document
-- JSON blob
-- simple table
-- simple list
-
-Example:
-
-```ts
-return {
-  content: [{ type: "text", text: "Package list" }],
-  details: {
-    renderHint: { type: "table", columns: ["name", "version"] },
-    data: rows,
-  },
-};
-```
+Even when the source content is naturally a list, table, JSON blob, code sample, or markdown-like text, convert it into a structured `details.uiSpec` tree.
 
 ## Good defaults
 

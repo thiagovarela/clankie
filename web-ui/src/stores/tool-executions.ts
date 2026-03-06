@@ -262,10 +262,19 @@ export function getToolExecutionsForMessage(
   messageId: string,
   state: ToolExecutionsStore,
 ): Array<ToolExecution> {
+  return getToolExecutionsForMessages([messageId], state)
+}
+
+export function getToolExecutionsForMessages(
+  messageIds: Array<string>,
+  state: ToolExecutionsStore,
+): Array<ToolExecution> {
+  const ids = new Set(messageIds)
+
   return state.executionOrder
     .map((id) => state.executions[id])
     .filter((execution): execution is ToolExecution => Boolean(execution))
-    .filter((execution) => execution.messageId === messageId)
+    .filter((execution) => execution.messageId !== null && ids.has(execution.messageId))
 }
 
 export function clearToolExecutions(): void {

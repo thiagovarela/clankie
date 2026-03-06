@@ -1,46 +1,29 @@
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
 
-const RenderHintTypeSchema = Type.Union(
-  [
-    Type.Literal("markdown"),
-    Type.Literal("json"),
-    Type.Literal("list"),
-    Type.Literal("table"),
-    Type.Literal("code"),
-    Type.Literal("diff"),
-    Type.Literal("terminal"),
-  ],
-  { description: "Preferred lightweight renderer" },
-);
-
 const RenderJsonUiParamsSchema = Type.Object({
   title: Type.Optional(Type.String({ description: "Optional card title" })),
   description: Type.Optional(Type.String({ description: "Optional card description" })),
   summary: Type.Optional(Type.String({ description: "Short transcript summary for the tool result" })),
-  text: Type.Optional(Type.String({ description: "Main text body for markdown or card content" })),
+  text: Type.Optional(Type.String({ description: "Main text body for card content" })),
   items: Type.Optional(
     Type.Array(Type.String(), {
-      description: "Simple list items for list or card rendering",
+      description: "Simple list items for card rendering",
     }),
   ),
   columns: Type.Optional(
     Type.Array(Type.String(), {
-      description: "Table column names when using renderHint=table",
+      description: "Optional column labels for structured data rows",
     }),
   ),
   rows: Type.Optional(
     Type.Array(Type.Record(Type.String(), Type.Unknown()), {
-      description: "Table rows or arbitrary JSON data",
+      description: "Structured data rows to render inside the card",
     }),
   ),
   ordered: Type.Optional(Type.Boolean({ description: "Render lists as ordered" })),
-  renderHint: Type.Optional(RenderHintTypeSchema),
-  language: Type.Optional(Type.String({ description: "Language for code/diff/terminal hints" })),
   uiSpec: Type.Optional(Type.Record(Type.String(), Type.Unknown(), { description: "Explicit uiSpec payload to return directly" })),
 }, { additionalProperties: false });
-
-type RenderHintType = "markdown" | "json" | "list" | "table" | "code" | "diff" | "terminal";
 
 type RenderJsonUiParams = {
   title?: string;
@@ -51,8 +34,6 @@ type RenderJsonUiParams = {
   columns?: string[];
   rows?: Array<Record<string, unknown>>;
   ordered?: boolean;
-  renderHint?: RenderHintType;
-  language?: string;
   uiSpec?: Record<string, unknown>;
 };
 
@@ -72,15 +53,6 @@ function isValidUiSpec(value: unknown): value is { root: string; elements: Recor
     isRecord(value.elements) &&
     (value.actions === undefined || isRecord(value.actions))
   );
-}
-
-function toText(value: unknown): string {
-  if (typeof value === "string") return value;
-  return JSON.stringify(value, null, 2);
-}
-
-function buildListMarkdown(items: string[], ordered = false): string {
-  return items.map((item, index) => `${ordered ? `${index + 1}.` : "-"} ${item}`).join("\n");
 }
 
 function buildFallbackUiSpec(params: RenderJsonUiParams) {
@@ -108,35 +80,124 @@ function buildFallbackUiSpec(params: RenderJsonUiParams) {
   };
 
   if (params.text?.trim()) {
-    elements["json-ui-render-text"] = {
+    const sectionId = "json-ui-render-summary-section";
+    const bodyId = "json-ui-render-summary-body";
+
+    elements[sectionId] = {
+      type: "Stack",
+      props: {
+        direction: "vertical",
+        gap: "sm",
+      },
+      children: [bodyId],
+    };
+    elements[bodyId] = {
       type: "Text",
       props: {
         text: params.text.trim(),
       },
     };
-    children.push("json-ui-render-text");
+
+    children.push(sectionId);
   }
 
   if (params.items?.length) {
-    elements["json-ui-render-items"] = {
+    const sectionId = "json-ui-render-items-section";
+    const listId = "json-ui-render-items-list";
+    const listChildren: string[] = [];
+
+    elements[sectionId] = {
+      type: "Stack",
+      props: {
+        direction: "vertical",
+        gap: "sm",
+      },
+      children: ["json-ui-render-items-heading", listId],
+    };
+    elements["json-ui-render-items-heading"] = {
       type: "Text",
       props: {
-        text: buildListMarkdown(params.items, params.ordered),
+        text: params.ordered ? "Ordered items" : "Highlights",
         variant: "muted",
       },
     };
-    children.push("json-ui-render-items");
+    elements[listId] = {
+      type: "Stack",
+      props: {
+        direction: "vertical",
+        gap: "xs",
+      },
+      children: listChildren,
+    };
+
+    params.items.forEach((item, index) => {
+      const itemId = `json-ui-render-item-${index}`;
+      listChildren.push(itemId);
+      elements[itemId] = {
+        type: "Text",
+        props: {
+          text: `${params.ordered ? `${index + 1}.` : "•"} ${item}`,
+        },
+      };
+    });
+
+    children.push(sectionId);
   }
 
   if (params.rows?.length) {
-    elements["json-ui-render-json"] = {
+    const sectionId = "json-ui-render-data-section";
+    const listId = "json-ui-render-data-list";
+    const rowChildren: string[] = [];
+
+    elements[sectionId] = {
+      type: "Stack",
+      props: {
+        direction: "vertical",
+        gap: "sm",
+      },
+      children: ["json-ui-render-data-heading", listId],
+    };
+    elements["json-ui-render-data-heading"] = {
       type: "Text",
       props: {
-        text: JSON.stringify(params.rows, null, 2),
+        text: "Data preview",
         variant: "muted",
       },
     };
-    children.push("json-ui-render-json");
+    elements[listId] = {
+      type: "Stack",
+      props: {
+        direction: "vertical",
+        gap: "xs",
+      },
+      children: rowChildren,
+    };
+
+    params.rows.slice(0, 6).forEach((row, index) => {
+      const rowId = `json-ui-render-row-${index}`;
+      rowChildren.push(rowId);
+      elements[rowId] = {
+        type: "Text",
+        props: {
+          text: JSON.stringify(row, null, 2),
+          variant: "muted",
+        },
+      };
+    });
+
+    if (params.rows.length > 6) {
+      const moreId = "json-ui-render-more-rows";
+      rowChildren.push(moreId);
+      elements[moreId] = {
+        type: "Text",
+        props: {
+          text: `…and ${params.rows.length - 6} more row(s)`,
+          variant: "muted",
+        },
+      };
+    }
+
+    children.push(sectionId);
   }
 
   if (children.length === 0) {
@@ -157,10 +218,7 @@ function buildFallbackUiSpec(params: RenderJsonUiParams) {
 }
 
 function buildResponse(params: RenderJsonUiParams): ToolResponse {
-  const summary =
-    params.summary?.trim() ||
-    params.title?.trim() ||
-    (params.renderHint ? `Rendered ${params.renderHint} output` : "Rendered structured UI output");
+  const summary = params.summary?.trim() || params.title?.trim() || "Rendered structured UI output";
 
   if (params.uiSpec !== undefined) {
     if (!isValidUiSpec(params.uiSpec)) {
@@ -175,72 +233,6 @@ function buildResponse(params: RenderJsonUiParams): ToolResponse {
     };
   }
 
-  if (params.renderHint) {
-    switch (params.renderHint) {
-      case "table": {
-        const rows = params.rows ?? [];
-        const columns = params.columns?.length
-          ? params.columns
-          : rows.length > 0
-            ? Array.from(new Set(rows.flatMap((row) => Object.keys(row))))
-            : [];
-
-        return {
-          content: [{ type: "text", text: summary }],
-          details: {
-            renderHint: { type: "table", columns },
-            data: rows,
-          },
-        };
-      }
-      case "list": {
-        const items = params.items ?? (params.rows?.map((row) => toText(row)) ?? []);
-        return {
-          content: [{ type: "text", text: summary }],
-          details: {
-            renderHint: { type: "list", ordered: params.ordered ?? false },
-            data: items,
-          },
-        };
-      }
-      case "json": {
-        const data = params.rows ?? params.items ?? params.text ?? {};
-        return {
-          content: [{ type: "text", text: summary }],
-          details: {
-            renderHint: { type: "json" },
-            data,
-          },
-        };
-      }
-      case "markdown": {
-        const markdown = params.text?.trim()
-          || (params.items?.length ? buildListMarkdown(params.items, params.ordered) : "");
-        return {
-          content: [{ type: "text", text: summary }],
-          details: {
-            renderHint: { type: "markdown" },
-            data: markdown,
-          },
-        };
-      }
-      case "code":
-      case "diff":
-      case "terminal": {
-        return {
-          content: [{ type: "text", text: summary }],
-          details: {
-            renderHint: {
-              type: params.renderHint,
-              ...(params.language ? { language: params.language } : {}),
-            },
-            data: params.text?.trim() || JSON.stringify(params.rows ?? params.items ?? {}, null, 2),
-          },
-        };
-      }
-    }
-  }
-
   return {
     content: [{ type: "text", text: summary }],
     details: {
@@ -251,14 +243,14 @@ function buildResponse(params: RenderJsonUiParams): ToolResponse {
 
 export default function jsonUiRenderExtension(pi: ExtensionAPI) {
   pi.on("before_agent_start", async (event) => ({
-    systemPrompt: `${event.systemPrompt}\n\nWhen the user asks for rich structured UI in chat, prefer the render_json_ui tool instead of merely describing that UI is possible. Use details.renderHint for simple markdown/list/table/json/code output and details.uiSpec for cards or richer layouts.`,
+    systemPrompt: `${event.systemPrompt}\n\nWhen the user asks for rich structured UI in chat, prefer the render_json_ui tool instead of merely describing that UI is possible. Always return details.uiSpec from render_json_ui instead of renderHint or plain formatted text.`,
   }));
 
   pi.registerTool({
     name: "render_json_ui",
     label: "Render JSON UI",
     description:
-      "Render rich structured output in the clankie web UI. Returns details.renderHint for simple formats or details.uiSpec for cards and richer layouts.",
+      "Render rich structured output in the clankie web UI. Always returns details.uiSpec for structured card-style rendering.",
     parameters: RenderJsonUiParamsSchema,
     async execute(_toolCallId, rawParams) {
       try {
