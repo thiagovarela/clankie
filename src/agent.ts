@@ -28,6 +28,7 @@ import {
 import { type AppConfig, getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
 import { createCronExtension } from "./extensions/cron/index.ts";
 import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
+import { createNotificationsExtension } from "./extensions/notifications.ts";
 import { createPackageManagerExtension } from "./extensions/package-manager.ts";
 import { createReloadRuntimeExtension } from "./extensions/reload-runtime.ts";
 import { createWorkspaceJailExtension } from "./extensions/workspace-jail.ts";
@@ -43,6 +44,7 @@ export function buildExtensionFactories(config: AppConfig, cwd: string): Extensi
 	const extensionFactories: ExtensionFactory[] = [];
 	extensionFactories.push(createCronExtension());
 	extensionFactories.push(createHeartbeatExtension());
+	extensionFactories.push(createNotificationsExtension());
 	extensionFactories.push(createPackageManagerExtension(reloadAllSessions));
 	extensionFactories.push(createReloadRuntimeExtension(reloadAllSessions));
 
