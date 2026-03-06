@@ -1,0 +1,24 @@
+{
+  "name": "clankie-json-ui-render",
+  "version": "0.1.0",
+  "description": "Render structured chat UI in clankie via details.renderHint and details.uiSpec",
+  "type": "module",
+  "keywords": [
+    "pi-package"
+  ],
+  "scripts": {
+    "typecheck": "npx tsgo --noEmit"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ],
+    "skills": [
+      "./skills"
+    ]
+  },
+  "peerDependencies": {
+    "@mariozechner/pi-coding-agent": "*",
+    "@sinclair/typebox": "*"
+  }
+}

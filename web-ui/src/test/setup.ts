@@ -29,6 +29,7 @@ const INITIAL_CONNECTION_STATE = {
   },
   status: 'disconnected' as const,
   error: undefined,
+  hasConnectedOnce: false,
 }
 
 const INITIAL_EXTENSIONS_STATE = {

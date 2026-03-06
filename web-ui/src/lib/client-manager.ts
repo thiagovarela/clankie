@@ -5,7 +5,11 @@
 import { ClankieClient } from './clankie-client'
 import { handleAuthEvent, handleSessionEvent } from './event-handlers'
 import type { ExtensionUIResponse } from './types'
-import { connectionStore, updateConnectionStatus } from '@/stores/connection'
+import {
+  connectionStore,
+  resetConnectionTracking,
+  updateConnectionStatus,
+} from '@/stores/connection'
 import { clearMessages, setMessages } from '@/stores/messages'
 import {
   clearToolExecutions,
@@ -82,6 +86,7 @@ class ClientManager {
       this.client.disconnect()
       this.client = null
     }
+    resetConnectionTracking()
     // Clear sessions list on disconnect
     clearSessions()
     resetSession()
@@ -179,11 +184,16 @@ class ClientManager {
     return this.client?.getConnectionState() === 'connected'
   }
 
+  reconnect(): void {
+    this.client?.connect()
+  }
+
   // ─── Session management ────────────────────────────────────────────────────
 
   async createNewSession(): Promise<string | null> {
-    if (!this.client) {
+    if (!this.client || this.client.getConnectionState() !== 'connected') {
       console.error('[client-manager] Cannot create session: not connected')
+      this.reconnect()
       return null
     }
 

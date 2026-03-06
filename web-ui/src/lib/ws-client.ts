@@ -79,10 +79,9 @@ export class WebSocketClient {
 
       this.ws.onclose = () => {
         this.ws = null
+        this.setState('disconnected')
         if (this.shouldReconnect && this.options.reconnect) {
           this.scheduleReconnect()
-        } else {
-          this.setState('disconnected')
         }
       }
     } catch (err) {

@@ -17,6 +17,7 @@ export interface ConnectionStore {
   settings: ConnectionSettings
   status: ConnectionState
   error?: string
+  hasConnectedOnce: boolean
 }
 
 /**
@@ -77,6 +78,7 @@ export const connectionStore = new Store<ConnectionStore>({
   settings: loadSettings(),
   status: 'disconnected',
   error: undefined,
+  hasConnectedOnce: false,
 })
 
 // ─── Actions ───────────────────────────────────────────────────────────────────
@@ -102,6 +104,14 @@ export function updateConnectionStatus(
     ...state,
     status,
     error,
+    hasConnectedOnce: state.hasConnectedOnce || status === 'connected',
+  }))
+}
+
+export function resetConnectionTracking(): void {
+  connectionStore.setState((state) => ({
+    ...state,
+    hasConnectedOnce: false,
   }))
 }
 

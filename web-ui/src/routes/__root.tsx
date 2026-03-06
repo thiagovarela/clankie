@@ -21,6 +21,7 @@ import {
   updateConnectionSettings,
 } from '@/stores/connection'
 import { ExtensionUIProvider } from '@/components/extension-ui/provider'
+import { ReconnectingModal } from '@/components/reconnecting-modal'
 import { initializeTheme, themeStore } from '@/stores/theme'
 
 export const Route = createRootRoute({
@@ -146,6 +147,7 @@ function RootComponent() {
             <Outlet />
           </SidebarInset>
           <ExtensionUIProvider />
+          <ReconnectingModal />
         </SidebarProvider>
         <Toaster />
       </TooltipProvider>

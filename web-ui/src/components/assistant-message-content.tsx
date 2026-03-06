@@ -1,9 +1,11 @@
 import { ChevronDown, Clock3, Loader2 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import rehypeHighlight from 'rehype-highlight'
 import remarkGfm from 'remark-gfm'
 import { ToolExecutionList } from './tool-execution-list'
+import { JsonRenderRenderer } from '@/lib/tool-renderers/json-render-renderer'
+import type { ExtensionUISpec } from '@/lib/tool-renderers/types'
 import type { DisplayMessage } from '@/stores/messages'
 import { cn } from '@/lib/utils'
 
@@ -25,6 +27,55 @@ function summarizeAssistantContent(content: string): string {
   return `${normalized.slice(0, 50)}…`
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isExtensionUISpec(value: unknown): value is ExtensionUISpec {
+  return (
+    isRecord(value) &&
+    typeof value.root === 'string' &&
+    isRecord(value.elements) &&
+    (value.actions === undefined || isRecord(value.actions))
+  )
+}
+
+function tryParseExtensionUISpec(content: string): {
+  spec: ExtensionUISpec | null
+  markdown: string
+} {
+  const trimmed = content.trim()
+
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (isExtensionUISpec(parsed)) {
+      return { spec: parsed, markdown: '' }
+    }
+  } catch {
+    // ignore plain JSON parse failures
+  }
+
+  const fencedJsonRegex = /```(?:json)?\s*([\s\S]*?)```/g
+  let match: RegExpExecArray | null
+
+  while ((match = fencedJsonRegex.exec(content)) !== null) {
+    const candidate = match[1]?.trim()
+    if (!candidate) continue
+
+    try {
+      const parsed = JSON.parse(candidate)
+      if (isExtensionUISpec(parsed)) {
+        const markdown = `${content.slice(0, match.index)}${content.slice(match.index + match[0].length)}`.trim()
+        return { spec: parsed, markdown }
+      }
+    } catch {
+      // ignore invalid fenced json
+    }
+  }
+
+  return { spec: null, markdown: content }
+}
+
 export function AssistantMessageContent({
   message,
 }: AssistantMessageContentProps) {
@@ -33,6 +84,11 @@ export function AssistantMessageContent({
   const thinkingText =
     message.thinkingContent ?? message.persistedThinkingContent ?? ''
   const hasThinking = thinkingText.length > 0
+
+  const { spec: inlineUiSpec, markdown } = useMemo(
+    () => tryParseExtensionUISpec(message.content),
+    [message.content],
+  )
 
   return (
     <>
@@ -78,16 +134,24 @@ export function AssistantMessageContent({
       {/* Tool executions inline before content */}
       <ToolExecutionList messageId={message.id} />
 
-      {message.content.trim().length > 0 ? (
+      {markdown.trim().length > 0 ? (
         <div className="prose prose-base dark:prose-invert max-w-none text-muted-foreground">
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeHighlight]}
           >
-            {message.content}
+            {markdown}
           </ReactMarkdown>
         </div>
-      ) : message.isStreaming ? (
+      ) : null}
+
+      {inlineUiSpec ? (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-border/60 bg-card/60 p-4 shadow-sm backdrop-blur-sm">
+          <JsonRenderRenderer spec={inlineUiSpec} />
+        </div>
+      ) : null}
+
+      {!inlineUiSpec && !markdown.trim().length && message.isStreaming ? (
         <div className="prose prose-base dark:prose-invert max-w-none text-muted-foreground">
           ...
         </div>
