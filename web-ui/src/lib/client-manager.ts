@@ -3,7 +3,11 @@
  */
 
 import { ClankieClient } from './clankie-client'
-import { handleAuthEvent, handleSessionEvent } from './event-handlers'
+import {
+  handleAuthEvent,
+  handleNotification,
+  handleSessionEvent,
+} from './event-handlers'
 import type { ExtensionUIResponse } from './types'
 import {
   connectionStore,
@@ -19,6 +23,11 @@ import {
   handleExtensionUIRequest,
   resetExtensionUI,
 } from '@/stores/extension-ui'
+import {
+  resetNotifications,
+  setNotifications,
+  setNotificationsLoading,
+} from '@/stores/notifications'
 import {
   resetSession,
   setAvailableModels,
@@ -69,11 +78,13 @@ class ClientManager {
       },
       onAuthEvent: (event) => handleAuthEvent(event),
       onExtensionUIRequest: (event) => handleExtensionUIRequest(event),
+      onNotification: (notification) => handleNotification(notification),
       onStateChange: (state, error) => {
         updateConnectionStatus(state, error)
         // Restore or create session when connection is established
         if (state === 'connected') {
           this.restoreOrCreateSession()
+          this.loadNotifications()
         }
       },
     })
@@ -94,6 +105,7 @@ class ClientManager {
     clearToolExecutions()
     resetExtensionUI()
     resetScopedModels()
+    resetNotifications()
     // Note: We keep the session ID in localStorage so it can be restored on reconnect
   }
 
@@ -169,6 +181,25 @@ class ClientManager {
       }
     } catch (err) {
       console.error('[client-manager] Failed to load sessions:', err)
+    }
+  }
+
+  private async loadNotifications(): Promise<void> {
+    if (!this.client) {
+      console.error('[client-manager] Cannot load notifications: not connected')
+      return
+    }
+
+    try {
+      setNotificationsLoading(true)
+      const { notifications } = await this.client.getNotifications()
+      console.log(
+        `[client-manager] Loaded ${notifications.length} notifications from server`,
+      )
+      setNotifications(notifications)
+    } catch (err) {
+      console.error('[client-manager] Failed to load notifications:', err)
+      setNotificationsLoading(false)
     }
   }
 

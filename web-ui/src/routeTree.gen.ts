@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SettingsIndexRouteImport } from './routes/settings/index'
 import { Route as SettingsThemeRouteImport } from './routes/settings/theme'
@@ -19,6 +20,11 @@ import { Route as SettingsConnectionRouteImport } from './routes/settings/connec
 import { Route as SettingsAuthRouteImport } from './routes/settings/auth'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
 
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -67,6 +73,7 @@ const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/notifications': typeof NotificationsRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/settings/auth': typeof SettingsAuthRoute
   '/settings/connection': typeof SettingsConnectionRoute
@@ -78,6 +85,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/notifications': typeof NotificationsRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/settings/auth': typeof SettingsAuthRoute
   '/settings/connection': typeof SettingsConnectionRoute
@@ -90,6 +98,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/notifications': typeof NotificationsRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/settings/auth': typeof SettingsAuthRoute
   '/settings/connection': typeof SettingsConnectionRoute
@@ -103,6 +112,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/notifications'
     | '/sessions/$sessionId'
     | '/settings/auth'
     | '/settings/connection'
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/notifications'
     | '/sessions/$sessionId'
     | '/settings/auth'
     | '/settings/connection'
@@ -125,6 +136,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/notifications'
     | '/sessions/$sessionId'
     | '/settings/auth'
     | '/settings/connection'
@@ -137,6 +149,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  NotificationsRoute: typeof NotificationsRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   SettingsAuthRoute: typeof SettingsAuthRoute
   SettingsConnectionRoute: typeof SettingsConnectionRoute
@@ -149,6 +162,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -217,6 +237,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  NotificationsRoute: NotificationsRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   SettingsAuthRoute: SettingsAuthRoute,
   SettingsConnectionRoute: SettingsConnectionRoute,

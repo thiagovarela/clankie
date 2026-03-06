@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Cron } from "croner";
 import { createSession } from "../../agent.ts";
+import { createNotification } from "../../notifications.ts";
 import { acquireCronLock, releaseCronLock } from "./lock.ts";
 import { ensureJobsFile, loadJobs, saveJobs } from "./storage.ts";
 import type { CronDeliveryTarget, CronJob, CronListItem, CronSchedule } from "./types.ts";
@@ -216,8 +217,39 @@ export class CronScheduler {
 			this.persist();
 		} catch (err) {
 			job.consecutiveFailures += 1;
+			const errorMessage = err instanceof Error ? err.message : String(err);
+			
+			// Create notification for job failure
+			createNotification({
+				type: "error",
+				source: "cron",
+				title: `Cron job failed: ${job.name}`,
+				message: errorMessage,
+				dedupKey: `cron-fail-${job.jobId}`,
+				metadata: {
+					dedupKey: `cron-fail-${job.jobId}`,
+					jobId: job.jobId,
+					jobName: job.name,
+					consecutiveFailures: job.consecutiveFailures,
+					error: errorMessage,
+				},
+			});
+			
 			if (job.consecutiveFailures >= 5) {
 				job.enabled = false;
+				// Create notification for auto-disabled job
+				createNotification({
+					type: "warning",
+					source: "cron",
+					title: `Cron job disabled: ${job.name}`,
+					message: `Job "${job.name}" was automatically disabled after 5 consecutive failures.`,
+					metadata: {
+						jobId: job.jobId,
+						jobName: job.name,
+						consecutiveFailures: job.consecutiveFailures,
+						autoDisabled: true,
+					},
+				});
 			}
 			this.persist();
 			console.error(`[cron] Job failed (${job.name}):`, err);

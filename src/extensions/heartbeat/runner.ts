@@ -7,6 +7,7 @@ import {
 	SessionManager,
 } from "@mariozechner/pi-coding-agent";
 import { getAgentDir, getAppDir, getAuthPath, loadConfig } from "../../config.ts";
+import { createNotification } from "../../notifications.ts";
 import { createCronExtension } from "../cron/index.ts";
 import { createWorkspaceJailExtension } from "../workspace-jail.ts";
 import { acquireHeartbeatLock, releaseHeartbeatLock } from "./lock.ts";
@@ -252,6 +253,23 @@ export class HeartbeatRunner {
 			this.stats.okCount += 1;
 		} else {
 			this.stats.alertCount += 1;
+			// Create notification for heartbeat alert
+			const message = result.error 
+				? `Error: ${result.error}` 
+				: result.normalizedResponse || "Heartbeat check failed";
+			createNotification({
+				type: result.error ? "error" : "warning",
+				source: "heartbeat",
+				title: "Heartbeat Alert",
+				message,
+				dedupKey: `heartbeat-${this.cwd}`,
+				metadata: {
+					dedupKey: `heartbeat-${this.cwd}`,
+					ok: result.ok,
+					error: result.error,
+					timestamp: result.timestamp,
+				},
+			});
 		}
 	}
 
