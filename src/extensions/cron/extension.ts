@@ -66,7 +66,14 @@ export function createCronExtension() {
 			const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 			const local = now.toLocaleString("sv-SE", { timeZone: timezone, hour12: false }).replace(" ", "T");
 			return {
-				systemPrompt: `${event.systemPrompt}\n\nYou can manage scheduled tasks with the cron tool.\nCurrent UTC time: ${now.toISOString()}\nCurrent timezone: ${timezone} (local: ${local})`,
+				systemPrompt:
+					`${event.systemPrompt}\n\n` +
+					`You can manage scheduled tasks with the cron tool.\n` +
+					`Current UTC time: ${now.toISOString()}\n` +
+					`Current timezone: ${timezone} (local: ${local})\n\n` +
+					`When creating cron jobs that should notify the user of results, ` +
+					`set deliveryChannel to "web" and deliveryChatId to the user's chat ID (use "default" if unsure). ` +
+					`This ensures the LLM response is delivered as a web notification.`,
 			};
 		});
 

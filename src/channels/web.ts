@@ -38,7 +38,16 @@ import { getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from ".
 import { reloadSharedHeartbeatRunnerSettings } from "../extensions/heartbeat/index.ts";
 import { HEARTBEAT_EXTENSION_UI_SPEC } from "../extensions/heartbeat/ui-spec.ts";
 import { resolveScopedModels } from "../lib/scoped-model-resolver.ts";
-import { type Notification, getNotifications, markRead, markAllRead, dismissNotification, dismissAll, setBroadcastCallback } from "../notifications.ts";
+import {
+	type Notification,
+	createNotification,
+	getNotifications,
+	markRead,
+	markAllRead,
+	dismissNotification,
+	dismissAll,
+	setBroadcastCallback,
+} from "../notifications.ts";
 import { getOrCreateSession, reloadAllSessions } from "../sessions.ts";
 import type { Channel, MessageHandler } from "./channel.ts";
 
@@ -861,8 +870,21 @@ export class WebChannel implements Channel {
 		this.notificationCleanup = () => setBroadcastCallback(null);
 	}
 
-	async send(_chatId: string, _text: string, _options?: { threadId?: string }): Promise<void> {
-		// No-op — WebChannel uses direct session streaming, not channel.send()
+	async send(_chatId: string, text: string, options?: { threadId?: string }): Promise<void> {
+		// Create a notification for cron/system deliveries to the web channel.
+		// Interactive chat uses direct session streaming instead.
+		const title = text.split("\n")[0]?.slice(0, 100) || "Scheduled Task Result";
+		const message = text.length > title.length ? text : text.slice(0, 500);
+		createNotification({
+			type: "info",
+			source: "cron",
+			title,
+			message,
+			metadata: {
+				chatId: _chatId,
+				threadId: options?.threadId,
+			},
+		});
 	}
 
 	async stop(): Promise<void> {
