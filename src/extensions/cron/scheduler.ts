@@ -98,6 +98,7 @@ export class CronScheduler {
 		};
 		this.jobs.push(job);
 		this.persist();
+		console.log(`[cron] Added job ${job.name} (${job.jobId}), total jobs: ${this.jobs.length}`);
 		return job;
 	}
 
