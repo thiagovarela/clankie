@@ -139,12 +139,13 @@ function RootComponent() {
       <TooltipProvider>
         <SidebarProvider>
           <AppSidebar variant="inset" />
-          <SidebarInset className="relative">
-            {/* Mobile sidebar trigger - positioned absolute */}
-            <div className="absolute left-4 top-3.5 z-50 md:hidden">
+          <SidebarInset className="relative min-h-0">
+            <header className="topbar-glass sticky top-0 z-40 flex h-14 shrink-0 items-center border-b px-4 md:hidden">
               <SidebarTrigger />
+            </header>
+            <div className="min-h-0 flex-1">
+              <Outlet />
             </div>
-            <Outlet />
           </SidebarInset>
           <ExtensionUIProvider />
           <ReconnectingModal />

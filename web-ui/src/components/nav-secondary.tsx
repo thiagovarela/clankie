@@ -1,4 +1,5 @@
 import { Link, useRouterState } from '@tanstack/react-router'
+import { useState } from 'react'
 import {
   Filter,
   Globe,
@@ -35,12 +36,20 @@ export function NavSecondary() {
   const { location } = useRouterState()
   const currentPath = location.pathname
   const isInSettings = currentPath.startsWith('/settings')
-  const { isMobile } = useSidebar()
+  const { isMobile, setOpenMobile } = useSidebar()
+  const [open, setOpen] = useState(false)
+
+  const handleNavigate = () => {
+    setOpen(false)
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }
 
   return (
     <SidebarMenu>
       <SidebarMenuItem>
-        <DropdownMenu>
+        <DropdownMenu open={open} onOpenChange={setOpen}>
           <DropdownMenuTrigger
             render={
               <SidebarMenuButton
@@ -64,6 +73,7 @@ export function NavSecondary() {
                   key={link.to}
                   render={<Link to={link.to} />}
                   className="h-9 text-sm"
+                  onClick={handleNavigate}
                 >
                   <Icon className="h-4 w-4 mr-2" />
                   <span>{link.label}</span>

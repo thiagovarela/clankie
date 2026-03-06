@@ -1,4 +1,4 @@
-import { Link, useNavigate } from '@tanstack/react-router'
+import { useNavigate } from '@tanstack/react-router'
 import { CirclePlusIcon } from 'lucide-react'
 import type * as React from 'react'
 import { NavSecondary } from '@/components/nav-secondary'
@@ -11,16 +11,30 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from '@/components/ui/sidebar'
 import { clientManager } from '@/lib/client-manager'
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navigate = useNavigate()
+  const { setOpenMobile, isMobile } = useSidebar()
+
+  const closeMobileSidebar = () => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
+  }
+
+  const handleGoHome = () => {
+    closeMobileSidebar()
+    navigate({ to: '/' })
+  }
 
   const handleCreateChat = async () => {
     try {
       const sessionId = await clientManager.createNewSession()
       if (sessionId) {
+        closeMobileSidebar()
         navigate({ to: '/sessions/$sessionId', params: { sessionId } })
       }
     } catch (error) {
@@ -38,11 +52,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         {/* Brand row */}
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              render={<Link to="/" />}
-              className="h-10"
-            >
+            <SidebarMenuButton size="lg" className="h-10" onClick={handleGoHome}>
               <div className="flex items-center gap-3">
                 <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary/15 border border-primary/20">
                   <span className="text-sm font-mono font-bold text-primary">

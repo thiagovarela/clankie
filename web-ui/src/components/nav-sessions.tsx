@@ -45,7 +45,7 @@ function formatSessionDate(timestamp?: number): string {
 
 export function NavRecentSessions() {
   const navigate = useNavigate()
-  const { isMobile } = useSidebar()
+  const { isMobile, setOpenMobile } = useSidebar()
   const { sessions, activeSessionId } = useStore(
     sessionsListStore,
     (state) => ({
@@ -55,6 +55,9 @@ export function NavRecentSessions() {
   )
 
   const handleSwitchSession = (sessionId: string) => {
+    if (isMobile) {
+      setOpenMobile(false)
+    }
     navigate({ to: '/sessions/$sessionId', params: { sessionId } })
   }
 
