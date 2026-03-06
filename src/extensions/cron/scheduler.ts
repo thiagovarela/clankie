@@ -71,6 +71,7 @@ export class CronScheduler {
 	reload(): void {
 		ensureJobsFile();
 		this.jobs = loadJobs();
+		console.log(`[cron] Reloaded ${this.jobs.length} job(s) from disk`);
 	}
 
 	list(): CronListItem[] {
@@ -146,6 +147,7 @@ export class CronScheduler {
 
 	private persist(): void {
 		saveJobs(this.jobs);
+		console.log(`[cron] Persisted ${this.jobs.length} job(s) to disk`);
 	}
 
 	private tick(): void {
