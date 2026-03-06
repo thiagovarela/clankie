@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { cn } from '@/lib/utils'
 import {
   SidebarMenu,
   SidebarMenuButton,
@@ -60,28 +61,29 @@ export function NavSecondary() {
       {/* Notifications */}
       <SidebarMenuItem>
         <SidebarMenuButton
-          asChild
           isActive={isInNotifications}
-          className="h-10 text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground rounded-xl"
-        >
-          <Link to="/notifications" onClick={handleNavigate}>
-            <div className="relative">
-              <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-3 w-3 items-center justify-center">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-                </span>
-              )}
-            </div>
-            <span>Notifications</span>
-            {unreadCount > 0 && (
-              <span className="ml-auto text-xs font-medium text-primary">
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </span>
-            )}
-          </Link>
-        </SidebarMenuButton>
+          className={cn(
+            "h-10 text-sm rounded-xl transition-colors",
+            unreadCount > 0
+              ? "text-sidebar-foreground font-medium bg-primary/10 hover:bg-primary/20"
+              : "text-sidebar-foreground/70 hover:text-sidebar-foreground"
+          )}
+          render={
+            <Link to="/notifications" onClick={handleNavigate}>
+              <div className="relative flex items-center justify-center w-4">
+                <Bell className={cn("h-4 w-4", unreadCount > 0 && "text-primary")} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1">
+                    <span className="text-[10px] font-bold text-primary-foreground leading-none">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  </span>
+                )}
+              </div>
+              <span>Notifications</span>
+            </Link>
+          }
+        />
       </SidebarMenuItem>
 
       <SidebarMenuItem>
