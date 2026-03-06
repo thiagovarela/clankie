@@ -108,6 +108,12 @@ export type RpcCommand =
   | { id?: string; type: 'auth_logout'; providerId: string }
   | { id?: string; type: 'get_scoped_models' }
   | { id?: string; type: 'set_scoped_models'; models: Array<string> }
+  // Notifications
+  | { id?: string; type: 'get_notifications' }
+  | { id?: string; type: 'mark_notification_read'; notificationId: string }
+  | { id?: string; type: 'mark_all_notifications_read' }
+  | { id?: string; type: 'dismiss_notification'; notificationId: string }
+  | { id?: string; type: 'dismiss_all_notifications' }
 
 // ─── RPC Responses (Server → Client) ──────────────────────────────────────────
 
@@ -272,6 +278,30 @@ export type AgentSessionEvent =
     }
   // Error
   | { type: 'error'; error: string }
+
+// ─── Notifications ───────────────────────────────────────────────────────────
+
+export type NotificationType = 'info' | 'warning' | 'error' | 'success'
+export type NotificationSource = 'heartbeat' | 'cron' | 'session' | 'system'
+
+export interface AppNotification {
+  id: string
+  type: NotificationType
+  source: NotificationSource
+  title: string
+  message: string
+  timestamp: string
+  read: boolean
+  dismissed: boolean
+  sessionId?: string
+  actionUrl?: string
+  metadata?: Record<string, unknown>
+}
+
+export type NotificationEvent = {
+  type: 'notification'
+  notification: AppNotification
+}
 
 export interface SessionState {
   model: ModelInfo

@@ -6,6 +6,7 @@
 import { WebSocketClient } from './ws-client'
 import type {
   AgentSessionEvent,
+  AppNotification,
   AuthEvent,
   AuthProvider,
   ExtensionError,
@@ -32,6 +33,7 @@ export interface ClankieClientOptions {
   onEvent: (sessionId: string, event: AgentSessionEvent | RpcResponse) => void
   onAuthEvent: (event: AuthEvent) => void
   onExtensionUIRequest: (event: ExtensionUIRequest) => void
+  onNotification?: (notification: AppNotification) => void
   onStateChange: (state: ConnectionState, error?: string) => void
 }
 
@@ -402,6 +404,35 @@ export class ClankieClient {
     await this.sendCommand({ type: 'reload' }, sessionId)
   }
 
+  // ─── Notifications ─────────────────────────────────────────────────────────
+
+  async getNotifications(): Promise<{ notifications: Array<AppNotification> }> {
+    const response = await this.sendCommand({ type: 'get_notifications' })
+    return response as { notifications: Array<AppNotification> }
+  }
+
+  async markNotificationRead(notificationId: string): Promise<void> {
+    await this.sendCommand({
+      type: 'mark_notification_read',
+      notificationId,
+    })
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    await this.sendCommand({ type: 'mark_all_notifications_read' })
+  }
+
+  async dismissNotification(notificationId: string): Promise<void> {
+    await this.sendCommand({
+      type: 'dismiss_notification',
+      notificationId,
+    })
+  }
+
+  async dismissAllNotifications(): Promise<void> {
+    await this.sendCommand({ type: 'dismiss_all_notifications' })
+  }
+
   // ─── Internal ──────────────────────────────────────────────────────────────
 
   private handleMessage(message: OutboundWebMessage | RpcResponse): void {
@@ -441,10 +472,22 @@ export class ClankieClient {
         }
       }
 
+      // Check if it's a notification event (sessionId === "_notifications")
+      if (sessionId === '_notifications') {
+        const notificationEvent = event as unknown as { type: 'notification'; notification: AppNotification }
+        if (notificationEvent.type === 'notification') {
+          this.options.onNotification?.(notificationEvent.notification)
+          return
+        }
+      }
+
       // Check if it's an auth event (sessionId === "_auth")
-      if (sessionId === '_auth' && event.type === 'auth_event') {
-        this.options.onAuthEvent(event)
-        return
+      if (sessionId === '_auth') {
+        const authEvent = event as AuthEvent
+        if (authEvent.type === 'auth_event') {
+          this.options.onAuthEvent(authEvent)
+          return
+        }
       }
 
       if (event.type === 'extension_ui_request') {

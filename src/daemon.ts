@@ -13,6 +13,7 @@ import type { Channel, InboundMessage } from "./channels/channel.ts";
 import { WebChannel } from "./channels/web.ts";
 import { getAppDir, getBundledWebUiDir, getConfigPath, getWorkspace, loadConfig } from "./config.ts";
 import { CronScheduler, getCronJobsPath, setCronScheduler } from "./extensions/cron/index.ts";
+import { initNotifications } from "./notifications.ts";
 import {
 	getActiveSessionName,
 	getOrCreateSession,
@@ -336,6 +337,9 @@ export async function startDaemon(): Promise<void> {
 	writePidFile();
 
 	console.log(`[daemon] Starting clankie daemon (pid ${process.pid})...`);
+
+	// Initialize notification system
+	initNotifications();
 
 	// Initial startup
 	await initializeChannels();

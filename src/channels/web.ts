@@ -38,6 +38,7 @@ import { getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from ".
 import { reloadSharedHeartbeatRunnerSettings } from "../extensions/heartbeat/index.ts";
 import { HEARTBEAT_EXTENSION_UI_SPEC } from "../extensions/heartbeat/ui-spec.ts";
 import { resolveScopedModels } from "../lib/scoped-model-resolver.ts";
+import { type Notification, getNotifications, markRead, markAllRead, dismissNotification, dismissAll, setBroadcastCallback } from "../notifications.ts";
 import { getOrCreateSession, reloadAllSessions } from "../sessions.ts";
 import type { Channel, MessageHandler } from "./channel.ts";
 
@@ -60,6 +61,12 @@ interface InboundWebMessage {
 	command: RpcCommand;
 }
 
+/** Notification event for real-time delivery */
+interface NotificationEvent {
+	type: "notification";
+	notification: Notification;
+}
+
 /** Extended session events including custom events */
 type ExtendedAgentSessionEvent =
 	| AgentSessionEvent
@@ -68,8 +75,8 @@ type ExtendedAgentSessionEvent =
 
 /** Outbound message to client */
 interface OutboundWebMessage {
-	sessionId: string; // "_auth" for auth events
-	event: ExtendedAgentSessionEvent | RpcResponse | RpcExtensionUIRequest | AuthEvent;
+	sessionId: string; // "_auth" for auth events, "_notifications" for notification events
+	event: ExtendedAgentSessionEvent | RpcResponse | RpcExtensionUIRequest | AuthEvent | NotificationEvent;
 }
 
 /** RPC command types from pi */
@@ -129,7 +136,13 @@ type RpcCommand =
 	| { id?: string; type: "auth_login_cancel"; loginFlowId: string }
 	| { id?: string; type: "auth_logout"; providerId: string }
 	| { id?: string; type: "get_scoped_models" }
-	| { id?: string; type: "set_scoped_models"; models: string[] };  // "provider/modelId" strings
+	| { id?: string; type: "set_scoped_models"; models: string[] }  // "provider/modelId" strings
+	// Notifications
+	| { id?: string; type: "get_notifications" }
+	| { id?: string; type: "mark_notification_read"; notificationId: string }
+	| { id?: string; type: "mark_all_notifications_read" }
+	| { id?: string; type: "dismiss_notification"; notificationId: string }
+	| { id?: string; type: "dismiss_all_notifications" };
 
 /** RPC response types from pi */
 type RpcResponse =
@@ -526,8 +539,14 @@ export class WebChannel implements Channel {
 		}
 	>();
 
+	/** All connected WebSocket clients (for broadcasting) */
+	private allConnections = new Set<WSContext>();
+
 	/** Heartbeat interval for keeping WebSocket connections alive */
 	private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+
+	/** Notification broadcast callback cleanup function */
+	private notificationCleanup: (() => void) | null = null;
 
 	constructor(options: WebChannelOptions) {
 		this.options = options;
@@ -587,8 +606,9 @@ export class WebChannel implements Channel {
 
 				// Return WebSocket handlers
 				return {
-					onOpen: (_evt: Event, _ws: WSContext<WebSocket>) => {
+					onOpen: (_evt: Event, ws: WSContext<WebSocket>) => {
 						console.log("[web] Client connected");
+						this.allConnections.add(ws);
 					},
 					onMessage: async (evt: MessageEvent, ws: WSContext<WebSocket>) => {
 						try {
@@ -616,6 +636,7 @@ export class WebChannel implements Channel {
 					},
 					onClose: (_evt: CloseEvent, ws: WSContext<WebSocket>) => {
 						console.log("[web] Client disconnected");
+						this.allConnections.delete(ws);
 
 						// Remove this connection from all session subscriptions
 						for (const [sessionId, subscribers] of this.sessionSubscriptions.entries()) {
@@ -816,6 +837,28 @@ export class WebChannel implements Channel {
 
 		console.log(`[web] WebSocket server listening on port ${this.options.port}`);
 		console.log(`[web] Open in browser: http://localhost:${this.options.port}?token=${this.options.authToken}`);
+
+		// ─── Notification broadcast setup ─────────────────────────────────────
+
+		// Register callback to broadcast notifications to all connected clients
+		const broadcastToAll = (notification: Notification) => {
+			const message: OutboundWebMessage = {
+				sessionId: "_notifications",
+				event: { type: "notification", notification },
+			};
+			const json = JSON.stringify(message);
+
+			for (const ws of this.allConnections) {
+				try {
+					ws.send(json);
+				} catch (err) {
+					console.error("[web] Failed to broadcast notification:", err);
+				}
+			}
+		};
+
+		setBroadcastCallback(broadcastToAll);
+		this.notificationCleanup = () => setBroadcastCallback(null);
 	}
 
 	async send(_chatId: string, _text: string, _options?: { threadId?: string }): Promise<void> {
@@ -828,6 +871,15 @@ export class WebChannel implements Channel {
 			clearInterval(this.heartbeatInterval);
 			this.heartbeatInterval = null;
 		}
+
+		// Clear notification broadcast callback
+		if (this.notificationCleanup) {
+			this.notificationCleanup();
+			this.notificationCleanup = null;
+		}
+
+		// Clear all connections tracking
+		this.allConnections.clear();
 
 		if (this.wss) {
 			for (const client of this.wss.clients) {
@@ -922,6 +974,67 @@ export class WebChannel implements Channel {
 					command: "list_sessions",
 					success: true,
 					data: { sessions },
+				});
+				return;
+			}
+
+			// Notification commands don't need a sessionId
+			if (command.type === "get_notifications") {
+				const notifications = getNotifications();
+				this.sendResponse(ws, undefined, {
+					id: commandId,
+					type: "response",
+					command: "get_notifications",
+					success: true,
+					data: { notifications },
+				});
+				return;
+			}
+
+			if (command.type === "mark_notification_read") {
+				const notification = markRead(command.notificationId);
+				this.sendResponse(ws, undefined, {
+					id: commandId,
+					type: "response",
+					command: "mark_notification_read",
+					success: true,
+					data: { notification },
+				});
+				return;
+			}
+
+			if (command.type === "mark_all_notifications_read") {
+				const count = markAllRead();
+				this.sendResponse(ws, undefined, {
+					id: commandId,
+					type: "response",
+					command: "mark_all_notifications_read",
+					success: true,
+					data: { count },
+				});
+				return;
+			}
+
+			if (command.type === "dismiss_notification") {
+				const notification = dismissNotification(command.notificationId);
+				this.sendResponse(ws, undefined, {
+					id: commandId,
+					type: "response",
+					command: "dismiss_notification",
+					success: true,
+					data: { notification },
+				});
+				return;
+			}
+
+			if (command.type === "dismiss_all_notifications") {
+				const count = dismissAll();
+				this.sendResponse(ws, undefined, {
+					id: commandId,
+					type: "response",
+					command: "dismiss_all_notifications",
+					success: true,
+					data: { count },
 				});
 				return;
 			}

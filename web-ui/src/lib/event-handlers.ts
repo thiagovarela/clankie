@@ -3,7 +3,9 @@
  * Extracted from ClientManager for testability.
  */
 
-import type { AgentSessionEvent, AuthEvent, RpcResponse } from '@/lib/types'
+import { toast } from 'sonner'
+import type { AgentSessionEvent, AppNotification, AuthEvent, RpcResponse } from '@/lib/types'
+import { addNotification } from '@/stores/notifications'
 import { updateLoginFlow } from '@/stores/auth'
 import {
   finishToolExecution,
@@ -263,4 +265,33 @@ export function handleSessionEvent(
 export function handleAuthEvent(event: AuthEvent): void {
   console.log('[event-handlers] Auth event:', event)
   updateLoginFlow(event)
+}
+
+/**
+ * Handle notification events from the WebSocket.
+ * Adds the notification to the store and triggers a toast.
+ */
+export function handleNotification(notification: AppNotification): void {
+  console.log('[event-handlers] Notification:', notification)
+  addNotification(notification)
+
+  // Trigger toast notification
+  const toastFn = {
+    info: toast.info,
+    warning: toast.warning,
+    error: toast.error,
+    success: toast.success,
+  }[notification.type]
+
+  toastFn(notification.title, {
+    description: notification.message,
+    action: notification.actionUrl
+      ? {
+          label: 'View',
+          onClick: () => {
+            window.location.href = notification.actionUrl!
+          },
+        }
+      : undefined,
+  })
 }
