@@ -22,7 +22,7 @@
 		"check:fix": "biome check --fix .",
 		"format": "biome format --write .",
 		"typecheck": "tsgo --noEmit",
-		"typecheck:all": "tsgo --noEmit && cd web-ui && npx tsgo --noEmit && cd ../extensions/clankie-memory && npx tsgo --noEmit && cd ../clankie-json-ui-render && npx tsgo --noEmit"
+		"typecheck:all": "tsgo --noEmit && cd web-ui && npx tsgo --noEmit && cd ../extensions/clankie-memory && npx tsgo --noEmit && cd ../clankie-json-ui-render && npx tsgo --noEmit && cd ../clankie-sandbox && npx tsgo --noEmit"
 	},
 	"engines": {
 		"node": ">=18.0.0"

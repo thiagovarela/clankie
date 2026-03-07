@@ -43,6 +43,27 @@ export interface AppConfig {
 		tickIntervalMs?: number;
 	};
 
+	/** Gondolin sandbox — runs bash commands in an isolated VM (used by clankie-sandbox extension) */
+	sandbox?: {
+		/** Enable sandbox (default: false) */
+		enabled?: boolean;
+		/** Network policy for the VM */
+		network?: {
+			/** "open" (default) = allow all, blocklist only; "allowlist" = strict */
+			mode?: "open" | "allowlist";
+			/** Hosts to allow (only in "allowlist" mode, glob patterns) */
+			allowedHosts?: string[];
+			/** Additional hosts to block (glob patterns) */
+			blockedHosts?: string[];
+			/** Secrets injected into the VM's HTTP layer */
+			secrets?: Record<string, string | { value: string; hosts?: string[] }>;
+			/** Log outgoing HTTP requests (default: false) */
+			logRequests?: boolean;
+		};
+		/** Extra environment variables for the VM */
+		env?: Record<string, string>;
+	};
+
 	/** Channel configuration — each channel starts when its section exists */
 	channels?: {
 		web?: {
