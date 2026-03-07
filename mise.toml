@@ -92,7 +92,7 @@ fi
 PACKAGE_NAME=$(node -p "require('./${DIR}/package.json').name")
 echo "==> Bumping ${PACKAGE_NAME} (${DIR})"
 
-NEW_VERSION=$(npm --prefix "$DIR" version "$BUMP" --no-git-tag-version)
+NEW_VERSION=$(cd "$DIR" && npm version "$BUMP" --no-git-tag-version)
 VERSION_NO_V="${NEW_VERSION#v}"
 
 git add "$DIR/package.json"
@@ -105,7 +105,7 @@ SAFE_PACKAGE=$(echo "$PACKAGE_NAME" | sed 's#^@##; s#/#-#g')
 git tag "${SAFE_PACKAGE}-v${VERSION_NO_V}"
 
 echo "==> Publishing ${PACKAGE_NAME}@${VERSION_NO_V}"
-npm --prefix "$DIR" publish --access public
+(cd "$DIR" && npm publish --access public)
 
 git push && git push --tags
 
