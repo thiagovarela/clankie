@@ -1,5 +1,5 @@
 {
-	"name": "clankie-memory",
+	"name": "@clankie/memory",
 	"version": "0.1.0",
 	"description": "Persistent memory with SQLite FTS5 + vector cosine similarity for clankie",
 	"type": "module",

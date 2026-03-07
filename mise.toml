@@ -44,6 +44,74 @@ git push && git push --tags
 echo "✓ Published $NEW_VERSION (with bundled web-ui)"
 """
 
+[tasks.publish-extension]
+description = "Bump and publish one extension to npm"
+run = """
+#!/usr/bin/env bash
+set -euo pipefail
+
+EXTENSION="${1:-}"
+BUMP="${2:-patch}"
+
+if [[ "$BUMP" != "patch" && "$BUMP" != "minor" && "$BUMP" != "major" ]]; then
+  echo "Usage: mise run publish-extension <extension-folder> [patch|minor|major]"
+  echo "Example: mise run publish-extension clankie-memory minor"
+  exit 1
+fi
+
+if [[ -z "$EXTENSION" ]]; then
+  echo "Usage: mise run publish-extension <extension-folder> [patch|minor|major]"
+  echo ""
+  echo "Available extension folders:"
+  for DIR in $(find extensions -mindepth 1 -maxdepth 1 -type d | sort); do
+    if [[ -f "$DIR/package.json" ]]; then
+      PACKAGE_NAME=$(node -p "require('./${DIR}/package.json').name")
+      echo "  - $(basename "$DIR") (${PACKAGE_NAME})"
+    fi
+  done
+  exit 1
+fi
+
+DIR="extensions/$EXTENSION"
+if [[ -d "$EXTENSION" && -f "$EXTENSION/package.json" ]]; then
+  DIR="$EXTENSION"
+fi
+
+if [[ ! -f "$DIR/package.json" ]]; then
+  echo "Error: Extension not found: $EXTENSION"
+  echo "Expected package.json at: $DIR/package.json"
+  exit 1
+fi
+
+# Ensure working directory is clean
+if [[ -n "$(git status --porcelain)" ]]; then
+  echo "Error: Working directory is not clean. Commit or stash changes first."
+  exit 1
+fi
+
+PACKAGE_NAME=$(node -p "require('./${DIR}/package.json').name")
+echo "==> Bumping ${PACKAGE_NAME} (${DIR})"
+
+NEW_VERSION=$(npm --prefix "$DIR" version "$BUMP" --no-git-tag-version)
+VERSION_NO_V="${NEW_VERSION#v}"
+
+git add "$DIR/package.json"
+if [[ -f "$DIR/package-lock.json" ]]; then
+  git add "$DIR/package-lock.json"
+fi
+git commit -m "release(${PACKAGE_NAME}): v${VERSION_NO_V}"
+
+SAFE_PACKAGE=$(echo "$PACKAGE_NAME" | sed 's#^@##; s#/#-#g')
+git tag "${SAFE_PACKAGE}-v${VERSION_NO_V}"
+
+echo "==> Publishing ${PACKAGE_NAME}@${VERSION_NO_V}"
+npm --prefix "$DIR" publish --access public
+
+git push && git push --tags
+
+echo "✓ Published ${PACKAGE_NAME}@${VERSION_NO_V}"
+"""
+
 [tasks.release-web-ui]
 description = "Build web-ui and publish to GitHub Releases"
 run = """

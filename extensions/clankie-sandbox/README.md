@@ -1,4 +1,4 @@
-# clankie-sandbox
+# @clankie/sandbox
 
 Runs bash commands inside a [Gondolin](https://github.com/earendil-works/gondolin) micro-VM. Transparent — just turn it on and all shell execution is sandboxed.
 

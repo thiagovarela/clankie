@@ -1,5 +1,5 @@
 {
-  "name": "clankie-web-search",
+  "name": "@clankie/web-search",
   "version": "0.1.0",
   "description": "Headless web search and page extraction for clankie using CloakBrowser + Playwright",
   "type": "module",
