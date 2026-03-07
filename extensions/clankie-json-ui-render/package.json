@@ -1,6 +1,6 @@
 {
   "name": "@clankie/json-ui-render",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Render structured chat UI in clankie via details.renderHint and details.uiSpec",
   "type": "module",
   "keywords": [
