@@ -82,18 +82,41 @@ async function createLocalEmbedder(config: EmbeddingConfig): Promise<(text: stri
 	if (localEmbedder) return localEmbedder;
 
 	const { pipeline } = await import("@huggingface/transformers");
-	const model = config.model || "Xenova/all-MiniLM-L6-v2";
+	const cacheDir = config.cacheDir ?? process.env.MEMORY_MODEL_CACHE_DIR;
 
-	console.log(`[memory] Loading local embedding model: ${model}`);
-	const extractor = await pipeline("feature-extraction", model);
-	console.log(`[memory] Local embedding model loaded`);
+	// Try user-provided model first, then known-compatible fallbacks
+	const candidates = [
+		config.model || "Xenova/all-MiniLM-L6-v2",
+		"Xenova/all-MiniLM-L6-v2",
+		"onnx-community/all-MiniLM-L6-v2",
+	].filter((m, i, arr) => arr.indexOf(m) === i);
 
-	localEmbedder = async (text: string): Promise<number[]> => {
-		const output = await extractor(text, { pooling: "mean", normalize: true });
-		return Array.from(output.data as Float32Array);
-	};
+	let lastError: Error | undefined;
+	for (const model of candidates) {
+		try {
+			console.log(`[memory] Loading local embedding model: ${model}${cacheDir ? ` (cache: ${cacheDir})` : ""}`);
+			const extractor = await pipeline("feature-extraction", model, {
+				cache_dir: cacheDir,
+				local_files_only: false,
+			});
+			console.log(`[memory] Local embedding model loaded: ${model}`);
 
-	return localEmbedder;
+			localEmbedder = async (text: string): Promise<number[]> => {
+				const output = await extractor(text, { pooling: "mean", normalize: true });
+				return Array.from(output.data as Float32Array);
+			};
+
+			return localEmbedder;
+		} catch (error) {
+			lastError = error instanceof Error ? error : new Error(String(error));
+			console.warn(`[memory] Failed to load local model '${model}': ${lastError.message}`);
+		}
+	}
+
+	throw new Error(
+		`Failed to load local embedding model. Tried: ${candidates.join(", ")}. ` +
+			`Last error: ${lastError?.message ?? "unknown"}`,
+	);
 }
 
 /**

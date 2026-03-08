@@ -193,16 +193,22 @@ export class Indexer {
 			// Chunk the document into memories
 			const memories = chunkDocument(content, filePath, this.config);
 
-			// Generate embeddings for memories
+			// Generate embeddings for memories (best-effort)
 			if (memories.length > 0) {
 				const texts = memories.map((m) => m.content);
-				const embeddings = await this.embeddingProvider.embed(texts);
-
-				for (let i = 0; i < memories.length; i++) {
-					memories[i].embedding = embeddings[i];
+				try {
+					const embeddings = await this.embeddingProvider.embed(texts);
+					for (let i = 0; i < memories.length; i++) {
+						memories[i].embedding = embeddings[i];
+					}
+				} catch (error) {
+					console.warn(
+						`[memory] Embedding generation failed for ${filePath}. Continuing with text-only indexing:`,
+						error,
+					);
 				}
 
-				// Store memories
+				// Store memories (with or without embeddings)
 				await this.store.upsertMemories(memories);
 			}
 

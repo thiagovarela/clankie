@@ -145,7 +145,7 @@ export class MemoryStore {
 
 		await this.db.prepare(`
 			INSERT INTO memories (id, content, embedding, file_path, line_start, line_end, category, created_at, updated_at)
-			VALUES (?, ?, vector8(?), ?, ?, ?, ?, ?, ?)
+			VALUES (?, ?, CASE WHEN ? IS NULL THEN NULL ELSE vector8(?) END, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(id) DO UPDATE SET
 				content = excluded.content,
 				embedding = excluded.embedding,
@@ -153,6 +153,7 @@ export class MemoryStore {
 		`).run(
 			memory.id,
 			memory.content,
+			embeddingJson,
 			embeddingJson,
 			memory.filePath ?? null,
 			memory.lineStart ?? null,
@@ -175,7 +176,7 @@ export class MemoryStore {
 		const insertFn = this.db.transaction(async () => {
 			const stmt = this.db!.prepare(`
 				INSERT INTO memories (id, content, embedding, file_path, line_start, line_end, category, created_at, updated_at)
-				VALUES (?, ?, vector8(?), ?, ?, ?, ?, ?, ?)
+				VALUES (?, ?, CASE WHEN ? IS NULL THEN NULL ELSE vector8(?) END, ?, ?, ?, ?, ?, ?)
 				ON CONFLICT(id) DO UPDATE SET
 					content = excluded.content,
 					embedding = excluded.embedding,
@@ -187,6 +188,7 @@ export class MemoryStore {
 				await stmt.run(
 					memory.id,
 					memory.content,
+					embeddingJson,
 					embeddingJson,
 					memory.filePath ?? null,
 					memory.lineStart ?? null,

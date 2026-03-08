@@ -13,6 +13,8 @@ export interface EmbeddingConfig {
 	apiKey?: string;
 	baseUrl?: string;
 	dimensions: number;
+	/** Cache directory for local models */
+	cacheDir?: string;
 }
 
 export interface SearchConfig {
@@ -48,6 +50,7 @@ export const DEFAULT_CONFIG: MemoryConfig = {
 		provider: "local",
 		model: "Xenova/all-MiniLM-L6-v2",
 		dimensions: 384,
+		cacheDir: join(homedir(), ".clankie", "models"),
 	},
 	search: {
 		vectorWeight: 0.7,
