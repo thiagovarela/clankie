@@ -7,12 +7,12 @@ import { join } from "node:path";
 
 export interface EmbeddingConfig {
 	/** Embedding provider. Omit or set to null for text-only search (no embeddings). */
-	provider?: "openai" | "ollama" | null;
+	provider?: "openai" | "ollama" | "local" | null;
+	/** Model name (for local: e.g. "Xenova/all-MiniLM-L6-v2") */
 	model: string;
 	apiKey?: string;
 	baseUrl?: string;
 	dimensions: number;
-	cacheDir?: string;
 }
 
 export interface SearchConfig {
@@ -42,13 +42,12 @@ export interface MemoryConfig {
 
 export const DEFAULT_CONFIG: MemoryConfig = {
 	enabled: true,
-	dbPath: join(homedir(), ".clankie", "memory.sqlite"),
+	dbPath: join(homedir(), ".clankie", "memory.db"),
 	embedding: {
-		// No provider = text-only search (no embeddings)
-		// Set to "openai" or "ollama" to enable vector search
-		provider: null,
-		model: "text-embedding-3-small",
-		dimensions: 1536,
+		// Local CPU embeddings by default (no API keys needed)
+		provider: "local",
+		model: "Xenova/all-MiniLM-L6-v2",
+		dimensions: 384,
 	},
 	search: {
 		vectorWeight: 0.7,
@@ -69,28 +68,34 @@ export const DEFAULT_CONFIG: MemoryConfig = {
 	debounceMs: 1500,
 };
 
-export interface Chunk {
+/**
+ * Memory record with TursoDB vector support
+ * Uses quantized F8_BLOB embeddings for 75% storage savings
+ */
+export interface Memory {
 	id: string;
-	filePath: string;
-	lineStart: number;
-	lineEnd: number;
 	content: string;
-	embedding?: Float64Array;
-	createdAt: string;
-	updatedAt: string;
+	embedding?: number[] | Float64Array;
+	filePath?: string;
+	lineStart?: number;
+	lineEnd?: number;
+	/** Memory category: chunk, daily, longterm, correction, user_pref */
+	category?: string;
+	createdAt?: number;
+	updatedAt?: number;
+	lastRetrieved?: number;
+	retrievalCount?: number;
+	sourceTask?: string;
 }
 
-export interface SearchResult {
-	chunk: Chunk;
+/**
+ * Search result from memory store
+ */
+export interface MemorySearchResult {
+	memory: Memory;
 	score: number;
 	vectorScore?: number;
 	textScore?: number;
-}
-
-export interface FileHash {
-	filePath: string;
-	hash: string;
-	updatedAt: string;
 }
 
 /**

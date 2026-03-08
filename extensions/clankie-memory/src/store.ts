@@ -1,18 +1,17 @@
 /**
- * SQLite database store for clankie-memory
- * Uses FTS5 for full-text search and BLOB storage for embeddings
+ * TursoDB-based memory store for clankie-memory
+ * Uses native vector functions (F8_BLOB, vector_distance_cos) and FTS5
  */
 
-import type Database from "better-sqlite3";
-import type { Chunk, FileHash, MemoryConfig } from "./types.ts";
+import type { Memory, MemoryConfig, MemorySearchResult } from "./types.ts";
 
-// Dynamic import to handle ESM/CJS compatibility
-let DatabaseConstructor: typeof Database;
+// Dynamic import for TursoDB
+let connectFn: typeof import("@tursodatabase/database").connect;
 
 export class MemoryStore {
-	private db: Database.Database | null = null;
+	private db: Awaited<ReturnType<typeof connectFn>> | null = null;
 	private config: MemoryConfig;
-	private statements: Map<string, Database.Statement> = new Map();
+	private hasFts = false;
 
 	constructor(config: MemoryConfig) {
 		this.config = config;
@@ -22,90 +21,78 @@ export class MemoryStore {
 	 * Open the database and initialize schema
 	 */
 	async open(): Promise<void> {
-		// Dynamic import better-sqlite3
-		if (!DatabaseConstructor) {
-			const mod = await import("better-sqlite3");
-			DatabaseConstructor = mod.default;
+		if (!connectFn) {
+			const mod = await import("@tursodatabase/database");
+			connectFn = mod.connect;
 		}
 
-		this.db = new DatabaseConstructor(this.config.dbPath);
-		this.db.pragma("journal_mode = WAL");
+		this.db = await connectFn(this.config.dbPath);
 
-		this.initializeSchema();
-		this.prepareStatements();
+		await this.initializeSchema();
 	}
 
 	/**
 	 * Close the database
 	 */
-	close(): void {
+	async close(): Promise<void> {
 		if (this.db) {
-			this.statements.clear();
-			this.db.close();
+			await this.db.close();
 			this.db = null;
 		}
 	}
 
 	/**
-	 * Initialize database schema
+	 * Initialize database schema with TursoDB vector support
 	 */
-	private initializeSchema(): void {
+	private async initializeSchema(): Promise<void> {
 		if (!this.db) return;
 
-		// Main chunks table
-		this.db.exec(`
-			CREATE TABLE IF NOT EXISTS chunks (
-				id TEXT PRIMARY KEY,
-				file_path TEXT NOT NULL,
-				line_start INTEGER NOT NULL,
-				line_end INTEGER NOT NULL,
-				content TEXT NOT NULL,
-				embedding BLOB,
-				created_at TEXT NOT NULL,
-				updated_at TEXT NOT NULL
+		const dimensions = this.config.embedding.dimensions;
+
+		// Main memories table with quantized vector embeddings
+		await this.db.exec(`
+			CREATE TABLE IF NOT EXISTS memories (
+				id              TEXT PRIMARY KEY,
+				content         TEXT NOT NULL,
+				embedding       F8_BLOB(${dimensions}),
+				file_path       TEXT,
+				line_start      INTEGER,
+				line_end        INTEGER,
+				category        TEXT NOT NULL DEFAULT 'chunk',
+				created_at      INTEGER NOT NULL,
+				updated_at      INTEGER NOT NULL,
+				last_retrieved  INTEGER,
+				retrieval_count INTEGER DEFAULT 0,
+				source_task     TEXT
 			);
 		`);
 
 		// Index on file_path for faster lookups
-		this.db.exec(`
-			CREATE INDEX IF NOT EXISTS idx_chunks_file_path ON chunks(file_path);
+		await this.db.exec(`
+			CREATE INDEX IF NOT EXISTS idx_memories_file_path ON memories(file_path);
 		`);
 
-		// FTS5 virtual table for full-text search
-		this.db.exec(`
-			CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
-				content,
-				content=chunks,
-				content_rowid=rowid
-			);
+		// Index on category for filtered searches
+		await this.db.exec(`
+			CREATE INDEX IF NOT EXISTS idx_memories_category ON memories(category);
 		`);
 
-		// Triggers to keep FTS index in sync
-		this.db.exec(`
-			CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN
-				INSERT INTO chunks_fts(rowid, content)
-				VALUES (new.rowid, new.content);
-			END;
-		`);
+		// TursoDB FTS using Tantivy (not SQLite FTS5)
+		// Try to create FTS index - may fail if experimental feature not enabled
+		try {
+			await this.db.exec(`
+				CREATE INDEX IF NOT EXISTS idx_memories_fts 
+				ON memories USING fts (content);
+			`);
+			this.hasFts = true;
+		} catch {
+			// FTS not available, will fall back to LIKE search
+			this.hasFts = false;
+			console.log("[memory] FTS index not available, using LIKE-based search");
+		}
 
-		this.db.exec(`
-			CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN
-				INSERT INTO chunks_fts(chunks_fts, rowid, content)
-				VALUES ('delete', old.rowid, old.content);
-			END;
-		`);
-
-		this.db.exec(`
-			CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunks BEGIN
-				INSERT INTO chunks_fts(chunks_fts, rowid, content)
-				VALUES ('delete', old.rowid, old.content);
-				INSERT INTO chunks_fts(rowid, content)
-				VALUES (new.rowid, new.content);
-			END;
-		`);
-
-		// Metadata table for file hashes and other info
-		this.db.exec(`
+		// Metadata table
+		await this.db.exec(`
 			CREATE TABLE IF NOT EXISTS meta (
 				key TEXT PRIMARY KEY,
 				value TEXT
@@ -113,346 +100,474 @@ export class MemoryStore {
 		`);
 
 		// File hashes table for tracking sync state
-		this.db.exec(`
+		await this.db.exec(`
 			CREATE TABLE IF NOT EXISTS file_hashes (
 				file_path TEXT PRIMARY KEY,
 				hash TEXT NOT NULL,
-				updated_at TEXT NOT NULL
+				updated_at INTEGER NOT NULL
+			);
+		`);
+
+		// Tasks table for tracking what the agent has worked on
+		await this.db.exec(`
+			CREATE TABLE IF NOT EXISTS tasks (
+				id          TEXT PRIMARY KEY,
+				description TEXT,
+				embedding   F8_BLOB(${dimensions}),
+				started_at  INTEGER,
+				finished_at INTEGER
+			);
+		`);
+
+		// Memory usage attribution (which memories were used in which tasks)
+		await this.db.exec(`
+			CREATE TABLE IF NOT EXISTS memory_usage (
+				id         TEXT PRIMARY KEY,
+				memory_id  TEXT NOT NULL,
+				task_id    TEXT,
+				similarity REAL,
+				credit     REAL DEFAULT 0,
+				used_at    INTEGER NOT NULL,
+				FOREIGN KEY (memory_id) REFERENCES memories(id) ON DELETE CASCADE,
+				FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE SET NULL
 			);
 		`);
 	}
 
 	/**
-	 * Prepare common SQL statements
+	 * Upsert a memory with quantized vector embedding
 	 */
-	private prepareStatements(): void {
-		if (!this.db) return;
+	async upsertMemory(memory: Memory): Promise<void> {
+		if (!this.db) throw new Error("Database not open");
 
-		this.statements.set(
-			"upsertChunk",
-			this.db.prepare(`
-			INSERT INTO chunks (id, file_path, line_start, line_end, content, embedding, created_at, updated_at)
-			VALUES (@id, @filePath, @lineStart, @lineEnd, @content, @embedding, @createdAt, @updatedAt)
+		const now = Date.now();
+		const embeddingJson = memory.embedding ? JSON.stringify(Array.from(memory.embedding)) : null;
+
+		await this.db.prepare(`
+			INSERT INTO memories (id, content, embedding, file_path, line_start, line_end, category, created_at, updated_at)
+			VALUES (?, ?, vector8(?), ?, ?, ?, ?, ?, ?)
 			ON CONFLICT(id) DO UPDATE SET
 				content = excluded.content,
 				embedding = excluded.embedding,
 				updated_at = excluded.updated_at
-		`),
-		);
-
-		this.statements.set(
-			"deleteByFile",
-			this.db.prepare(`
-			DELETE FROM chunks WHERE file_path = @filePath
-		`),
-		);
-
-		this.statements.set(
-			"getFileHash",
-			this.db.prepare(`
-			SELECT hash, updated_at as updatedAt FROM file_hashes WHERE file_path = @filePath
-		`),
-		);
-
-		this.statements.set(
-			"setFileHash",
-			this.db.prepare(`
-			INSERT INTO file_hashes (file_path, hash, updated_at)
-			VALUES (@filePath, @hash, @updatedAt)
-			ON CONFLICT(file_path) DO UPDATE SET
-				hash = excluded.hash,
-				updated_at = excluded.updated_at
-		`),
-		);
-
-		this.statements.set(
-			"deleteFileHash",
-			this.db.prepare(`
-			DELETE FROM file_hashes WHERE file_path = @filePath
-		`),
-		);
-
-		this.statements.set(
-			"searchFTS",
-			this.db.prepare(`
-			SELECT 
-				c.id,
-				c.file_path as filePath,
-				c.line_start as lineStart,
-				c.line_end as lineEnd,
-				c.content,
-				c.embedding,
-				c.created_at as createdAt,
-				c.updated_at as updatedAt,
-				rank as ftsRank
-			FROM chunks_fts
-			JOIN chunks c ON c.rowid = chunks_fts.rowid
-			WHERE chunks_fts MATCH @query
-			ORDER BY rank
-			LIMIT @limit
-		`),
-		);
-
-		this.statements.set(
-			"getAllChunks",
-			this.db.prepare(`
-			SELECT 
-				id,
-				file_path as filePath,
-				line_start as lineStart,
-				line_end as lineEnd,
-				content,
-				embedding,
-				created_at as createdAt,
-				updated_at as updatedAt
-			FROM chunks
-		`),
-		);
-
-		this.statements.set(
-			"getChunksByFile",
-			this.db.prepare(`
-			SELECT 
-				id,
-				file_path as filePath,
-				line_start as lineStart,
-				line_end as lineEnd,
-				content,
-				embedding,
-				created_at as createdAt,
-				updated_at as updatedAt
-			FROM chunks
-			WHERE file_path = @filePath
-		`),
-		);
-
-		this.statements.set(
-			"getStats",
-			this.db.prepare(`
-			SELECT 
-				(SELECT COUNT(*) FROM chunks) as chunkCount,
-				(SELECT COUNT(DISTINCT file_path) FROM chunks) as fileCount,
-				(SELECT COUNT(*) FROM file_hashes) as trackedFileCount
-		`),
-		);
-
-		this.statements.set(
-			"getMeta",
-			this.db.prepare(`
-			SELECT value FROM meta WHERE key = @key
-		`),
-		);
-
-		this.statements.set(
-			"setMeta",
-			this.db.prepare(`
-			INSERT INTO meta (key, value) VALUES (@key, @value)
-			ON CONFLICT(key) DO UPDATE SET value = excluded.value
-		`),
+		`).run(
+			memory.id,
+			memory.content,
+			embeddingJson,
+			memory.filePath ?? null,
+			memory.lineStart ?? null,
+			memory.lineEnd ?? null,
+			memory.category ?? "chunk",
+			memory.createdAt ?? now,
+			now,
 		);
 	}
 
 	/**
-	 * Upsert chunks (insert or update)
+	 * Upsert multiple memories in a transaction
 	 */
-	upsertChunks(chunks: Chunk[]): void {
+	async upsertMemories(memories: Memory[]): Promise<void> {
 		if (!this.db) throw new Error("Database not open");
+		if (memories.length === 0) return;
 
-		const stmt = this.statements.get("upsertChunk");
-		if (!stmt) throw new Error("Statement not prepared");
+		const now = Date.now();
 
-		const insert = this.db.transaction((items: Chunk[]) => {
-			for (const chunk of items) {
-				stmt.run({
-					id: chunk.id,
-					filePath: chunk.filePath,
-					lineStart: chunk.lineStart,
-					lineEnd: chunk.lineEnd,
-					content: chunk.content,
-					embedding: chunk.embedding ? Buffer.from(chunk.embedding.buffer) : null,
-					createdAt: chunk.createdAt,
-					updatedAt: chunk.updatedAt,
-				});
+		const insertFn = this.db.transaction(async () => {
+			const stmt = this.db!.prepare(`
+				INSERT INTO memories (id, content, embedding, file_path, line_start, line_end, category, created_at, updated_at)
+				VALUES (?, ?, vector8(?), ?, ?, ?, ?, ?, ?)
+				ON CONFLICT(id) DO UPDATE SET
+					content = excluded.content,
+					embedding = excluded.embedding,
+					updated_at = excluded.updated_at
+			`);
+
+			for (const memory of memories) {
+				const embeddingJson = memory.embedding ? JSON.stringify(Array.from(memory.embedding)) : null;
+				await stmt.run(
+					memory.id,
+					memory.content,
+					embeddingJson,
+					memory.filePath ?? null,
+					memory.lineStart ?? null,
+					memory.lineEnd ?? null,
+					memory.category ?? "chunk",
+					memory.createdAt ?? now,
+					now,
+				);
 			}
 		});
 
-		insert(chunks);
+		await insertFn();
 	}
 
 	/**
-	 * Delete all chunks for a file
+	 * Delete all memories for a file
 	 */
-	deleteByFile(filePath: string): void {
+	async deleteByFile(filePath: string): Promise<void> {
+		if (!this.db) throw new Error("Database not open");
+		await this.db.prepare("DELETE FROM memories WHERE file_path = ?").run(filePath);
+	}
+
+	/**
+	 * Semantic vector search using native vector_distance_cos
+	 */
+	async vectorSearch(queryEmbedding: number[], limit: number, category?: string): Promise<MemorySearchResult[]> {
 		if (!this.db) throw new Error("Database not open");
 
-		const stmt = this.statements.get("deleteByFile");
-		if (!stmt) throw new Error("Statement not prepared");
+		const embeddingJson = JSON.stringify(queryEmbedding);
 
-		stmt.run({ filePath });
+		let sql = `
+			SELECT 
+				id, content, file_path, line_start, line_end, category,
+				created_at, updated_at, retrieval_count,
+				vector_distance_cos(embedding, vector8(?)) AS distance
+			FROM memories
+			WHERE embedding IS NOT NULL
+		`;
+
+		const params: (string | number)[] = [embeddingJson];
+
+		if (category) {
+			sql += " AND category = ?";
+			params.push(category);
+		}
+
+		sql += " ORDER BY distance ASC LIMIT ?";
+		params.push(limit);
+
+		const rows = await this.db.prepare(sql).all(...params);
+
+		return rows.map((row: Record<string, unknown>) => ({
+			memory: {
+				id: row.id as string,
+				content: row.content as string,
+				filePath: row.file_path as string | undefined,
+				lineStart: row.line_start as number | undefined,
+				lineEnd: row.line_end as number | undefined,
+				category: row.category as string,
+				createdAt: row.created_at as number,
+				updatedAt: row.updated_at as number,
+				retrievalCount: row.retrieval_count as number,
+			},
+			// Convert distance (0=identical, 2=opposite) to similarity (1=identical, -1=opposite)
+			score: 1.0 - (row.distance as number),
+			vectorScore: 1.0 - (row.distance as number),
+		}));
+	}
+
+	/**
+	 * Text search using Tantivy FTS (or LIKE fallback)
+	 * When FTS is available, uses BM25 scoring via fts_score()
+	 */
+	async textSearch(query: string, limit: number): Promise<MemorySearchResult[]> {
+		if (!this.db) throw new Error("Database not open");
+
+		// Try Tantivy FTS first if available
+		if (this.hasFts) {
+			try {
+				const rows = await this.db.prepare(`
+					SELECT 
+						id, content, file_path, line_start, line_end, category,
+						created_at, updated_at, retrieval_count,
+						fts_score(content, ?) AS score
+					FROM memories
+					WHERE content MATCH ?
+					ORDER BY score DESC
+					LIMIT ?
+				`).all(query, query, limit);
+
+				// Normalize scores (BM25 scores aren't bounded)
+				const maxScore = rows.length > 0 
+					? Math.max(...(rows as Record<string, unknown>[]).map(r => r.score as number))
+					: 1;
+
+				return (rows as Record<string, unknown>[]).map((row) => ({
+					memory: {
+						id: row.id as string,
+						content: row.content as string,
+						filePath: row.file_path as string | undefined,
+						lineStart: row.line_start as number | undefined,
+						lineEnd: row.line_end as number | undefined,
+						category: row.category as string,
+						createdAt: row.created_at as number,
+						updatedAt: row.updated_at as number,
+						retrievalCount: row.retrieval_count as number,
+					},
+					score: (row.score as number) / maxScore,
+					textScore: (row.score as number) / maxScore,
+				}));
+			} catch {
+				// FTS query failed, fall back to LIKE
+				this.hasFts = false;
+			}
+		}
+
+		// Fallback: LIKE-based search
+		const terms = query
+			.toLowerCase()
+			.split(/\s+/)
+			.filter((t) => t.length > 2);  // Skip short words
+
+		if (terms.length === 0) return [];
+
+		// Build LIKE conditions for each term
+		const conditions = terms.map(() => "LOWER(content) LIKE ?").join(" OR ");
+		const params = terms.map((t) => `%${t}%`);
+
+		const rows = await this.db.prepare(`
+			SELECT 
+				id, content, file_path, line_start, line_end, category,
+				created_at, updated_at, retrieval_count
+			FROM memories
+			WHERE ${conditions}
+			LIMIT ?
+		`).all(...params, limit * 2);  // Fetch extra for scoring
+
+		// Score results by number of matching terms
+		const scored = (rows as Record<string, unknown>[]).map((row) => {
+			const contentLower = (row.content as string).toLowerCase();
+			let matchCount = 0;
+			for (const term of terms) {
+				if (contentLower.includes(term)) matchCount++;
+			}
+			const score = matchCount / terms.length;
+
+			return {
+				memory: {
+					id: row.id as string,
+					content: row.content as string,
+					filePath: row.file_path as string | undefined,
+					lineStart: row.line_start as number | undefined,
+					lineEnd: row.line_end as number | undefined,
+					category: row.category as string,
+					createdAt: row.created_at as number,
+					updatedAt: row.updated_at as number,
+					retrievalCount: row.retrieval_count as number,
+				},
+				score,
+				textScore: score,
+			};
+		});
+
+		// Sort by score and limit
+		scored.sort((a, b) => b.score - a.score);
+		return scored.slice(0, limit);
+	}
+
+	/**
+	 * Alias for backward compatibility
+	 */
+	async ftsSearch(query: string, limit: number): Promise<MemorySearchResult[]> {
+		return this.textSearch(query, limit);
+	}
+
+	/**
+	 * Hybrid search combining FTS5 + vector similarity
+	 */
+	async hybridSearch(
+		query: string,
+		queryEmbedding: number[] | null,
+		limit: number,
+		options?: {
+			textWeight?: number;
+			vectorWeight?: number;
+			category?: string;
+		},
+	): Promise<MemorySearchResult[]> {
+		if (!this.db) throw new Error("Database not open");
+
+		const textWeight = options?.textWeight ?? 0.3;
+		const vectorWeight = options?.vectorWeight ?? 0.7;
+		const candidateLimit = limit * 4;
+
+		// Get FTS candidates
+		const ftsResults = await this.ftsSearch(query, candidateLimit);
+		const ftsMap = new Map(ftsResults.map((r) => [r.memory.id, r]));
+
+		// Get vector candidates if embedding provided
+		let vectorMap = new Map<string, MemorySearchResult>();
+		if (queryEmbedding) {
+			const vectorResults = await this.vectorSearch(queryEmbedding, candidateLimit, options?.category);
+			vectorMap = new Map(vectorResults.map((r) => [r.memory.id, r]));
+		}
+
+		// Merge results
+		const allIds = new Set([...ftsMap.keys(), ...vectorMap.keys()]);
+		const merged: MemorySearchResult[] = [];
+
+		for (const id of allIds) {
+			const ftsResult = ftsMap.get(id);
+			const vectorResult = vectorMap.get(id);
+
+			const textScore = ftsResult?.textScore ?? 0;
+			const vectorScore = vectorResult?.vectorScore ?? 0;
+			const combinedScore = textScore * textWeight + vectorScore * vectorWeight;
+
+			merged.push({
+				memory: (ftsResult ?? vectorResult)!.memory,
+				score: combinedScore,
+				textScore: textScore || undefined,
+				vectorScore: vectorScore || undefined,
+			});
+		}
+
+		// Sort by combined score and limit
+		merged.sort((a, b) => b.score - a.score);
+		return merged.slice(0, limit);
+	}
+
+	/**
+	 * Update retrieval metadata after a memory is used
+	 */
+	async markRetrieved(memoryIds: string[], taskId?: string): Promise<void> {
+		if (!this.db) throw new Error("Database not open");
+
+		const now = Date.now();
+
+		const updateFn = this.db.transaction(async () => {
+			// Update retrieval count
+			const updateStmt = this.db!.prepare(`
+				UPDATE memories 
+				SET last_retrieved = ?, retrieval_count = retrieval_count + 1
+				WHERE id = ?
+			`);
+
+			// Record usage
+			const usageStmt = this.db!.prepare(`
+				INSERT INTO memory_usage (id, memory_id, task_id, used_at)
+				VALUES (?, ?, ?, ?)
+			`);
+
+			for (const memoryId of memoryIds) {
+				await updateStmt.run(now, memoryId);
+
+				const usageId = `${memoryId}-${now}-${Math.random().toString(36).slice(2, 8)}`;
+				await usageStmt.run(usageId, memoryId, taskId ?? null, now);
+			}
+		});
+
+		await updateFn();
+	}
+
+	/**
+	 * Prune old unused memories
+	 */
+	async pruneUnused(maxAgeDays: number): Promise<number> {
+		if (!this.db) throw new Error("Database not open");
+
+		const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+
+		const result = await this.db.prepare(`
+			DELETE FROM memories
+			WHERE retrieval_count = 0 AND created_at < ?
+		`).run(cutoff);
+
+		return result.changes;
 	}
 
 	/**
 	 * Get stored hash for a file
 	 */
-	getFileHash(filePath: string): FileHash | undefined {
+	async getFileHash(filePath: string): Promise<{ hash: string; updatedAt: number } | undefined> {
 		if (!this.db) throw new Error("Database not open");
 
-		const stmt = this.statements.get("getFileHash");
-		if (!stmt) throw new Error("Statement not prepared");
+		const row = await this.db.prepare(`
+			SELECT hash, updated_at FROM file_hashes WHERE file_path = ?
+		`).get(filePath);
 
-		const result = stmt.get({ filePath }) as { hash: string; updatedAt: string } | undefined;
-		if (!result) return undefined;
-
+		if (!row) return undefined;
 		return {
-			filePath,
-			hash: result.hash,
-			updatedAt: result.updatedAt,
+			hash: (row as Record<string, unknown>).hash as string,
+			updatedAt: (row as Record<string, unknown>).updated_at as number,
 		};
 	}
 
 	/**
 	 * Set hash for a file
 	 */
-	setFileHash(filePath: string, hash: string): void {
+	async setFileHash(filePath: string, hash: string): Promise<void> {
 		if (!this.db) throw new Error("Database not open");
 
-		const stmt = this.statements.get("setFileHash");
-		if (!stmt) throw new Error("Statement not prepared");
-
-		stmt.run({
-			filePath,
-			hash,
-			updatedAt: new Date().toISOString(),
-		});
+		await this.db.prepare(`
+			INSERT INTO file_hashes (file_path, hash, updated_at)
+			VALUES (?, ?, ?)
+			ON CONFLICT(file_path) DO UPDATE SET
+				hash = excluded.hash,
+				updated_at = excluded.updated_at
+		`).run(filePath, hash, Date.now());
 	}
 
 	/**
 	 * Delete file hash tracking
 	 */
-	deleteFileHash(filePath: string): void {
+	async deleteFileHash(filePath: string): Promise<void> {
 		if (!this.db) throw new Error("Database not open");
-
-		const stmt = this.statements.get("deleteFileHash");
-		if (!stmt) throw new Error("Statement not prepared");
-
-		stmt.run({ filePath });
+		await this.db.prepare("DELETE FROM file_hashes WHERE file_path = ?").run(filePath);
 	}
 
 	/**
-	 * Clear all file hash tracking (forces full reindex)
+	 * Clear all file hashes (forces full reindex)
 	 */
-	clearAllFileHashes(): void {
+	async clearAllFileHashes(): Promise<void> {
 		if (!this.db) throw new Error("Database not open");
-		this.db.exec("DELETE FROM file_hashes");
-	}
-
-	/**
-	 * Search using FTS5
-	 */
-	searchFTS(query: string, limit: number): Chunk[] {
-		if (!this.db) throw new Error("Database not open");
-
-		const stmt = this.statements.get("searchFTS");
-		if (!stmt) throw new Error("Statement not prepared");
-
-		// Escape special FTS5 characters
-		const escapedQuery = query
-			.replace(/"/g, '""')
-			.split(/\s+/)
-			.map((term) => `"${term}"`)
-			.join(" ");
-
-		const rows = stmt.all({ query: escapedQuery, limit }) as Array<{
-			id: string;
-			filePath: string;
-			lineStart: number;
-			lineEnd: number;
-			content: string;
-			embedding: Buffer | null;
-			createdAt: string;
-			updatedAt: string;
-		}>;
-
-		return rows.map((row) => ({
-			id: row.id,
-			filePath: row.filePath,
-			lineStart: row.lineStart,
-			lineEnd: row.lineEnd,
-			content: row.content,
-			embedding: row.embedding ? new Float64Array(row.embedding.buffer) : undefined,
-			createdAt: row.createdAt,
-			updatedAt: row.updatedAt,
-		}));
-	}
-
-	/**
-	 * Get all chunks with embeddings for vector search
-	 */
-	getAllChunksWithEmbeddings(): Chunk[] {
-		if (!this.db) throw new Error("Database not open");
-
-		const stmt = this.statements.get("getAllChunks");
-		if (!stmt) throw new Error("Statement not prepared");
-
-		const rows = stmt.all() as Array<{
-			id: string;
-			filePath: string;
-			lineStart: number;
-			lineEnd: number;
-			content: string;
-			embedding: Buffer | null;
-			createdAt: string;
-			updatedAt: string;
-		}>;
-
-		return rows
-			.filter((row) => row.embedding !== null)
-			.map((row) => ({
-				id: row.id,
-				filePath: row.filePath,
-				lineStart: row.lineStart,
-				lineEnd: row.lineEnd,
-				content: row.content,
-				embedding: row.embedding ? new Float64Array(row.embedding.buffer) : undefined,
-				createdAt: row.createdAt,
-				updatedAt: row.updatedAt,
-			}));
+		await this.db.exec("DELETE FROM file_hashes");
 	}
 
 	/**
 	 * Get database stats
 	 */
-	getStats(): { chunkCount: number; fileCount: number; trackedFileCount: number } {
+	async getStats(): Promise<{
+		memoryCount: number;
+		fileCount: number;
+		trackedFileCount: number;
+		categoryCounts: Record<string, number>;
+	}> {
 		if (!this.db) throw new Error("Database not open");
 
-		const stmt = this.statements.get("getStats");
-		if (!stmt) throw new Error("Statement not prepared");
+		const counts = (await this.db.prepare(`
+			SELECT 
+				(SELECT COUNT(*) FROM memories) as memory_count,
+				(SELECT COUNT(DISTINCT file_path) FROM memories) as file_count,
+				(SELECT COUNT(*) FROM file_hashes) as tracked_file_count
+		`).get()) as Record<string, number>;
 
-		return stmt.get() as { chunkCount: number; fileCount: number; trackedFileCount: number };
+		const categories = (await this.db.prepare(`
+			SELECT category, COUNT(*) as count FROM memories GROUP BY category
+		`).all()) as Array<{ category: string; count: number }>;
+
+		const categoryCounts: Record<string, number> = {};
+		for (const row of categories) {
+			categoryCounts[row.category] = row.count;
+		}
+
+		return {
+			memoryCount: counts.memory_count,
+			fileCount: counts.file_count,
+			trackedFileCount: counts.tracked_file_count,
+			categoryCounts,
+		};
 	}
 
 	/**
 	 * Get metadata value
 	 */
-	getMeta(key: string): string | undefined {
+	async getMeta(key: string): Promise<string | undefined> {
 		if (!this.db) throw new Error("Database not open");
 
-		const stmt = this.statements.get("getMeta");
-		if (!stmt) throw new Error("Statement not prepared");
-
-		const result = stmt.get({ key }) as { value: string } | undefined;
-		return result?.value;
+		const row = await this.db.prepare("SELECT value FROM meta WHERE key = ?").get(key);
+		return row ? ((row as Record<string, unknown>).value as string) : undefined;
 	}
 
 	/**
 	 * Set metadata value
 	 */
-	setMeta(key: string, value: string): void {
+	async setMeta(key: string, value: string): Promise<void> {
 		if (!this.db) throw new Error("Database not open");
 
-		const stmt = this.statements.get("setMeta");
-		if (!stmt) throw new Error("Statement not prepared");
-
-		stmt.run({ key, value });
+		await this.db.prepare(`
+			INSERT INTO meta (key, value) VALUES (?, ?)
+			ON CONFLICT(key) DO UPDATE SET value = excluded.value
+		`).run(key, value);
 	}
 }

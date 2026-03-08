@@ -2,6 +2,7 @@
   "name": "clankie-web-ui",
   "private": true,
   "type": "module",
+  "license": "MIT",
   "scripts": {
     "dev": "vite dev --port 3000",
     "build": "vite build",

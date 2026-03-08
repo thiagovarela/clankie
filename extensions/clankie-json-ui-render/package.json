@@ -3,6 +3,13 @@
   "version": "0.2.0",
   "description": "Render structured chat UI in clankie via details.renderHint and details.uiSpec",
   "type": "module",
+  "license": "MIT",
+  "files": [
+    "src/",
+    "skills/",
+    "package.json",
+    "README.md"
+  ],
   "keywords": [
     "pi-package"
   ],

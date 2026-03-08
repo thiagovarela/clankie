@@ -1,6 +1,6 @@
 /**
  * Embedding provider for clankie-memory
- * Supports OpenAI-compatible APIs. Local embeddings via Transformers.js removed due to ONNX compatibility issues.
+ * Supports local CPU embeddings (HuggingFace Transformers) and OpenAI-compatible APIs
  */
 
 import { createHash } from "node:crypto";
@@ -9,6 +9,9 @@ import type { EmbeddingConfig } from "./types.ts";
 export interface EmbeddingProvider {
 	embed(texts: string[]): Promise<number[][]>;
 }
+
+// Cached local embedder pipeline
+let localEmbedder: ((text: string) => Promise<number[]>) | null = null;
 
 interface CacheEntry {
 	embedding: number[];
@@ -67,10 +70,30 @@ class NullEmbeddingProvider implements EmbeddingProvider {
 	async embed(): Promise<number[][]> {
 		throw new Error(
 			"No embedding provider configured. " +
-				"Set embedding.provider to 'openai' or 'ollama' in config, " +
-				"or use MEMORY_EMBEDDING_PROVIDER environment variable."
+				"Set embedding.provider to 'local', 'openai', or 'ollama' in config."
 		);
 	}
+}
+
+/**
+ * Create a local embedder using HuggingFace Transformers (ONNX, runs on CPU)
+ */
+async function createLocalEmbedder(config: EmbeddingConfig): Promise<(text: string) => Promise<number[]>> {
+	if (localEmbedder) return localEmbedder;
+
+	const { pipeline } = await import("@huggingface/transformers");
+	const model = config.model || "Xenova/all-MiniLM-L6-v2";
+
+	console.log(`[memory] Loading local embedding model: ${model}`);
+	const extractor = await pipeline("feature-extraction", model);
+	console.log(`[memory] Local embedding model loaded`);
+
+	localEmbedder = async (text: string): Promise<number[]> => {
+		const output = await extractor(text, { pooling: "mean", normalize: true });
+		return Array.from(output.data as Float32Array);
+	};
+
+	return localEmbedder;
 }
 
 /**
@@ -89,6 +112,41 @@ export function createEmbeddingProvider(
 		return new NullEmbeddingProvider();
 	}
 
+	// Local provider uses HuggingFace Transformers
+	if (provider === "local") {
+		let embedderPromise: Promise<(text: string) => Promise<number[]>> | null = null;
+
+		return {
+			async embed(texts: string[]): Promise<number[][]> {
+				// Lazy-load the embedder
+				if (!embedderPromise) {
+					embedderPromise = createLocalEmbedder(config);
+				}
+				const embedder = await embedderPromise;
+
+				// Check cache first
+				const results: (number[] | undefined)[] = texts.map((t) => globalCache.get(t));
+				const uncachedIndices: number[] = [];
+
+				for (let i = 0; i < texts.length; i++) {
+					if (results[i] === undefined) {
+						uncachedIndices.push(i);
+					}
+				}
+
+				// Generate uncached embeddings
+				for (const idx of uncachedIndices) {
+					const embedding = await embedder(texts[idx]);
+					globalCache.set(texts[idx], embedding);
+					results[idx] = embedding;
+				}
+
+				return results as number[][];
+			},
+		};
+	}
+
+	// OpenAI/Ollama providers use API
 	return {
 		async embed(texts: string[]): Promise<number[][]> {
 			// Check cache first
@@ -233,8 +291,9 @@ function resolveApiKey(
 }
 
 /**
- * Clear the global embedding cache
+ * Clear the global embedding cache and unload local model
  */
 export function clearEmbeddingCache(): void {
 	globalCache.clear();
+	localEmbedder = null;
 }

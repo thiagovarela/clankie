@@ -7,9 +7,8 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import { join } from "node:path";
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import { Type } from "@sinclair/typebox";
-import { clearEmbeddingCache, createEmbeddingProvider } from "./embeddings.ts";
+import { clearEmbeddingCache, createEmbeddingProvider, type EmbeddingProvider } from "./embeddings.ts";
 import { Indexer } from "./indexer.ts";
-import { SearchEngine } from "./search.ts";
 import { MemoryStore } from "./store.ts";
 import { type MemoryConfig, resolveConfig } from "./types.ts";
 
@@ -18,7 +17,7 @@ interface MemoryState {
 	config: MemoryConfig;
 	store: MemoryStore;
 	indexer: Indexer;
-	searchEngine: SearchEngine;
+	embeddingProvider: EmbeddingProvider;
 	workspaceDir: string;
 	isReady: boolean;
 }
@@ -77,24 +76,24 @@ async function initializeMemory(pi: ExtensionAPI, cwd: string): Promise<void> {
 		writeFileSync(memoryFile, "# Memory\n\nThis file contains long-term memory for Clankie.\n");
 	}
 
-	// Initialize database
+	// Initialize TursoDB store
 	const store = new MemoryStore(config);
 	await store.open();
 
 	// Detect embedding provider/dimension changes and force reindex when needed
-	const currentEmbeddingProvider = config.embedding.provider;
+	const currentEmbeddingProvider = config.embedding.provider ?? "none";
 	const currentEmbeddingDimensions = String(config.embedding.dimensions);
-	const storedEmbeddingProvider = store.getMeta("embedding_provider");
-	const storedEmbeddingDimensions = store.getMeta("embedding_dimensions");
+	const storedEmbeddingProvider = await store.getMeta("embedding_provider");
+	const storedEmbeddingDimensions = await store.getMeta("embedding_dimensions");
 
 	if (
 		storedEmbeddingProvider !== currentEmbeddingProvider ||
 		storedEmbeddingDimensions !== currentEmbeddingDimensions
 	) {
 		console.log("[memory] Embedding configuration changed, forcing full reindex");
-		store.clearAllFileHashes();
-		store.setMeta("embedding_provider", currentEmbeddingProvider);
-		store.setMeta("embedding_dimensions", currentEmbeddingDimensions);
+		await store.clearAllFileHashes();
+		await store.setMeta("embedding_provider", currentEmbeddingProvider);
+		await store.setMeta("embedding_dimensions", currentEmbeddingDimensions);
 	}
 
 	// Initialize embedding provider
@@ -103,15 +102,12 @@ async function initializeMemory(pi: ExtensionAPI, cwd: string): Promise<void> {
 	// Initialize indexer
 	const indexer = new Indexer(config, store, embeddingProvider);
 
-	// Initialize search engine
-	const searchEngine = new SearchEngine(config, store, embeddingProvider);
-
-	// Store state
+	// Store state (search is now built into MemoryStore)
 	state = {
 		config,
 		store,
 		indexer,
-		searchEngine,
+		embeddingProvider,
 		workspaceDir: cwd,
 		isReady: false,
 	};
@@ -131,10 +127,10 @@ async function initializeMemory(pi: ExtensionAPI, cwd: string): Promise<void> {
 /**
  * Shutdown the memory extension
  */
-function shutdownMemory(): void {
+async function shutdownMemory(): Promise<void> {
 	if (state) {
 		state.indexer.stopWatching();
-		state.store.close();
+		await state.store.close();
 		clearEmbeddingCache();
 		state = null;
 		console.log("[memory] Extension unloaded");
@@ -193,18 +189,44 @@ export default function memoryExtension(pi: ExtensionAPI) {
 					});
 				}
 
-				const results = await state.searchEngine.search(args.query, args.maxResults ?? 10);
+				// Get embedding for query if provider is configured
+				let queryEmbedding: number[] | null = null;
+				try {
+					const embeddings = await state.embeddingProvider.embed([args.query]);
+					queryEmbedding = embeddings[0];
+				} catch {
+					// Embedding failed, will use text-only search
+				}
+
+				// Use TursoDB hybrid search
+				const results = await state.store.hybridSearch(
+					args.query,
+					queryEmbedding,
+					args.maxResults ?? 10,
+					{
+						textWeight: state.config.search.textWeight,
+						vectorWeight: state.config.search.vectorWeight,
+					},
+				);
+
+				// Mark retrieved memories
+				const memoryIds = results.map((r) => r.memory.id);
+				if (memoryIds.length > 0) {
+					await state.store.markRetrieved(memoryIds);
+				}
 
 				const text = JSON.stringify(
 					{
 						success: true,
 						results: results.map((r) => ({
-							snippet: r.chunk.content.substring(0, 500),
-							filePath: r.chunk.filePath,
-							lineRange: [r.chunk.lineStart, r.chunk.lineEnd],
+							snippet: r.memory.content.substring(0, 500),
+							filePath: r.memory.filePath,
+							lineRange: [r.memory.lineStart, r.memory.lineEnd],
 							score: r.score,
 							vectorScore: r.vectorScore,
 							textScore: r.textScore,
+							category: r.memory.category,
+							retrievalCount: r.memory.retrievalCount,
 						})),
 					},
 					null,
@@ -313,16 +335,17 @@ export default function memoryExtension(pi: ExtensionAPI) {
 						ctx.ui.notify("Memory extension not ready", "error");
 						return;
 					}
-					const stats = state.store.getStats();
+					const stats = await state.store.getStats();
 					const embeddingConfig = state.config.embedding;
-					const cacheLine =
-						embeddingConfig.provider === "local" ? `\n- Model cache: ${embeddingConfig.cacheDir ?? "default"}` : "";
+					const categories = Object.entries(stats.categoryCounts)
+						.map(([k, v]) => `${k}: ${v}`)
+						.join(", ");
 					const text = `Memory Status:
-- Chunks indexed: ${stats.chunkCount}
+- Memories indexed: ${stats.memoryCount}
 - Files tracked: ${stats.fileCount}
-- File hashes stored: ${stats.trackedFileCount}
+- Categories: ${categories || "none"}
 - Database: ${state.config.dbPath}
-- Embedding: ${embeddingConfig.provider}/${embeddingConfig.model} (${embeddingConfig.dimensions} dims)${cacheLine}`;
+- Embedding: ${embeddingConfig.provider ?? "none"}/${embeddingConfig.model} (${embeddingConfig.dimensions} dims)`;
 					ctx.ui.notify(text, "info");
 					break;
 				}
@@ -334,9 +357,10 @@ export default function memoryExtension(pi: ExtensionAPI) {
 						return;
 					}
 					console.log("[memory] Starting forced reindex...");
+					await state.store.clearAllFileHashes();
 					await state.indexer.syncAll(state.workspaceDir);
-					const stats = state.store.getStats();
-					ctx.ui.notify(`Reindex complete. Indexed ${stats.chunkCount} chunks from ${stats.fileCount} files.`, "info");
+					const stats = await state.store.getStats();
+					ctx.ui.notify(`Reindex complete. Indexed ${stats.memoryCount} memories from ${stats.fileCount} files.`, "info");
 					break;
 				}
 
@@ -350,19 +374,38 @@ export default function memoryExtension(pi: ExtensionAPI) {
 						ctx.ui.notify("Usage: /memory search <query>", "error");
 						return;
 					}
-					const results = await state.searchEngine.search(query, 5);
+					// Get embedding for query
+					let queryEmbedding: number[] | null = null;
+					try {
+						const embeddings = await state.embeddingProvider.embed([query]);
+						queryEmbedding = embeddings[0];
+					} catch {
+						// Will use text-only search
+					}
+					const results = await state.store.hybridSearch(query, queryEmbedding, 5);
 					const output = results
 						.map(
 							(r, i) =>
-								`${i + 1}. [${r.score.toFixed(3)}] ${r.chunk.filePath}:${r.chunk.lineStart}-${r.chunk.lineEnd}\n   ${r.chunk.content.substring(0, 200)}...`,
+								`${i + 1}. [${r.score.toFixed(3)}] ${r.memory.filePath}:${r.memory.lineStart}-${r.memory.lineEnd}\n   ${r.memory.content.substring(0, 200)}...`,
 						)
 						.join("\n\n");
 					ctx.ui.notify(output || "No results found", "info");
 					break;
 				}
 
+				case "prune": {
+					if (!state?.isReady) {
+						ctx.ui.notify("Memory extension not ready", "error");
+						return;
+					}
+					const days = parseInt(rest[0] || "30", 10);
+					const pruned = await state.store.pruneUnused(days);
+					ctx.ui.notify(`Pruned ${pruned} unused memories older than ${days} days`, "info");
+					break;
+				}
+
 				default: {
-					ctx.ui.notify("Usage: /memory [status|reindex|search <query>]", "error");
+					ctx.ui.notify("Usage: /memory [status|reindex|search <query>|prune <days>]", "error");
 				}
 			}
 		},

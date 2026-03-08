@@ -1,8 +1,15 @@
 {
 	"name": "@clankie/memory",
 	"version": "0.4.0",
-	"description": "Persistent memory with SQLite FTS5 + vector cosine similarity for clankie",
+	"description": "Persistent memory with TursoDB native vector search for clankie",
 	"type": "module",
+	"license": "MIT",
+	"files": [
+		"src/",
+		"skills/",
+		"package.json",
+		"README.md"
+	],
 	"keywords": [
 		"pi-package"
 	],
@@ -22,10 +29,8 @@
 		"@sinclair/typebox": "*"
 	},
 	"dependencies": {
-		"better-sqlite3": "^12.6.2",
-		"sqlite-vec": "^0.1.7-alpha.2"
-	},
-	"devDependencies": {
-		"@types/better-sqlite3": "^7.6.13"
+		"@huggingface/transformers": "^3.4.0",
+		"@tursodatabase/database": "^0.5.0",
+		"glob": "^11.0.0"
 	}
 }

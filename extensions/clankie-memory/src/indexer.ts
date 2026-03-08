@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { glob } from "glob";
 import type { EmbeddingProvider } from "./embeddings.ts";
 import type { MemoryStore } from "./store.ts";
-import type { Chunk, MemoryConfig } from "./types.ts";
+import type { Memory, MemoryConfig } from "./types.ts";
 
 // Rough token estimation (characters / 4)
 function estimateTokens(text: string): number {
@@ -28,12 +28,12 @@ function generateFileHash(content: string): string {
 }
 
 /**
- * Chunk a markdown document into smaller pieces
+ * Chunk a markdown document into Memory entries
  * Strategy: heading-aware splitting with target token size
  */
-export function chunkDocument(content: string, filePath: string, config: MemoryConfig): Chunk[] {
+export function chunkDocument(content: string, filePath: string, config: MemoryConfig): Memory[] {
 	const lines = content.split("\n");
-	const chunks: Chunk[] = [];
+	const memories: Memory[] = [];
 	let currentChunk: string[] = [];
 	let currentStartLine = 0;
 	let chunkIndex = 0;
@@ -42,14 +42,15 @@ export function chunkDocument(content: string, filePath: string, config: MemoryC
 		if (currentChunk.length === 0) return;
 
 		const chunkContent = currentChunk.join("\n");
-		const now = new Date().toISOString();
+		const now = Date.now();
 
-		chunks.push({
+		memories.push({
 			id: generateChunkId(filePath, chunkIndex++),
+			content: chunkContent,
 			filePath,
 			lineStart: currentStartLine + 1, // 1-indexed
 			lineEnd: endLine,
-			content: chunkContent,
+			category: "chunk",
 			createdAt: now,
 			updatedAt: now,
 		});
@@ -86,7 +87,7 @@ export function chunkDocument(content: string, filePath: string, config: MemoryC
 		flushChunk(lines.length);
 	}
 
-	return chunks;
+	return memories;
 }
 
 /**
@@ -181,34 +182,34 @@ export class Indexer {
 			const hash = generateFileHash(content);
 
 			// Check if file has changed
-			const existing = this.store.getFileHash(filePath);
+			const existing = await this.store.getFileHash(filePath);
 			if (existing?.hash === hash) {
 				return; // No change
 			}
 
-			// Delete old chunks for this file
-			this.store.deleteByFile(filePath);
+			// Delete old memories for this file
+			await this.store.deleteByFile(filePath);
 
-			// Chunk the document
-			const chunks = chunkDocument(content, filePath, this.config);
+			// Chunk the document into memories
+			const memories = chunkDocument(content, filePath, this.config);
 
-			// Generate embeddings for chunks
-			if (chunks.length > 0) {
-				const texts = chunks.map((c) => c.content);
+			// Generate embeddings for memories
+			if (memories.length > 0) {
+				const texts = memories.map((m) => m.content);
 				const embeddings = await this.embeddingProvider.embed(texts);
 
-				for (let i = 0; i < chunks.length; i++) {
-					chunks[i].embedding = new Float64Array(embeddings[i]);
+				for (let i = 0; i < memories.length; i++) {
+					memories[i].embedding = embeddings[i];
 				}
 
-				// Store chunks
-				this.store.upsertChunks(chunks);
+				// Store memories
+				await this.store.upsertMemories(memories);
 			}
 
 			// Update file hash
-			this.store.setFileHash(filePath, hash);
+			await this.store.setFileHash(filePath, hash);
 
-			console.log(`[memory] Indexed ${chunks.length} chunks from ${filePath}`);
+			console.log(`[memory] Indexed ${memories.length} memories from ${filePath}`);
 		} catch (error) {
 			console.error(`[memory] Failed to sync ${filePath}:`, error);
 		}
