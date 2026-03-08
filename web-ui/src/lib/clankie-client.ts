@@ -9,6 +9,7 @@ import type {
   AppNotification,
   AuthEvent,
   AuthProvider,
+  ExtensionDetails,
   ExtensionError,
   ExtensionInfo,
   ExtensionUIRequest,
@@ -290,6 +291,28 @@ export class ClankieClient {
       extensions: Array<ExtensionInfo>
       errors: Array<ExtensionError>
     }
+  }
+
+  async getExtensionDetails(
+    sessionId: string,
+    extensionPath: string,
+  ): Promise<ExtensionDetails> {
+    const response = await this.sendCommand(
+      { type: 'get_extension_details', extensionPath },
+      sessionId,
+    )
+    return response as ExtensionDetails
+  }
+
+  async uninstallExtension(
+    sessionId: string,
+    extensionPath: string,
+  ): Promise<{ message: string }> {
+    const response = await this.sendCommand(
+      { type: 'uninstall_extension', extensionPath },
+      sessionId,
+    )
+    return response as { message: string }
   }
 
   async getExtensionConfig(

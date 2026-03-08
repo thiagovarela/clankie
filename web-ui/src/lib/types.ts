@@ -73,7 +73,9 @@ export type RpcCommand =
   | { id?: string; type: 'get_messages' }
   | { id?: string; type: 'get_commands' }
   | { id?: string; type: 'get_extensions' }
+  | { id?: string; type: 'get_extension_details'; extensionPath: string }
   | { id?: string; type: 'get_extension_config'; extensionPath: string }
+  | { id?: string; type: 'uninstall_extension'; extensionPath: string }
   | {
       id?: string
       type: 'set_extension_config'
@@ -443,6 +445,36 @@ export interface ExtensionInfo {
   resolvedPath: string
   tools: Array<string>
   commands: Array<string>
+  flags: Array<string>
+  shortcuts: Array<string>
+  uiSpec?: ExtensionUISpec
+  uiState?: Record<string, unknown>
+}
+
+export interface ExtensionToolInfo {
+  name: string
+  description?: string
+  inputSchema?: Record<string, unknown>
+}
+
+export interface ExtensionCommandInfo {
+  name: string
+  description?: string
+}
+
+export interface ExtensionSkillInfo {
+  name: string
+  description: string
+  filePath: string
+}
+
+export interface ExtensionDetails {
+  path: string
+  resolvedPath: string
+  readme?: string
+  skills: Array<ExtensionSkillInfo>
+  tools: Array<ExtensionToolInfo>
+  commands: Array<ExtensionCommandInfo>
   flags: Array<string>
   shortcuts: Array<string>
   uiSpec?: ExtensionUISpec

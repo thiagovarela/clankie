@@ -1,12 +1,14 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { useStore } from '@tanstack/react-store'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Bell,
+  Download,
   Filter,
   Globe,
   KeyRound,
   Palette,
+  Package,
   Puzzle,
   Settings,
   Sparkles,
@@ -16,6 +18,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
@@ -29,13 +32,17 @@ import {
   getUnreadCount,
   notificationsStore,
 } from '@/stores/notifications'
+import { extensionsStore, setExtensions, setLoading } from '@/stores/extensions'
+import { sessionsListStore } from '@/stores/sessions-list'
+import { connectionStore } from '@/stores/connection'
+import { clientManager } from '@/lib/client-manager'
+import { deriveExtensionDisplayName, getExtensionCategory } from '@/lib/extension-utils'
 
 const settingsLinks = [
   { to: '/settings/theme', label: 'Appearance', icon: Palette },
   { to: '/settings/connection', label: 'Connection', icon: Globe },
   { to: '/settings/auth', label: 'Auth', icon: KeyRound },
   { to: '/settings/scoped-models', label: 'Scoped Models', icon: Filter },
-  { to: '/settings/extensions', label: 'Extensions', icon: Puzzle },
   { to: '/settings/skills', label: 'Skills', icon: Sparkles },
 ]
 
@@ -44,17 +51,62 @@ export function NavSecondary() {
   const currentPath = location.pathname
   const isInSettings = currentPath.startsWith('/settings')
   const isInNotifications = currentPath === '/notifications'
+  const isInExtensions = currentPath.startsWith('/extensions')
   const { isMobile, setOpenMobile } = useSidebar()
-  const [open, setOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [extensionsMenuOpen, setExtensionsMenuOpen] = useState(false)
 
   const unreadCount = useStore(notificationsStore, getUnreadCount)
 
+  const { status } = useStore(connectionStore, (state) => ({
+    status: state.status,
+  }))
+
+  const { activeSessionId } = useStore(sessionsListStore, (state) => ({
+    activeSessionId: state.activeSessionId,
+  }))
+
+  const { extensions } = useStore(extensionsStore, (state) => ({
+    extensions: state.extensions,
+  }))
+
+  const isConnected = status === 'connected'
+
+  // Load extensions when connected
+  const loadExtensions = useCallback(async () => {
+    const client = clientManager.getClient()
+    if (!client || !activeSessionId) return
+
+    setLoading(true)
+    try {
+      const { extensions: extList, errors } = await client.getExtensions(activeSessionId)
+      setExtensions(extList, errors)
+    } catch (err) {
+      console.error('Failed to load extensions:', err)
+    } finally {
+      setLoading(false)
+    }
+  }, [activeSessionId])
+
+  useEffect(() => {
+    if (isConnected && activeSessionId && extensions.length === 0) {
+      loadExtensions()
+    }
+  }, [isConnected, activeSessionId, extensions.length, loadExtensions])
+
   const handleNavigate = () => {
-    setOpen(false)
+    setSettingsOpen(false)
+    setExtensionsMenuOpen(false)
     if (isMobile) {
       setOpenMobile(false)
     }
   }
+
+  // Get package extensions (non-built-in) for the menu
+  const packageExtensions = extensions.filter((ext) => {
+    const category = getExtensionCategory(ext)
+    return category === 'packages' || category === 'local'
+  })
 
   return (
     <SidebarMenu>
@@ -86,8 +138,64 @@ export function NavSecondary() {
         />
       </SidebarMenuItem>
 
+      {/* Extensions Dropdown */}
       <SidebarMenuItem>
-        <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenu open={extensionsMenuOpen} onOpenChange={setExtensionsMenuOpen}>
+          <DropdownMenuTrigger
+            render={
+              <SidebarMenuButton
+                isActive={isInExtensions}
+                className="h-10 text-sm text-sidebar-foreground/70 hover:text-sidebar-foreground rounded-xl"
+              >
+                <Puzzle className="h-4 w-4" />
+                <span>Extensions</span>
+              </SidebarMenuButton>
+            }
+          />
+          <DropdownMenuContent
+            side={isMobile ? 'bottom' : 'right'}
+            align={isMobile ? 'end' : 'start'}
+            className="w-56"
+          >
+            <DropdownMenuItem
+              render={<Link to="/extensions/install" />}
+              className="h-9 text-sm"
+              onClick={handleNavigate}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              <span>Install</span>
+            </DropdownMenuItem>
+
+            {packageExtensions.length > 0 && <DropdownMenuSeparator />}
+
+            {packageExtensions.map((ext) => {
+              const displayName = deriveExtensionDisplayName(ext.path, ext.resolvedPath)
+              const encodedPath = encodeURIComponent(ext.path)
+
+              return (
+                <DropdownMenuItem
+                  key={ext.path}
+                  render={
+                    <Link
+                      to="/extensions/$extensionId"
+                      params={{ extensionId: encodedPath }}
+                    />
+                  }
+                  className="h-9 text-sm"
+                  onClick={handleNavigate}
+                >
+                  <Package className="h-4 w-4 mr-2" />
+                  <span className="truncate">{displayName}</span>
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </SidebarMenuItem>
+
+      {/* Settings Dropdown */}
+      <SidebarMenuItem>
+        <DropdownMenu open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DropdownMenuTrigger
             render={
               <SidebarMenuButton

@@ -19,6 +19,8 @@ import { Route as SettingsExtensionsRouteImport } from './routes/settings/extens
 import { Route as SettingsConnectionRouteImport } from './routes/settings/connection'
 import { Route as SettingsAuthRouteImport } from './routes/settings/auth'
 import { Route as SessionsSessionIdRouteImport } from './routes/sessions.$sessionId'
+import { Route as ExtensionsInstallRouteImport } from './routes/extensions/install'
+import { Route as ExtensionsExtensionIdRouteImport } from './routes/extensions/$extensionId'
 
 const NotificationsRoute = NotificationsRouteImport.update({
   id: '/notifications',
@@ -70,10 +72,22 @@ const SessionsSessionIdRoute = SessionsSessionIdRouteImport.update({
   path: '/sessions/$sessionId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ExtensionsInstallRoute = ExtensionsInstallRouteImport.update({
+  id: '/extensions/install',
+  path: '/extensions/install',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExtensionsExtensionIdRoute = ExtensionsExtensionIdRouteImport.update({
+  id: '/extensions/$extensionId',
+  path: '/extensions/$extensionId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/notifications': typeof NotificationsRoute
+  '/extensions/$extensionId': typeof ExtensionsExtensionIdRoute
+  '/extensions/install': typeof ExtensionsInstallRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/settings/auth': typeof SettingsAuthRoute
   '/settings/connection': typeof SettingsConnectionRoute
@@ -86,6 +100,8 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/notifications': typeof NotificationsRoute
+  '/extensions/$extensionId': typeof ExtensionsExtensionIdRoute
+  '/extensions/install': typeof ExtensionsInstallRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/settings/auth': typeof SettingsAuthRoute
   '/settings/connection': typeof SettingsConnectionRoute
@@ -99,6 +115,8 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/notifications': typeof NotificationsRoute
+  '/extensions/$extensionId': typeof ExtensionsExtensionIdRoute
+  '/extensions/install': typeof ExtensionsInstallRoute
   '/sessions/$sessionId': typeof SessionsSessionIdRoute
   '/settings/auth': typeof SettingsAuthRoute
   '/settings/connection': typeof SettingsConnectionRoute
@@ -113,6 +131,8 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/notifications'
+    | '/extensions/$extensionId'
+    | '/extensions/install'
     | '/sessions/$sessionId'
     | '/settings/auth'
     | '/settings/connection'
@@ -125,6 +145,8 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/notifications'
+    | '/extensions/$extensionId'
+    | '/extensions/install'
     | '/sessions/$sessionId'
     | '/settings/auth'
     | '/settings/connection'
@@ -137,6 +159,8 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/notifications'
+    | '/extensions/$extensionId'
+    | '/extensions/install'
     | '/sessions/$sessionId'
     | '/settings/auth'
     | '/settings/connection'
@@ -150,6 +174,8 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   NotificationsRoute: typeof NotificationsRoute
+  ExtensionsExtensionIdRoute: typeof ExtensionsExtensionIdRoute
+  ExtensionsInstallRoute: typeof ExtensionsInstallRoute
   SessionsSessionIdRoute: typeof SessionsSessionIdRoute
   SettingsAuthRoute: typeof SettingsAuthRoute
   SettingsConnectionRoute: typeof SettingsConnectionRoute
@@ -232,12 +258,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SessionsSessionIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/extensions/install': {
+      id: '/extensions/install'
+      path: '/extensions/install'
+      fullPath: '/extensions/install'
+      preLoaderRoute: typeof ExtensionsInstallRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/extensions/$extensionId': {
+      id: '/extensions/$extensionId'
+      path: '/extensions/$extensionId'
+      fullPath: '/extensions/$extensionId'
+      preLoaderRoute: typeof ExtensionsExtensionIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   NotificationsRoute: NotificationsRoute,
+  ExtensionsExtensionIdRoute: ExtensionsExtensionIdRoute,
+  ExtensionsInstallRoute: ExtensionsInstallRoute,
   SessionsSessionIdRoute: SessionsSessionIdRoute,
   SettingsAuthRoute: SettingsAuthRoute,
   SettingsConnectionRoute: SettingsConnectionRoute,

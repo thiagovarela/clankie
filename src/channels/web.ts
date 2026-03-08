@@ -121,7 +121,9 @@ type RpcCommand =
 	| { id?: string; type: "get_messages" }
 	| { id?: string; type: "get_commands" }
 	| { id?: string; type: "get_extensions" }
+	| { id?: string; type: "get_extension_details"; extensionPath: string }
 	| { id?: string; type: "get_extension_config"; extensionPath: string }
+	| { id?: string; type: "uninstall_extension"; extensionPath: string }
 	| {
 			id?: string;
 			type: "set_extension_config";
@@ -1465,6 +1467,180 @@ export class WebChannel implements Channel {
 						errors: extensionsResult.errors,
 					},
 				};
+			}
+
+			case "get_extension_details": {
+				const extension = this.getExtensionDescriptor(session, command.extensionPath);
+				if (!extension) {
+					return {
+						id,
+						type: "response",
+						command: "get_extension_details",
+						success: false,
+						error: `Unknown extension: ${command.extensionPath}`,
+					};
+				}
+
+				const cwd = this.getSessionCwd(session);
+				const uiSpec = resolveExtensionUiSpec(extension);
+				const config = getExtensionUiConfig(cwd, extension);
+				const availableModels = await session.modelRegistry.getAvailable();
+				const availableModelIds = [
+					"(default session model)",
+					...Array.from(new Set(availableModels.map((model) => `${model.provider}/${model.id}`))).sort(),
+				];
+
+				// Find README
+				let readme: string | undefined;
+				const extensionDir = extension.resolvedPath.startsWith("<inline:")
+					? undefined
+					: existsSync(extension.resolvedPath) && statSync(extension.resolvedPath).isDirectory()
+						? extension.resolvedPath
+						: dirname(extension.resolvedPath);
+
+				if (extensionDir) {
+					// Look for README in extension directory or package root
+					const packageRoot = findPackageRoot(extensionDir);
+					const readmeCandidates = [
+						join(extensionDir, "README.md"),
+						join(extensionDir, "readme.md"),
+						...(packageRoot
+							? [join(packageRoot, "README.md"), join(packageRoot, "readme.md")]
+							: []),
+					];
+					for (const candidate of readmeCandidates) {
+						if (existsSync(candidate)) {
+							try {
+								readme = readFileSync(candidate, "utf8");
+								break;
+							} catch {
+								// ignore read errors
+							}
+						}
+					}
+				}
+
+				// Get skills associated with this extension
+				const skillsResult = session.resourceLoader.getSkills();
+				const extensionSkills = skillsResult.skills
+					.filter((skill) => {
+						// Check if skill's baseDir or filePath is within extension directory
+						if (!extensionDir) return false;
+						return (
+							skill.baseDir.startsWith(extensionDir) || skill.filePath.startsWith(extensionDir)
+						);
+					})
+					.map((skill) => ({
+						name: skill.name,
+						description: skill.description,
+						filePath: skill.filePath,
+					}));
+
+				// Get tool details
+				const tools = Array.from(extension.tools.entries()).map(([name, tool]) => {
+					const toolDef = tool as { description?: string; inputSchema?: Record<string, unknown> };
+					return {
+						name,
+						description: toolDef.description,
+						inputSchema: toolDef.inputSchema,
+					};
+				});
+
+				// Get command details
+				const commands = Array.from(extension.commands.entries()).map(([name, cmd]) => {
+					const cmdDef = cmd as { description?: string };
+					return {
+						name,
+						description: cmdDef.description,
+					};
+				});
+
+				const uiState = uiSpec
+					? {
+							config: {
+								...config,
+								model:
+									typeof config.model === "string" && config.model.trim().length > 0
+										? config.model
+										: "(default session model)",
+							},
+							availableModels: availableModelIds,
+							extensionPath: extension.path,
+						}
+					: undefined;
+
+				return {
+					id,
+					type: "response",
+					command: "get_extension_details",
+					success: true,
+					data: {
+						path: extension.path,
+						resolvedPath: extension.resolvedPath,
+						readme,
+						skills: extensionSkills,
+						tools,
+						commands,
+						flags: Array.from(extension.flags.keys()),
+						shortcuts: Array.from(extension.shortcuts.keys()),
+						uiSpec,
+						uiState,
+					},
+				};
+			}
+
+			case "uninstall_extension": {
+				const extension = this.getExtensionDescriptor(session, command.extensionPath);
+				if (!extension) {
+					return {
+						id,
+						type: "response",
+						command: "uninstall_extension",
+						success: false,
+						error: `Unknown extension: ${command.extensionPath}`,
+					};
+				}
+
+				const config = loadConfig();
+				const cwd = getWorkspace(config);
+				const agentDir = getAgentDir(config);
+				const settingsManager = SettingsManager.create(cwd, agentDir);
+				const packageManager = new DefaultPackageManager({ cwd, agentDir, settingsManager });
+
+				try {
+					// Remove from settings
+					const removed = packageManager.removeSourceFromSettings(extension.path);
+					if (!removed) {
+						return {
+							id,
+							type: "response",
+							command: "uninstall_extension",
+							success: false,
+							error: `Extension not found in settings: ${extension.path}`,
+						};
+					}
+
+					// Reload all sessions to pick up the change
+					await reloadAllSessions();
+
+					return {
+						id,
+						type: "response",
+						command: "uninstall_extension",
+						success: true,
+						data: {
+							message: `Uninstalled ${extension.path}`,
+						},
+					};
+				} catch (err) {
+					return {
+						id,
+						type: "response",
+						command: "uninstall_extension",
+						success: false,
+						error: err instanceof Error ? err.message : "Unknown error during uninstall",
+					};
+				}
 			}
 
 			case "get_extension_config": {

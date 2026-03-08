@@ -9,6 +9,14 @@ const PATH_SPLIT_PATTERN = /[\\/]+/
 const FILE_EXTENSION_PATTERN = /\.[a-z0-9]+$/i
 
 const INDEX_FILENAMES = new Set(['index', 'main', 'mod'])
+const GENERIC_DIR_SEGMENTS = new Set([
+  'src',
+  'dist',
+  'lib',
+  'build',
+  'esm',
+  'cjs',
+])
 
 function splitPath(pathValue: string): Array<string> {
   return pathValue.split(PATH_SPLIT_PATTERN).filter(Boolean)
@@ -48,22 +56,32 @@ function extractPackageName(pathValue: string): string | undefined {
   const segments = splitPath(pathValue)
   const nodeModulesIndex = segments.lastIndexOf('node_modules')
 
-  if (nodeModulesIndex < 0) {
-    return undefined
+  if (nodeModulesIndex >= 0) {
+    const first = segments[nodeModulesIndex + 1]
+    const second = segments[nodeModulesIndex + 2]
+
+    if (!first) {
+      return undefined
+    }
+
+    // For scoped packages like @clankie/memory, return just the package name part
+    if (first.startsWith('@') && second) {
+      return prettifyName(second)
+    }
+
+    return prettifyName(first)
   }
 
-  const first = segments[nodeModulesIndex + 1]
-  const second = segments[nodeModulesIndex + 2]
-
-  if (!first) {
-    return undefined
+  // Fallback for package-manager install roots like ~/.clankie/extensions/@scope/pkg/src/index.ts
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const current = segments[index]
+    const next = segments[index + 1]
+    if (current.startsWith('@') && next) {
+      return prettifyName(next)
+    }
   }
 
-  if (first.startsWith('@') && second) {
-    return `${first}/${second}`
-  }
-
-  return first
+  return undefined
 }
 
 function pickBestPathSegment(pathValue: string): string | undefined {
@@ -78,6 +96,17 @@ function pickBestPathSegment(pathValue: string): string | undefined {
   }
 
   if (INDEX_FILENAMES.has(lastSegment.toLowerCase()) && segments.length > 1) {
+    const previous = stripFileExtension(segments[segments.length - 2])
+    if (
+      GENERIC_DIR_SEGMENTS.has(previous.toLowerCase()) &&
+      segments.length > 2
+    ) {
+      return stripFileExtension(segments[segments.length - 3])
+    }
+    return previous
+  }
+
+  if (GENERIC_DIR_SEGMENTS.has(lastSegment.toLowerCase()) && segments.length > 1) {
     return stripFileExtension(segments[segments.length - 2])
   }
 
