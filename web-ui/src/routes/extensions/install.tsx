@@ -10,6 +10,7 @@ import {
   Puzzle,
   Search,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -127,6 +128,7 @@ function ExtensionsInstallPage() {
       setExtensions(extList, errors)
     } catch (err) {
       console.error('Failed to load extensions:', err)
+      toast.warning('Installed, but failed to refresh extension list')
       setLoading(false)
     }
   }, [activeSessionId])
@@ -138,6 +140,7 @@ function ExtensionsInstallPage() {
 
       setInstallingPackage(source)
       setInstallOutput({ output: `Installing ${source}...` })
+      const toastId = toast.loading(`Installing ${source}...`)
 
       try {
         const result = await client.installPackage(activeSessionId, source, false)
@@ -145,11 +148,28 @@ function ExtensionsInstallPage() {
           output: result.output,
           exitCode: result.exitCode,
         })
-        await loadExtensions()
+        toast.success(`Installed ${source}`, {
+          id: toastId,
+          description: 'Refreshing extensions…',
+        })
+        loadExtensions().catch((refreshError) => {
+          console.error('Failed to refresh extensions after install:', refreshError)
+        })
       } catch (err) {
+        const rawMessage =
+          err instanceof Error ? err.message : 'Failed to install package'
+        const message = rawMessage.includes('Request timeout')
+          ? 'Install request timed out. The package may still be installing in the background.'
+          : rawMessage
+
         setInstallOutput({
-          error: err instanceof Error ? err.message : 'Failed to install package',
+          error: message,
           exitCode: 1,
+        })
+
+        toast.error(`Failed to install ${source}`, {
+          id: toastId,
+          description: message,
         })
       } finally {
         setInstallingPackage(null)
@@ -162,6 +182,7 @@ function ExtensionsInstallPage() {
     const source = packageSource.trim()
     if (!source) {
       setInstallOutput({ error: 'Package source is required' })
+      toast.error('Package source is required')
       return
     }
     await installPackage(source)
@@ -217,6 +238,9 @@ function ExtensionsInstallPage() {
                   <h3 className="font-medium mb-1">Install from Package</h3>
                   <p className="text-sm text-muted-foreground">
                     Install any npm package or git repository
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Installs can take a while; the UI waits up to 5 minutes before timing out.
                   </p>
                 </div>
 

@@ -38,12 +38,20 @@ export interface ClankieClientOptions {
   onStateChange: (state: ConnectionState, error?: string) => void
 }
 
+const DEFAULT_REQUEST_TIMEOUT_MS = 30_000
+const INSTALL_REQUEST_TIMEOUT_MS = 5 * 60_000
+const RELOAD_REQUEST_TIMEOUT_MS = 90_000
+
 export class ClankieClient {
   private ws: WebSocketClient
   private options: ClankieClientOptions
   private pendingRequests = new Map<
     string,
-    { resolve: (data: unknown) => void; reject: (error: Error) => void }
+    {
+      resolve: (data: unknown) => void
+      reject: (error: Error) => void
+      timeoutHandle: ReturnType<typeof setTimeout>
+    }
   >()
   private requestIdCounter = 0
 
@@ -67,6 +75,7 @@ export class ClankieClient {
     this.ws.disconnect()
     // Reject all pending requests
     for (const [id, pending] of this.pendingRequests.entries()) {
+      clearTimeout(pending.timeoutHandle)
       pending.reject(new Error('Connection closed'))
       this.pendingRequests.delete(id)
     }
@@ -419,12 +428,15 @@ export class ClankieClient {
     const response = await this.sendCommand(
       { type: 'install_package', source, local },
       sessionId,
+      { timeoutMs: INSTALL_REQUEST_TIMEOUT_MS },
     )
     return response as { output: string; exitCode: number }
   }
 
   async reload(sessionId: string): Promise<void> {
-    await this.sendCommand({ type: 'reload' }, sessionId)
+    await this.sendCommand({ type: 'reload' }, sessionId, {
+      timeoutMs: RELOAD_REQUEST_TIMEOUT_MS,
+    })
   }
 
   // ─── Notifications ─────────────────────────────────────────────────────────
@@ -465,6 +477,7 @@ export class ClankieClient {
       if (!response.id) return // Skip responses without id
       const pending = this.pendingRequests.get(response.id)
       if (pending) {
+        clearTimeout(pending.timeoutHandle)
         this.pendingRequests.delete(response.id)
         if (response.success) {
           pending.resolve(response.data)
@@ -485,6 +498,7 @@ export class ClankieClient {
       if (event.type === 'response' && event.id) {
         const pending = this.pendingRequests.get(event.id)
         if (pending) {
+          clearTimeout(pending.timeoutHandle)
           this.pendingRequests.delete(event.id)
           if (event.success) {
             pending.resolve(event.data)
@@ -530,6 +544,7 @@ export class ClankieClient {
   private async sendCommand(
     command: RpcCommand,
     sessionId?: string,
+    options?: { timeoutMs?: number },
   ): Promise<unknown> {
     if (this.getConnectionState() !== 'connected') {
       throw new Error('WebSocket is not connected')
@@ -542,16 +557,16 @@ export class ClankieClient {
     }
 
     return new Promise((resolve, reject) => {
-      this.pendingRequests.set(id, { resolve, reject })
-      this.ws.send(message)
-
-      // Timeout after 30 seconds
-      setTimeout(() => {
+      const timeoutMs = options?.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS
+      const timeoutHandle = setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id)
-          reject(new Error('Request timeout'))
+          reject(new Error(`Request timeout (${command.type}, ${timeoutMs}ms)`))
         }
-      }, 30000)
+      }, timeoutMs)
+
+      this.pendingRequests.set(id, { resolve, reject, timeoutHandle })
+      this.ws.send(message)
     })
   }
 }

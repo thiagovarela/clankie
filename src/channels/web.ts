@@ -1772,8 +1772,12 @@ export class WebChannel implements Channel {
 						output.push(`Package source already configured: ${source}`);
 					}
 
-					// Successful install - reload all sessions to pick up new extensions/skills
-					await reloadAllSessions();
+					// Successful install - trigger runtime reload asynchronously.
+					setTimeout(() => {
+						reloadAllSessions().catch((reloadErr) => {
+							console.error("[web] Failed to reload sessions after install:", reloadErr);
+						});
+					}, 0);
 
 					return {
 						id,
@@ -1781,7 +1785,7 @@ export class WebChannel implements Channel {
 						command: "install_package",
 						success: true,
 						data: {
-							output: output.join("\n") || `Installed ${source}`,
+							output: output.join("\n") || `Installed ${source}. Runtime reload scheduled.`,
 							exitCode: 0,
 						},
 					};
