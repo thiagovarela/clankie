@@ -7,8 +7,9 @@
  * Each chat gets its own persistent session (keyed by channel+chatId).
  */
 
+import { spawn } from "node:child_process";
 import { existsSync, readFileSync, unlinkSync, watch, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { Channel, InboundMessage } from "./channels/channel.ts";
 import { WebChannel } from "./channels/web.ts";
 import { getAppDir, getBundledWebUiDir, getConfigPath, getWorkspace, loadConfig } from "./config.ts";
@@ -53,6 +54,57 @@ function cleanupPidFile(): void {
 		unlinkSync(PID_FILE);
 	} catch {
 		// ignore
+	}
+}
+
+function isProcessAlive(pid: number): boolean {
+	try {
+		process.kill(pid, 0);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+async function waitForProcessExit(pid: number, timeoutMs = 10000): Promise<boolean> {
+	const start = Date.now();
+	while (Date.now() - start < timeoutMs) {
+		if (!isProcessAlive(pid)) return true;
+		await new Promise((resolve) => setTimeout(resolve, 100));
+	}
+	return !isProcessAlive(pid);
+}
+
+function resolveCliEntryPath(): string {
+	const thisFile = import.meta.filename;
+	return thisFile.endsWith("daemon.ts") ? join(dirname(thisFile), "cli.ts") : join(dirname(thisFile), "cli.js");
+}
+
+/**
+ * Restart this daemon process by handing off to a detached CLI helper.
+ *
+ * The helper executes `clankie restart`, while this process exits via SIGTERM.
+ */
+export function requestSelfRestart(): boolean {
+	try {
+		const runtime = process.execPath || process.argv[0];
+		const cliEntry = resolveCliEntryPath();
+		const helper = spawn(runtime, [cliEntry, "restart"], {
+			detached: true,
+			stdio: "ignore",
+			env: {
+				...process.env,
+				CLANKIE_SELF_RESTART_HANDOFF: "1",
+			},
+		});
+		helper.unref();
+
+		console.log(`[daemon] Spawned restart helper (pid ${helper.pid ?? "unknown"}). Shutting down current process...`);
+		process.kill(process.pid, "SIGTERM");
+		return true;
+	} catch (err) {
+		console.error(`[daemon] Failed to request self-restart: ${err instanceof Error ? err.message : String(err)}`);
+		return false;
 	}
 }
 
@@ -432,8 +484,8 @@ export function stopDaemon(): boolean {
 
 	try {
 		process.kill(status.pid, "SIGTERM");
-		console.log(`Stopped daemon (pid ${status.pid}).`);
-		cleanupPidFile();
+		console.log(`Sent SIGTERM to daemon (pid ${status.pid}).`);
+		// Do not remove PID file here; the daemon removes it on graceful shutdown.
 		return true;
 	} catch (err) {
 		console.error(`Failed to stop daemon: ${err instanceof Error ? err.message : String(err)}`);
@@ -443,23 +495,32 @@ export function stopDaemon(): boolean {
 
 export async function restartDaemon(): Promise<void> {
 	const status = isRunning();
-	if (!status.running) {
+	if (!status.running || !status.pid) {
 		console.log("Daemon is not running. Starting...");
 		await startDaemon();
 		return;
 	}
 
+	if (status.pid === process.pid) {
+		console.log("Restart requested from within daemon process — using helper handoff...");
+		if (!requestSelfRestart()) {
+			process.exit(1);
+		}
+		return;
+	}
+
 	console.log(`Restarting daemon (pid ${status.pid})...`);
 
-	// Stop the daemon
 	if (!stopDaemon()) {
 		console.error("Failed to stop daemon. Aborting restart.");
 		process.exit(1);
 	}
 
-	// Wait a moment for cleanup
-	await new Promise((resolve) => setTimeout(resolve, 1000));
+	const exited = await waitForProcessExit(status.pid, 10000);
+	if (!exited) {
+		console.error(`Timed out waiting for daemon (pid ${status.pid}) to stop.`);
+		process.exit(1);
+	}
 
-	// Start fresh
 	await startDaemon();
 }

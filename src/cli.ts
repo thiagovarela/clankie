@@ -389,6 +389,12 @@ function cmdStop(): void {
 }
 
 async function cmdRestart(): Promise<void> {
+	if (hasInstalledService()) {
+		console.log("Restarting installed service...");
+		restartInstalledService();
+		return;
+	}
+
 	await restartDaemon();
 }
 
