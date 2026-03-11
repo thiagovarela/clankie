@@ -4,7 +4,12 @@
  */
 
 import { toast } from 'sonner'
-import type { AgentSessionEvent, AppNotification, AuthEvent, RpcResponse } from '@/lib/types'
+import type {
+  AgentSessionEvent,
+  AppNotification,
+  AuthEvent,
+  RpcResponse,
+} from '@/lib/types'
 import { addNotification } from '@/stores/notifications'
 import { updateLoginFlow } from '@/stores/auth'
 import {
@@ -17,6 +22,7 @@ import {
   appendThinkingToken,
   endAssistantMessage,
   endThinking,
+  markCurrentAssistantHasToolCalls,
   startAssistantMessage,
   startThinking,
 } from '@/stores/messages'
@@ -209,6 +215,7 @@ export function handleSessionEvent(
     // ─── Tool execution ────────────────────────────────────────────────
     case 'tool_execution_start':
       if (isActiveSession) {
+        markCurrentAssistantHasToolCalls()
         startToolExecution({
           toolCallId: event.toolCallId,
           toolName: event.toolName,

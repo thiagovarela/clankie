@@ -24,6 +24,7 @@ export interface DisplayMessage {
   thinkingContent?: string
   persistedThinkingContent?: string
   isThinking?: boolean
+  hasToolCalls?: boolean
   attachments?: Array<DisplayAttachment>
 }
 
@@ -81,6 +82,7 @@ export function startAssistantMessage(): void {
         content: '',
         timestamp: Date.now(),
         isStreaming: true,
+        hasToolCalls: false,
       },
     ],
   }))
@@ -121,7 +123,8 @@ export function endAssistantMessage(): void {
 
         const hasText = msg.content.trim().length > 0
         const hasThinking = (msg.thinkingContent ?? '').trim().length > 0
-        return hasText || hasThinking
+        const hasToolCalls = msg.hasToolCalls === true
+        return hasText || hasThinking || hasToolCalls
       }),
   }))
 }
@@ -169,6 +172,21 @@ export function endThinking(): void {
   })
 }
 
+export function markCurrentAssistantHasToolCalls(): void {
+  messagesStore.setState((state) => {
+    if (!state.currentMessageId) return state
+
+    return {
+      ...state,
+      messages: state.messages.map((msg) =>
+        msg.id === state.currentMessageId
+          ? { ...msg, hasToolCalls: true }
+          : msg,
+      ),
+    }
+  })
+}
+
 export function setMessages(messages: Array<Message>): void {
   // Convert pi's Message format to DisplayMessage format
   // Filter to only user and assistant messages (skip bashExecution, toolResult, etc.)
@@ -177,6 +195,7 @@ export function setMessages(messages: Array<Message>): void {
     .map((msg, idx) => {
       let textContent = ''
       let persistedThinkingContent: string | undefined
+      let hasToolCalls = false
       let attachments: Array<DisplayAttachment> = []
 
       // Handle different content shapes: string, array, or undefined
@@ -197,6 +216,7 @@ export function setMessages(messages: Array<Message>): void {
             .map((c) => c.thinking)
             .join('\n\n')
 
+          hasToolCalls = msg.content.some((c) => c.type === 'toolCall')
           persistedThinkingContent = thinkingBlocks || undefined
         }
 
@@ -217,6 +237,7 @@ export function setMessages(messages: Array<Message>): void {
         role: msg.role as 'user' | 'assistant',
         content: textContent,
         persistedThinkingContent,
+        hasToolCalls: hasToolCalls || undefined,
         attachments: attachments.length > 0 ? attachments : undefined,
         timestamp: Date.now() - (messages.length - idx) * 1000, // Approximate timestamps
       }
@@ -229,8 +250,9 @@ export function setMessages(messages: Array<Message>): void {
       const hasText = message.content.trim().length > 0
       const hasThinking =
         (message.persistedThinkingContent ?? '').trim().length > 0
+      const hasToolCalls = message.hasToolCalls === true
 
-      return hasText || hasThinking
+      return hasText || hasThinking || hasToolCalls
     })
 
   messagesStore.setState((state) => ({

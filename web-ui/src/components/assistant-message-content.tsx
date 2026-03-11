@@ -87,6 +87,14 @@ export function AssistantMessageContent({
             {message.content}
           </ReactMarkdown>
         </div>
+      ) : message.isStreaming ? (
+        <div className="prose prose-base dark:prose-invert max-w-none text-muted-foreground">
+          ...
+        </div>
+      ) : message.hasToolCalls ? (
+        <p className="text-sm text-muted-foreground">
+          Used tools to complete this step.
+        </p>
       ) : null}
     </>
   )
