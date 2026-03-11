@@ -4,7 +4,7 @@ import { createSession } from "../../agent.ts";
 import { createNotification } from "../../notifications.ts";
 import { acquireCronLock, releaseCronLock } from "./lock.ts";
 import { ensureJobsFile, loadJobs, saveJobs } from "./storage.ts";
-import type { CronDeliveryTarget, CronJob, CronListItem, CronSchedule } from "./types.ts";
+import type { CronDeliveryTarget, CronForkContext, CronJob, CronListItem, CronSchedule } from "./types.ts";
 
 const DEFAULT_TICK_MS = 30_000;
 const JOB_TIMEOUT_MS = 5 * 60_000;
@@ -20,6 +20,8 @@ export interface CronCreateJobInput {
 	message: string;
 	delivery?: CronDeliveryTarget;
 	deleteAfterRun?: boolean;
+	/** Fork from a session instead of running ephemeral */
+	forkFrom?: CronForkContext;
 }
 
 export interface CronUpdateJobInput {
@@ -95,10 +97,11 @@ export class CronScheduler {
 			deleteAfterRun: input.deleteAfterRun ?? input.schedule.kind === "at",
 			createdAt,
 			consecutiveFailures: 0,
+			forkFrom: input.forkFrom,
 		};
 		this.jobs.push(job);
 		this.persist();
-		console.log(`[cron] Added job ${job.name} (${job.jobId}), total jobs: ${this.jobs.length}`);
+		console.log(`[cron] Added job ${job.name} (${job.jobId})${job.forkFrom ? " (will fork)" : ""}, total jobs: ${this.jobs.length}`);
 		return job;
 	}
 
@@ -190,7 +193,23 @@ export class CronScheduler {
 		}, JOB_TIMEOUT_MS);
 
 		try {
-			const { session } = await createSession({ ephemeral: true });
+			let session: Awaited<ReturnType<typeof createSession>>["session"];
+
+			if (job.forkFrom) {
+				// Fork from existing session - continues with full context
+				console.log(`[cron] Forking job ${job.name} from session ${job.forkFrom.sessionFile}`);
+				const result = await createSession({ sessionFile: job.forkFrom.sessionFile });
+				session = result.session;
+				
+				// Fork at the specified entry point
+				await session.fork(job.forkFrom.entryId);
+				console.log(`[cron] Forked session, new file: ${session.sessionFile}`);
+			} else {
+				// Ephemeral session - no persistence, no context
+				const result = await createSession({ ephemeral: true });
+				session = result.session;
+			}
+
 			const prompt = `[cron:${job.jobId} ${job.name}]\n${job.message}`;
 			await session.prompt(prompt, { source: "rpc" });
 
@@ -213,7 +232,7 @@ export class CronScheduler {
 			job.lastRunAt = new Date().toISOString();
 			job.consecutiveFailures = 0;
 
-			if (job.schedule.kind === "at" && job.deleteAfterRun) {
+			if (job.deleteAfterRun) {
 				this.jobs = this.jobs.filter((entry) => entry.jobId !== job.jobId);
 			}
 

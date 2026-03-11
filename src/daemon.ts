@@ -12,7 +12,7 @@ import { join } from "node:path";
 import type { Channel, InboundMessage } from "./channels/channel.ts";
 import { WebChannel } from "./channels/web.ts";
 import { getAppDir, getBundledWebUiDir, getConfigPath, getWorkspace, loadConfig } from "./config.ts";
-import { CronScheduler, getCronJobsPath, setCronScheduler } from "./extensions/cron/index.ts";
+import { CronScheduler, getCronJobsPath, setCronScheduler, setScheduleTaskScheduler } from "./extensions/cron/index.ts";
 import { initNotifications } from "./notifications.ts";
 import {
 	getActiveSessionName,
@@ -281,6 +281,7 @@ async function initializeChannels(): Promise<void> {
 		cronScheduler.stop();
 		cronScheduler = null;
 		setCronScheduler(null);
+		setScheduleTaskScheduler(null);
 	}
 	if (config.cron?.enabled !== false) {
 		cronScheduler = new CronScheduler({
@@ -294,6 +295,7 @@ async function initializeChannels(): Promise<void> {
 			},
 		});
 		setCronScheduler(cronScheduler);
+		setScheduleTaskScheduler(cronScheduler);
 		const started = cronScheduler.start();
 		if (started) {
 			console.log("[daemon] Cron scheduler started.");
@@ -315,6 +317,7 @@ async function restartChannels(): Promise<void> {
 		cronScheduler.stop();
 		cronScheduler = null;
 		setCronScheduler(null);
+		setScheduleTaskScheduler(null);
 	}
 
 	// Stop existing channels
@@ -404,6 +407,7 @@ export async function startDaemon(): Promise<void> {
 			cronScheduler.stop();
 			cronScheduler = null;
 			setCronScheduler(null);
+			setScheduleTaskScheduler(null);
 		}
 
 		// Stop channels
