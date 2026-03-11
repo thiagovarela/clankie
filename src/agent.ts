@@ -37,30 +37,48 @@ import { reloadAllSessions } from "./sessions.ts";
 
 // ─── Shared loader infrastructure ──────────────────────────────────────────────
 
-/**
- * Build the standard set of extension factories for clankie sessions.
- * Includes cron, heartbeat, and (optionally) workspace jail.
- */
-export function buildExtensionFactories(config: AppConfig, cwd: string): ExtensionFactory[] {
-	const extensionFactories: ExtensionFactory[] = [];
+type NamedExtensionFactory = {
+	name: string;
+	factory: ExtensionFactory;
+};
+
+function buildNamedExtensionFactories(config: AppConfig, cwd: string): NamedExtensionFactory[] {
+	const named: NamedExtensionFactory[] = [];
 	const agentDir = getAgentDir(config);
-	extensionFactories.push(createAgentContextFilesExtension(agentDir));
-	extensionFactories.push(createCronExtension());
-	extensionFactories.push(createScheduleTaskTool());
-	extensionFactories.push(createHeartbeatExtension());
-	extensionFactories.push(createWebNotificationsExtension());
-	extensionFactories.push(createPackageManagerExtension(reloadAllSessions));
-	extensionFactories.push(createReloadRuntimeExtension(reloadAllSessions));
+
+	named.push({ name: "agent-context-files", factory: createAgentContextFilesExtension(agentDir) });
+	named.push({ name: "cron", factory: createCronExtension() });
+	named.push({ name: "schedule-task", factory: createScheduleTaskTool() });
+	named.push({ name: "heartbeat", factory: createHeartbeatExtension() });
+	named.push({ name: "web-notifications", factory: createWebNotificationsExtension() });
+	named.push({ name: "package-manager", factory: createPackageManagerExtension(reloadAllSessions) });
+	named.push({ name: "reload-runtime", factory: createReloadRuntimeExtension(reloadAllSessions) });
 
 	const restrictToWorkspace = config.agent?.restrictToWorkspace ?? true; // default: enabled
 	if (restrictToWorkspace) {
 		const configuredAllowedPaths = config.agent?.allowedPaths ?? [];
 		const attachmentRoot = join(getAppDir(), "attachments");
 		const allowedPaths = Array.from(new Set([...configuredAllowedPaths, attachmentRoot]));
-		extensionFactories.push(createWorkspaceJailExtension(cwd, allowedPaths));
+		named.push({ name: "workspace-jail", factory: createWorkspaceJailExtension(cwd, allowedPaths) });
 	}
 
-	return extensionFactories;
+	return named;
+}
+
+/**
+ * Build the standard set of extension factories for clankie sessions.
+ * Includes cron, heartbeat, and (optionally) workspace jail.
+ */
+export function buildExtensionFactories(config: AppConfig, cwd: string): ExtensionFactory[] {
+	return buildNamedExtensionFactories(config, cwd).map((entry) => entry.factory);
+}
+
+/**
+ * Names for bundled inline extensions in the same order they are registered.
+ * Used for human-friendly startup logging.
+ */
+export function getInlineExtensionNames(config: AppConfig, cwd: string): string[] {
+	return buildNamedExtensionFactories(config, cwd).map((entry) => entry.name);
 }
 
 /**

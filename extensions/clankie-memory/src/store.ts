@@ -12,6 +12,7 @@ export class MemoryStore {
 	private db: Awaited<ReturnType<typeof connectFn>> | null = null;
 	private config: MemoryConfig;
 	private hasFts = false;
+	private capabilityProbeLogged = false;
 
 	constructor(config: MemoryConfig) {
 		this.config = config;
@@ -38,6 +39,62 @@ export class MemoryStore {
 		if (this.db) {
 			await this.db.close();
 			this.db = null;
+		}
+	}
+
+	private formatError(err: unknown): string {
+		if (err instanceof Error) return err.message;
+		if (typeof err === "string") return err;
+		try {
+			return JSON.stringify(err);
+		} catch {
+			return String(err);
+		}
+	}
+
+	private async logCapabilityProbe(reason: string, err?: unknown): Promise<void> {
+		if (!this.db || this.capabilityProbeLogged) return;
+		this.capabilityProbeLogged = true;
+
+		console.warn(`[memory] Capability probe (${reason}) for db: ${this.config.dbPath}`);
+		if (err) {
+			console.warn(`[memory] Triggering error: ${this.formatError(err)}`);
+		}
+
+		try {
+			const row = await this.db.prepare(`SELECT sqlite_version() AS version`).get();
+			const version = (row as Record<string, unknown> | null)?.version;
+			if (version) {
+				console.warn(`[memory] sqlite_version(): ${String(version)}`);
+			}
+		} catch (versionErr) {
+			console.warn(`[memory] sqlite_version() probe failed: ${this.formatError(versionErr)}`);
+		}
+
+		try {
+			await this.db.prepare(`SELECT vector_distance_cos(vector8('[1,0]'), vector8('[1,0]')) AS score`).get();
+			console.warn(`[memory] Vector probe: OK`);
+		} catch (vectorErr) {
+			console.warn(`[memory] Vector probe: FAILED (${this.formatError(vectorErr)})`);
+		}
+
+		const suffix = Math.random().toString(36).slice(2, 10);
+		const probeTable = `__memory_fts_probe_${suffix}`;
+		const probeIndex = `__memory_fts_probe_idx_${suffix}`;
+		try {
+			await this.db.exec(`CREATE TABLE "${probeTable}" (id INTEGER PRIMARY KEY, content TEXT);`);
+			await this.db.exec(`CREATE INDEX "${probeIndex}" ON "${probeTable}" USING fts(content);`);
+			console.warn(`[memory] FTS index-method probe: OK (USING fts is supported)`);
+			await this.db.exec(`DROP INDEX "${probeIndex}";`);
+			await this.db.exec(`DROP TABLE "${probeTable}";`);
+		} catch (ftsErr) {
+			console.warn(`[memory] FTS index-method probe: FAILED (${this.formatError(ftsErr)})`);
+			try {
+				await this.db.exec(`DROP INDEX IF EXISTS "${probeIndex}";`);
+				await this.db.exec(`DROP TABLE IF EXISTS "${probeTable}";`);
+			} catch {
+				// ignore cleanup errors
+			}
 		}
 	}
 
@@ -78,17 +135,19 @@ export class MemoryStore {
 		`);
 
 		// TursoDB FTS using Tantivy (not SQLite FTS5)
-		// Try to create FTS index - may fail if experimental feature not enabled
+		// Try to create FTS index - may fail if index methods are unavailable
 		try {
 			await this.db.exec(`
 				CREATE INDEX IF NOT EXISTS idx_memories_fts 
 				ON memories USING fts (content);
 			`);
 			this.hasFts = true;
-		} catch {
+			console.log("[memory] FTS index available (USING fts)");
+		} catch (err) {
 			// FTS not available, will fall back to LIKE search
 			this.hasFts = false;
-			console.log("[memory] FTS index not available, using LIKE-based search");
+			console.warn(`[memory] FTS index not available, using LIKE-based search: ${this.formatError(err)}`);
+			await this.logCapabilityProbe("fts-index-create", err);
 		}
 
 		// Metadata table
@@ -280,8 +339,8 @@ export class MemoryStore {
 				`).all(query, query, limit);
 
 				// Normalize scores (BM25 scores aren't bounded)
-				const maxScore = rows.length > 0 
-					? Math.max(...(rows as Record<string, unknown>[]).map(r => r.score as number))
+				const maxScore = rows.length > 0
+					? Math.max(...(rows as Record<string, unknown>[]).map((r) => r.score as number))
 					: 1;
 
 				return (rows as Record<string, unknown>[]).map((row) => ({
@@ -299,9 +358,11 @@ export class MemoryStore {
 					score: (row.score as number) / maxScore,
 					textScore: (row.score as number) / maxScore,
 				}));
-			} catch {
+			} catch (err) {
 				// FTS query failed, fall back to LIKE
 				this.hasFts = false;
+				console.warn(`[memory] FTS query failed, falling back to LIKE: ${this.formatError(err)}`);
+				await this.logCapabilityProbe("fts-query", err);
 			}
 		}
 

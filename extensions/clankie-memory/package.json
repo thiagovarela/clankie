@@ -16,7 +16,9 @@
 	"scripts": {
 		"typecheck": "npx tsgo --noEmit",
 		"test:model": "npx tsx tests/model-load.ts",
-		"test:model:strict": "MEMORY_TEST_STRICT=1 npx tsx tests/model-load.ts"
+		"test:model:strict": "MEMORY_TEST_STRICT=1 npx tsx tests/model-load.ts",
+		"test:local-vector": "npx tsx tests/local-vector-compat.ts",
+		"test:local-vector:strict": "MEMORY_TEST_STRICT=1 npx tsx tests/local-vector-compat.ts"
 	},
 	"pi": {
 		"extensions": [

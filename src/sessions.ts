@@ -16,7 +16,7 @@ import {
 	ModelRegistry,
 	SessionManager,
 } from "@mariozechner/pi-coding-agent";
-import { createResourceLoader, resolveModelFromConfig } from "./agent.ts";
+import { createResourceLoader, getInlineExtensionNames, resolveModelFromConfig } from "./agent.ts";
 import type { Attachment } from "./channels/channel.ts";
 import { type AppConfig, getAgentDir, getAppDir, getAuthPath, getWorkspace } from "./config.ts";
 import { resolveScopedModels } from "./lib/scoped-model-resolver.ts";
@@ -122,14 +122,25 @@ export async function logStartupLoadedResources(config: AppConfig): Promise<void
 	const { loader } = await createResourceLoader(config);
 
 	const pathMetadata = loader.getPathMetadata();
+	const inlineNames = getInlineExtensionNames(config, cwd);
 
 	const extensionItems = loader.getExtensions().extensions.map((extension) => {
 		const metadata =
 			(pathMetadata.get(extension.path) as ResourcePathMetadata | undefined) ??
 			(pathMetadata.get(extension.resolvedPath) as ResourcePathMetadata | undefined);
+		const inlineMatch = extension.path.match(/^<inline:(\d+)>$/);
+		let displayPath = toDisplayPath(extension.resolvedPath, metadata?.baseDir);
+		if (inlineMatch) {
+			const inlineIndex = Number.parseInt(inlineMatch[1] ?? "0", 10) - 1;
+			const inlineName = inlineNames[inlineIndex];
+			if (inlineName) {
+				displayPath = `${inlineName} (${displayPath})`;
+			}
+		}
+
 		return {
 			source: getSourceLabel(metadata, extension.resolvedPath, cwd, agentDir),
-			path: toDisplayPath(extension.resolvedPath, metadata?.baseDir),
+			path: displayPath,
 		};
 	});
 
