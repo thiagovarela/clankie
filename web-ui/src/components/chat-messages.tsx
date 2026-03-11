@@ -1,5 +1,5 @@
 import { useStore } from '@tanstack/react-store'
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { MessageBubble } from './message-bubble'
 import { ThinkingStepsIndicator } from './thinking-steps-indicator'
 import type { DisplayMessage } from '@/stores/messages'
@@ -8,6 +8,8 @@ import { messagesStore } from '@/stores/messages'
 type MessageGroup =
   | { type: 'message'; message: DisplayMessage }
   | { type: 'thinking-steps'; messages: Array<DisplayMessage> }
+
+const AUTO_SCROLL_THRESHOLD_PX = 96
 
 /**
  * Check if a message is thinking-only (no text content, but has thinking content)
@@ -57,11 +59,35 @@ export function ChatMessages() {
     messages: state.messages,
   }))
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
+  const shouldAutoScrollRef = useRef(true)
+  const previousMessageCountRef = useRef(0)
 
-  // Auto-scroll to bottom when messages change
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const distanceFromBottom =
+      container.scrollHeight - container.scrollTop - container.clientHeight
+
+    shouldAutoScrollRef.current = distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX
+  }, [])
+
+  // Auto-scroll only when the user is near the bottom.
+  // During token streaming we use instant scroll to avoid repeated smooth-scroll flicker.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const hasNewMessage = messages.length > previousMessageCountRef.current
+    const isStreamingUpdate =
+      messages[messages.length - 1]?.isStreaming === true
+
+    if (shouldAutoScrollRef.current) {
+      bottomRef.current?.scrollIntoView({
+        behavior: hasNewMessage && !isStreamingUpdate ? 'smooth' : 'auto',
+      })
+    }
+
+    previousMessageCountRef.current = messages.length
   }, [messages])
 
   if (messages.length === 0) {
@@ -102,6 +128,8 @@ export function ChatMessages() {
 
   return (
     <div
+      ref={scrollContainerRef}
+      onScroll={handleScroll}
       className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 chat-background"
       style={{ paddingBottom: '180px' }}
     >

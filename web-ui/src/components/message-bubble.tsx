@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { AssistantMessageContent } from './assistant-message-content'
 import { MessageAttachments } from './message-attachments'
 import type { DisplayMessage } from '@/stores/messages'
@@ -9,6 +10,25 @@ interface MessageBubbleProps {
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user'
+  const [showStreamingIndicator, setShowStreamingIndicator] = useState(
+    Boolean(message.isStreaming),
+  )
+
+  useEffect(() => {
+    if (message.isStreaming) {
+      setShowStreamingIndicator(true)
+      return
+    }
+
+    // Keep the indicator visible briefly to avoid rapid hide/show flicker
+    const timeoutId = window.setTimeout(() => {
+      setShowStreamingIndicator(false)
+    }, 180)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [message.isStreaming])
 
   return (
     <div
@@ -37,7 +57,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           <AssistantMessageContent message={message} />
         )}
 
-        {message.isStreaming && !isUser && (
+        {showStreamingIndicator && !isUser && (
           <span className="ml-2 inline-flex gap-1">
             <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-primary/60" />
             <span className="typing-dot inline-block h-1.5 w-1.5 rounded-full bg-primary/60" />
