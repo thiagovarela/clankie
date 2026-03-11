@@ -2,6 +2,9 @@
 
 Render structured UI cards in clankie chats using `details.uiSpec`.
 
+> **Note**
+> While some `@clankie` extensions may work with a bare pi installation, they are crafted to be used with clankie (built on top of pi).
+
 This extension adds one tool:
 
 - `render_json_ui` — returns a valid `details.uiSpec` payload

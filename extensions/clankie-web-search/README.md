@@ -2,6 +2,9 @@
 
 Headless web search and page extraction for clankie using CloakBrowser + Playwright.
 
+> **Note**
+> While some `@clankie` extensions may work with a bare pi installation, they are crafted to be used with clankie (built on top of pi).
+
 ## Tools
 
 - `web_search` — search DuckDuckGo (HTML results) and return title/link/snippet blocks

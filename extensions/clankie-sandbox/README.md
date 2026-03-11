@@ -2,6 +2,9 @@
 
 Runs bash commands inside a [Gondolin](https://github.com/earendil-works/gondolin) micro-VM. Transparent — just turn it on and all shell execution is sandboxed.
 
+> **Note**
+> While some `@clankie` extensions may work with a bare pi installation, they are crafted to be used with clankie (built on top of pi).
+
 File tools (read/write/edit) stay on the host as-is — workspace-jail handles those. The workspace is mounted into the VM via VFS, so bash commands see the same files.
 
 ## Setup

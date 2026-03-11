@@ -2,6 +2,9 @@
 
 Persistent memory for clankie using **TursoDB** with native vector search.
 
+> **Note**
+> While some `@clankie` extensions may work with a bare pi installation, they are crafted to be used with clankie (built on top of pi).
+
 ## Features
 
 - **Native vector search** — Uses TursoDB's `F8_BLOB` for 75% storage savings and `vector_distance_cos()` for SQL-native similarity
