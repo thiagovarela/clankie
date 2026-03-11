@@ -21,20 +21,39 @@
  *   clankie config set <path> <value>   Set a config value by dot-path
  *   clankie config unset <path>         Remove a config value
  *   clankie config path                 Show config file path
+ *   clankie agents reset                Reset AGENTS.md/IDENTITY.md/SOUL.md/USER.md to defaults
  */
 
 import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import * as readline from "node:readline/promises";
 import { AuthStorage, runPrintMode } from "@mariozechner/pi-coding-agent";
 import JSON5 from "json5";
 import { createSession } from "./agent.ts";
 import { buildApiKeyProviders } from "./auth/providers.ts";
-import { getAuthPath, getByPath, getConfigPath, loadConfig, saveConfig, setByPath, unsetByPath } from "./config.ts";
+import {
+	getAgentDir,
+	getAuthPath,
+	getByPath,
+	getConfigPath,
+	getWorkspace,
+	loadConfig,
+	saveConfig,
+	setByPath,
+	unsetByPath,
+} from "./config.ts";
 import { isRunning, restartDaemon, startDaemon, stopDaemon } from "./daemon.ts";
-import { hasInstalledService, installService, restartInstalledService, showServiceLogs, showServiceStatus, uninstallService } from "./service.ts";
+import { getManagedContextFileSpecs, writeManagedContextTemplates } from "./extensions/agent-context-files.ts";
+import {
+	hasInstalledService,
+	installService,
+	restartInstalledService,
+	showServiceLogs,
+	showServiceStatus,
+	uninstallService,
+} from "./service.ts";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,7 +62,7 @@ function printHelp(): void {
 
 Usage:
   clankie send "<message>"          Send a message, print response, exit
-  clankie init                      Set up clankie (generates auth token, configures web channel)
+  clankie init                      Set up clankie (web auth token + default context files)
   clankie login                     Authenticate with your AI provider
   clankie start [--foreground]      Start the daemon (foreground by default)
   clankie stop                      Stop the daemon
@@ -59,6 +78,7 @@ Usage:
   clankie config get <path>         Get a config value (dot-path)
   clankie config set <path> <value> Set a config value (dot-path)
   clankie config unset <path>       Remove a config value
+  clankie agents reset              Reset AGENTS.md/IDENTITY.md/SOUL.md/USER.md to defaults
   clankie --help, -h                Show this help
 
 Config file: ~/.clankie/clankie.json (JSON5 — comments and trailing commas allowed)
@@ -81,7 +101,7 @@ Session commands (when running as daemon):
 
 Examples:
   # Quick start
-  clankie init                          # generates token, configures web channel
+  clankie init                          # generates token + default context files
   clankie login                         # authenticate with AI provider
   clankie start                         # starts daemon, prints connect URL
   
@@ -95,6 +115,9 @@ Examples:
   # System service
   clankie daemon install                # install as system service (auto-start on boot)
   clankie daemon logs                   # tail daemon logs
+
+  # Reset default context templates
+  clankie agents reset
 
 Credentials are stored at ~/.clankie/auth.json (separate from pi's auth).
 `);
@@ -137,6 +160,40 @@ function getLatestPublishedVersion(): string | undefined {
 	if (result.status !== 0) return undefined;
 	const version = result.stdout.trim();
 	return version || undefined;
+}
+
+function getContextTemplateInputs(config: ReturnType<typeof loadConfig>): { agentDir: string; workspaceDir: string } {
+	return {
+		agentDir: getAgentDir(config),
+		workspaceDir: getWorkspace(config),
+	};
+}
+
+async function ensureManagedContextFiles(rl: readline.Interface, config: ReturnType<typeof loadConfig>): Promise<void> {
+	const { agentDir, workspaceDir } = getContextTemplateInputs(config);
+	const specs = getManagedContextFileSpecs(agentDir, workspaceDir);
+
+	for (const spec of specs) {
+		if (existsSync(spec.path)) {
+			console.log(`✓ ${spec.filename} already exists at ${spec.path}.\n`);
+			const answer = await rl.question(`Reset ${spec.filename} to clankie default template? (y/N): `);
+			if (answer.trim().toLowerCase() === "y") {
+				writeManagedContextTemplates(agentDir, workspaceDir, [spec.id]);
+				console.log(`\n✓ Reset ${spec.filename} at ${spec.path}.\n`);
+			} else {
+				console.log(`\n✓ Keeping existing ${spec.filename}.\n`);
+			}
+			continue;
+		}
+
+		writeManagedContextTemplates(agentDir, workspaceDir, [spec.id]);
+		console.log(`✓ Created default ${spec.filename} at ${spec.path}.\n`);
+	}
+}
+
+function resetAllManagedContextFiles(config: ReturnType<typeof loadConfig>): string[] {
+	const { agentDir, workspaceDir } = getContextTemplateInputs(config);
+	return writeManagedContextTemplates(agentDir, workspaceDir).map((spec) => spec.path);
 }
 
 // ─── Command handlers ─────────────────────────────────────────────────────────
@@ -267,7 +324,7 @@ async function cmdLogin(_args: string[]): Promise<void> {
 async function cmdInit(_args: string[]): Promise<void> {
 	const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 
-	console.log("clankie setup — configuring web channel\n");
+	console.log("clankie setup — configuring web channel + context defaults\n");
 
 	const config = loadConfig();
 	const existingToken = config.channels?.web?.authToken;
@@ -305,12 +362,15 @@ async function cmdInit(_args: string[]): Promise<void> {
 	};
 
 	saveConfig(updated);
+	await ensureManagedContextFiles(rl, updated);
 
 	console.log(`Configuration saved to ${getConfigPath()}\n`);
 	console.log("Next steps:");
-	console.log("  1. Run 'clankie login' to authenticate with an AI provider");
-	console.log("  2. Run 'clankie start' to start the daemon");
-	console.log("  3. Open the connect URL printed by the daemon\n");
+	console.log("  1. Review/edit ~/.clankie/workspace/AGENTS.md");
+	console.log("  2. Review/edit ~/.clankie/IDENTITY.md, ~/.clankie/workspace/SOUL.md, ~/.clankie/workspace/USER.md");
+	console.log("  3. Run 'clankie login' to authenticate with an AI provider");
+	console.log("  4. Run 'clankie start' to start the daemon");
+	console.log("  5. Open the connect URL printed by the daemon\n");
 
 	rl.close();
 }
@@ -512,6 +572,29 @@ async function cmdConfig(args: string[]): Promise<void> {
 	process.exit(1);
 }
 
+function cmdAgents(args: string[]): void {
+	const [sub] = args;
+	if (!sub) {
+		console.error("Usage: clankie agents reset");
+		process.exit(1);
+	}
+
+	switch (sub) {
+		case "reset": {
+			const config = loadConfig();
+			const paths = resetAllManagedContextFiles(config);
+			console.log("Reset context files to default templates:");
+			for (const path of paths) {
+				console.log(`  - ${path}`);
+			}
+			return;
+		}
+		default:
+			console.error(`Unknown agents subcommand "${sub}".\n\nUsage: clankie agents reset`);
+			process.exit(1);
+	}
+}
+
 async function main(): Promise<void> {
 	const args = process.argv.slice(2);
 	const [command, ...rest] = args;
@@ -571,6 +654,10 @@ async function main(): Promise<void> {
 
 		case "config":
 			await cmdConfig(rest);
+			break;
+
+		case "agents":
+			cmdAgents(rest);
 			break;
 
 		default:

@@ -46,6 +46,8 @@ clankie login
 clankie start
 ```
 
+`clankie init` also creates default context files (`AGENTS.md`, `IDENTITY.md`, `SOUL.md`, `USER.md`) if missing.
+
 You should see output like:
 
 ```text
@@ -126,6 +128,9 @@ clankie stop
 
 # View configuration
 clankie config show
+
+# Reset AGENTS.md / IDENTITY.md / SOUL.md / USER.md to defaults
+clankie agents reset
 ```
 
 ## Configuration
@@ -148,6 +153,23 @@ clankie config set agent.model.primary "anthropic/claude-sonnet-4-5"
 # Workspace (where agent works)
 clankie config set agent.workspace "~/projects"
 ```
+
+### Default Context Files (OpenClaw-style)
+
+clankie ships built-in context templates owned by the `agent-context-files` extension.
+
+Created by `clankie init` (if missing):
+
+- `~/.clankie/workspace/AGENTS.md` (loaded natively by pi)
+- `~/.clankie/IDENTITY.md`
+- `~/.clankie/workspace/SOUL.md`
+- `~/.clankie/workspace/USER.md`
+
+`clankie agents reset` rewrites all of the files above to clankie defaults.
+
+Prompt loading order for extension-managed files:
+
+- `IDENTITY.md` → `SOUL.md` → `USER.md`
 
 ### Config Reference
 

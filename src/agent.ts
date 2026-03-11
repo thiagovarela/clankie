@@ -26,6 +26,7 @@ import {
 	SettingsManager,
 } from "@mariozechner/pi-coding-agent";
 import { type AppConfig, getAgentDir, getAppDir, getAuthPath, getWorkspace, loadConfig } from "./config.ts";
+import { createAgentContextFilesExtension } from "./extensions/agent-context-files.ts";
 import { createCronExtension } from "./extensions/cron/index.ts";
 import { createHeartbeatExtension } from "./extensions/heartbeat/index.ts";
 import { createPackageManagerExtension } from "./extensions/package-manager.ts";
@@ -42,6 +43,8 @@ import { reloadAllSessions } from "./sessions.ts";
  */
 export function buildExtensionFactories(config: AppConfig, cwd: string): ExtensionFactory[] {
 	const extensionFactories: ExtensionFactory[] = [];
+	const agentDir = getAgentDir(config);
+	extensionFactories.push(createAgentContextFilesExtension(agentDir));
 	extensionFactories.push(createCronExtension());
 	extensionFactories.push(createHeartbeatExtension());
 	extensionFactories.push(createWebNotificationsExtension());
