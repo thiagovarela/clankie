@@ -20,6 +20,9 @@ global.alert = mockAlert
 describe('ChatInput', () => {
   const mockClient = {
     prompt: vi.fn(),
+    abort: vi.fn(),
+    abortRetry: vi.fn(),
+    abortBash: vi.fn(),
     uploadAttachment: vi.fn(),
     getCommands: vi.fn(),
   }
@@ -249,6 +252,52 @@ describe('ChatInput', () => {
     })
   })
 
+  describe('Abort generation', () => {
+    it('calls abort when stop button is clicked while streaming', async () => {
+      const user = userEvent.setup()
+      mockClient.abort.mockResolvedValue({})
+
+      sessionStore.setState((state) => ({
+        ...state,
+        sessionId: 'test-session-123',
+        isStreaming: true,
+      }))
+
+      render(<ChatInput />)
+
+      await user.click(
+        screen.getByRole('button', { name: /Stop generation/i }),
+      )
+
+      await waitFor(() => {
+        expect(mockClient.abort).toHaveBeenCalledWith('test-session-123')
+        expect(mockClient.abortBash).toHaveBeenCalledWith('test-session-123')
+        expect(mockClient.abortRetry).toHaveBeenCalledWith('test-session-123')
+      })
+    })
+
+    it('calls abort on Escape while streaming', async () => {
+      const user = userEvent.setup()
+      mockClient.abort.mockResolvedValue({})
+
+      sessionStore.setState((state) => ({
+        ...state,
+        sessionId: 'test-session-123',
+        isStreaming: true,
+      }))
+
+      render(<ChatInput />)
+
+      await user.keyboard('{Escape}')
+
+      await waitFor(() => {
+        expect(mockClient.abort).toHaveBeenCalledWith('test-session-123')
+        expect(mockClient.abortBash).toHaveBeenCalledWith('test-session-123')
+        expect(mockClient.abortRetry).toHaveBeenCalledWith('test-session-123')
+      })
+    })
+  })
+
   describe('Disabled states', () => {
     it('disables inputs when no sessionId', () => {
       sessionStore.setState((state) => ({
@@ -267,7 +316,7 @@ describe('ChatInput', () => {
       expect(attachButton).toBeDisabled()
     })
 
-    it('disables inputs when streaming', () => {
+    it('disables input controls and shows stop button when streaming', () => {
       sessionStore.setState((state) => ({
         ...state,
         sessionId: 'test-session-123',
@@ -277,12 +326,17 @@ describe('ChatInput', () => {
       render(<ChatInput />)
 
       const textarea = screen.getByPlaceholderText(/Send a message/i)
-      const sendButton = screen.getByRole('button', { name: /Send message/i })
+      const stopButton = screen.getByRole('button', {
+        name: /Stop generation/i,
+      })
       const attachButton = screen.getByTitle('Attach files')
 
       expect(textarea).toBeDisabled()
-      expect(sendButton).toBeDisabled()
+      expect(stopButton).not.toBeDisabled()
       expect(attachButton).toBeDisabled()
+      expect(
+        screen.queryByRole('button', { name: /Send message/i }),
+      ).not.toBeInTheDocument()
     })
 
     it('disables send button when message is empty and no attachments', () => {

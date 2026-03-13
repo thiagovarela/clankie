@@ -1,7 +1,11 @@
 import { useStore } from '@tanstack/react-store'
-import { Paperclip, Send, Slash } from 'lucide-react'
+import { Paperclip, Send, Slash, Square } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ClipboardEvent, DragEvent, KeyboardEvent } from 'react'
+import type {
+  ClipboardEvent,
+  DragEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+} from 'react'
 import type { AttachmentItem } from '@/components/attachment-preview'
 import type { ImageContent } from '@/lib/types'
 import type { DisplayAttachment } from '@/stores/messages'
@@ -29,6 +33,7 @@ export function ChatInput() {
   const [isDragging, setIsDragging] = useState(false)
   const [isCommandPaletteDismissed, setIsCommandPaletteDismissed] =
     useState(false)
+  const [isAborting, setIsAborting] = useState(false)
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -54,6 +59,12 @@ export function ChatInput() {
       document.removeEventListener('mousedown', handlePointerDownOutside)
     }
   }, [showCommandPalette])
+
+  useEffect(() => {
+    if (!isStreaming) {
+      setIsAborting(false)
+    }
+  }, [isStreaming])
 
   // Convert File to base64
   const fileToBase64 = useCallback((file: File): Promise<string> => {
@@ -224,6 +235,56 @@ export function ChatInput() {
     setAttachments((prev) => prev.filter((att) => att.id !== id))
   }, [])
 
+  const handleAbort = useCallback(async () => {
+    if (!sessionId || !isStreaming || isAborting) return
+
+    const client = clientManager.getClient()
+    if (!client) {
+      console.error('No client available')
+      return
+    }
+
+    try {
+      setIsAborting(true)
+      const results = await Promise.allSettled([
+        client.abort(sessionId),
+        client.abortBash(sessionId),
+        client.abortRetry(sessionId),
+      ])
+
+      const failed = results.filter((result) => result.status === 'rejected')
+      if (failed.length > 0) {
+        console.error(
+          `Failed to stop ${failed.length} cancellation request(s):`,
+          failed,
+        )
+
+        // Let users retry stopping if every cancellation call failed.
+        if (failed.length === results.length) {
+          setIsAborting(false)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to abort generation:', err)
+      setIsAborting(false)
+    }
+  }, [sessionId, isStreaming, isAborting])
+
+  useEffect(() => {
+    if (!isStreaming) return
+
+    const handleGlobalKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      void handleAbort()
+    }
+
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleGlobalKeyDown)
+    }
+  }, [isStreaming, handleAbort])
+
   // Send message
   const handleSend = async () => {
     if (
@@ -307,11 +368,19 @@ export function ChatInput() {
     textareaRef.current?.focus()
   }
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Escape' && showCommandPalette) {
-      e.preventDefault()
-      setIsCommandPaletteDismissed(true)
-      return
+  const handleKeyDown = (e: ReactKeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Escape') {
+      if (showCommandPalette) {
+        e.preventDefault()
+        setIsCommandPaletteDismissed(true)
+        return
+      }
+
+      if (isStreaming) {
+        e.preventDefault()
+        void handleAbort()
+        return
+      }
     }
 
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -416,21 +485,33 @@ export function ChatInput() {
 
             <div className="flex items-center gap-2">
               <kbd className="hidden sm:inline-flex h-6 items-center rounded border border-border/50 bg-muted/50 px-2 text-[10px] font-medium text-muted-foreground">
-                Enter
+                {isStreaming ? 'Esc' : 'Enter'}
               </kbd>
-              <Button
-                onClick={handleSend}
-                disabled={
-                  (!message.trim() && attachments.length === 0) ||
-                  !sessionId ||
-                  isStreaming
-                }
-                size="icon-sm"
-                className="h-8 w-8 transition-transform hover:scale-105 active:scale-95"
-              >
-                <Send className="h-4 w-4" />
-                <span className="sr-only">Send message</span>
-              </Button>
+              {isStreaming ? (
+                <Button
+                  onClick={() => void handleAbort()}
+                  disabled={!sessionId || isAborting}
+                  size="icon-sm"
+                  variant="destructive"
+                  className="h-8 w-8 transition-transform hover:scale-105 active:scale-95"
+                  title="Stop generation"
+                >
+                  <Square className="h-3.5 w-3.5" />
+                  <span className="sr-only">Stop generation</span>
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleSend}
+                  disabled={
+                    (!message.trim() && attachments.length === 0) || !sessionId
+                  }
+                  size="icon-sm"
+                  className="h-8 w-8 transition-transform hover:scale-105 active:scale-95"
+                >
+                  <Send className="h-4 w-4" />
+                  <span className="sr-only">Send message</span>
+                </Button>
+              )}
             </div>
           </div>
         </div>

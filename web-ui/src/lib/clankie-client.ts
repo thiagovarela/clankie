@@ -139,6 +139,14 @@ export class ClankieClient {
     await this.sendCommand({ type: 'abort' }, sessionId)
   }
 
+  async abortRetry(sessionId: string): Promise<void> {
+    await this.sendCommand({ type: 'abort_retry' }, sessionId)
+  }
+
+  async abortBash(sessionId: string): Promise<void> {
+    await this.sendCommand({ type: 'abort_bash' }, sessionId)
+  }
+
   async uploadAttachment(
     sessionId: string,
     fileName: string,
