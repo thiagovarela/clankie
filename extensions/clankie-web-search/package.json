@@ -1,6 +1,6 @@
 {
   "name": "@clankie/web-search",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "Headless web search and page extraction for clankie using CloakBrowser + Playwright",
   "type": "module",
   "license": "MIT",
